@@ -1,0 +1,366 @@
+@page "/listastolowtest"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Net
+@using System.Text
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using StolyDoGrania.Data
+@using StolyDoGrania.Data.Table
+@inject ApplicationDbContext Db
+@inject NavigationManager Nav
+
+<PageTitle>ListaStolowTest</PageTitle>
+
+<h1>ListaStolowTest</h1>
+
+<p><a href="">&larr; Strona główna</a></p>
+
+<button type="button" class="btn btn-primary mb-3" @onclick="ToggleForm">
+    @(showForm ? "Anuluj" : "Dodaj stół")
+</button>
+
+@if (statusMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible" role="alert">
+        @statusMessage
+        <button type="button" class="btn-close" aria-label="Zamknij" @onclick="() => statusMessage = null"></button>
+    </div>
+}
+
+@if (showForm)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Nowy stół</h5>
+
+            <EditForm Model="model" OnValidSubmit="AddTableAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                @if (formError is not null)
+                {
+                    <div class="alert alert-danger" role="alert">@formError</div>
+                }
+
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <label class="form-label">Okładka</label>
+                        <div>
+                            <img src="@CoverPreviewSrc" alt="Podgląd okładki"
+                                 class="img-thumbnail" style="width:200px;height:200px;object-fit:cover;" />
+                        </div>
+                        <div class="mt-2 d-flex gap-2 flex-wrap">
+                            @if (customCover is null)
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RandomizeColor">Losuj kolor</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearCustomCover">Przywróć placeholder</button>
+                            }
+                        </div>
+                        <InputFile OnChange="OnCoverSelected" class="form-control form-control-sm mt-2"
+                                   accept="image/png,image/jpeg,image/webp,image/gif" />
+                        <div class="form-text">Własny obraz: PNG, JPEG, WebP lub GIF, maks. 2 MB.</div>
+                    </div>
+
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label class="form-label" for="tbl-name">Nazwa gry</label>
+                            <input id="tbl-name" class="form-control" maxlength="200"
+                                   @bind="model.Name" @bind:event="oninput" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-sm-6 mb-3">
+                                <label class="form-label" for="tbl-kind">Rodzaj stołu</label>
+                                <select id="tbl-kind" class="form-select" @bind="model.Kind">
+                                    <option value="@TableKind.Small">Mały</option>
+                                    <option value="@TableKind.Big">Duży</option>
+                                    <option value="@TableKind.Other">Inny</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-3 mb-3">
+                                <label class="form-label" for="tbl-diff">Trudność (0–5)</label>
+                                <input id="tbl-diff" type="number" class="form-control" step="0.1" min="0" max="5"
+                                       @bind="model.Difficulty" />
+                            </div>
+                            <div class="col-sm-3 mb-3">
+                                <label class="form-label" for="tbl-max">Maks. graczy</label>
+                                <input id="tbl-max" type="number" class="form-control" step="1" min="1" max="20"
+                                       @bind="model.MaxPlayers" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="tbl-bgg">Link do gry (BGG)</label>
+                            <input id="tbl-bgg" class="form-control" maxlength="500" @bind="model.BggUrl" />
+                        </div>
+
+                        <button type="submit" class="btn btn-success" disabled="@saving">Dodaj stół</button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (tables is null)
+{
+    <p><em>Ładowanie...</em></p>
+}
+else if (tables.Count == 0)
+{
+    <div class="alert alert-info">Brak stołów w bazie.</div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+        @foreach (var t in tables)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    @if (CoverSrc(t.Cover, t.CoverContentType) is { } src)
+                    {
+                        <img src="@src" class="card-img-top" alt="Okładka: @t.Name" style="object-fit:cover;max-height:200px;" />
+                    }
+                    <div class="card-body">
+                        <h5 class="card-title">@t.Name</h5>
+                        <p class="card-text mb-2">
+                            <span class="badge text-bg-secondary">@KindLabel(t.Kind)</span>
+                            <span class="badge text-bg-light border">Trudność: @t.Difficulty.ToString("0.00")</span>
+                        </p>
+                        <p class="card-text mb-2">
+                            Start: @(t.Start == default ? "nie ustalono" : t.Start.ToString("dd.MM.yyyy HH:mm"))<br />
+                            Zapisani: @t.ParticipantAmount / @t.AvailableSlots
+                            @if (t.IsFull)
+                            {
+                                <span class="badge text-bg-danger">Pełny</span>
+                            }
+                            @if (t.TakenSlots > 0)
+                            {
+                                <br /><small class="text-muted">Zajęte przez operatora: @t.TakenSlots</small>
+                            }
+                        </p>
+
+                        <ul class="list-group list-group-flush mb-2">
+                            @for (var slot = 1; slot <= t.MaxPlayers; slot++)
+                            {
+                                var name = t.Slots.GetValueOrDefault(slot);
+                                <li class="list-group-item px-0 py-1">
+                                    @slot.
+                                    @if (t.IsSlotTaken(slot))
+                                    {
+                                        <span class="text-danger">Zajęte</span>
+                                    }
+                                    else if (name is not null)
+                                    {
+                                        @name
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">wolne</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+
+                        @if (t.BggUrl is not null)
+                        {
+                            <a href="@t.BggUrl" target="_blank" rel="noopener noreferrer">BoardGameGeek</a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private const long MaxCoverBytes = 2 * 1024 * 1024;
+    private static readonly string[] AllowedCoverTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+    private List<PlayTable>? tables;
+    private NewTableModel model = new();
+    private bool showForm;
+    private bool saving;
+    private string? formError;
+    private string? statusMessage;
+
+    // Okładka: albo placeholder (kwadrat w losowym kolorze z tytułem), albo własny obraz.
+    private int coverHue;
+    private byte[]? customCover;
+    private string? customCoverType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        tables = await Db.Tables
+            .AsNoTracking()
+            .Include(t => t.Participants)
+            .OrderBy(t => t.Name)
+            .ToListAsync();
+    }
+
+    private void ToggleForm()
+    {
+        if (!showForm)
+        {
+            ResetForm();
+        }
+        showForm = !showForm;
+    }
+
+    private void ResetForm()
+    {
+        model = new NewTableModel { BggUrl = Nav.BaseUri };
+        customCover = null;
+        customCoverType = null;
+        formError = null;
+        RandomizeColor();
+    }
+
+    private void RandomizeColor() => coverHue = Random.Shared.Next(360);
+
+    private void ClearCustomCover()
+    {
+        customCover = null;
+        customCoverType = null;
+    }
+
+    private async Task OnCoverSelected(InputFileChangeEventArgs e)
+    {
+        formError = null;
+        var file = e.File;
+
+        if (!AllowedCoverTypes.Contains(file.ContentType))
+        {
+            formError = "Okładka musi być obrazem PNG, JPEG, WebP lub GIF.";
+            return;
+        }
+
+        if (file.Size > MaxCoverBytes)
+        {
+            formError = "Okładka może mieć maksymalnie 2 MB.";
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(MaxCoverBytes);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+
+        customCover = buffer.ToArray();
+        customCoverType = file.ContentType;
+    }
+
+    private async Task AddTableAsync()
+    {
+        formError = null;
+
+        var name = model.Name.Trim();
+
+        Uri? bggUrl = null;
+        if (!string.IsNullOrWhiteSpace(model.BggUrl))
+        {
+            if (!Uri.TryCreate(model.BggUrl.Trim(), UriKind.Absolute, out bggUrl)
+                || (bggUrl.Scheme != Uri.UriSchemeHttp && bggUrl.Scheme != Uri.UriSchemeHttps))
+            {
+                formError = "Link do gry musi być poprawnym adresem http(s).";
+                return;
+            }
+        }
+
+        byte[] cover;
+        string coverContentType;
+        if (customCover is not null && customCoverType is not null)
+        {
+            cover = customCover;
+            coverContentType = customCoverType;
+        }
+        else
+        {
+            cover = Encoding.UTF8.GetBytes(BuildPlaceholderSvg(name));
+            coverContentType = "image/svg+xml";
+        }
+
+        var table = new PlayTable
+        {
+            Name = name,
+            Kind = model.Kind,
+            Difficulty = Math.Round(model.Difficulty, 2),
+            MaxPlayers = model.MaxPlayers,
+            BggUrl = bggUrl,
+            Cover = cover,
+            CoverContentType = coverContentType
+            // Id nadaje baza; Participants (Slots) na starcie są puste.
+        };
+
+        saving = true;
+        try
+        {
+            Db.Tables.Add(table);
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            formError = "Nie udało się zapisać stołu w bazie danych.";
+            return;
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            saving = false;
+        }
+
+        statusMessage = $"Dodano stół „{name}”.";
+        showForm = false;
+        await LoadAsync();
+    }
+
+    // --- okładka / prezentacja ---
+
+    private string BuildPlaceholderSvg(string title) =>
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"300\" viewBox=\"0 0 300 300\">" +
+        $"<rect width=\"300\" height=\"300\" fill=\"hsl({coverHue}, 60%, 40%)\"/>" +
+        "<text x=\"150\" y=\"150\" text-anchor=\"middle\" dominant-baseline=\"middle\" fill=\"white\" font-family=\"sans-serif\">" +
+        WebUtility.HtmlEncode(title) +
+        "</text></svg>";
+
+    private string CoverPreviewSrc => customCover is not null
+        ? CoverSrc(customCover, customCoverType)!
+        : CoverSrc(Encoding.UTF8.GetBytes(BuildPlaceholderSvg(model.Name.Trim())), "image/svg+xml")!;
+
+    private static string? CoverSrc(byte[]? cover, string? contentType) =>
+        cover is { Length: > 0 }
+            ? $"data:{contentType ?? "image/jpeg"};base64,{Convert.ToBase64String(cover)}"
+            : null;
+
+    private static string KindLabel(TableKind kind) => kind switch
+    {
+        TableKind.Small => "Mały",
+        TableKind.Big => "Duży",
+        _ => "Inny"
+    };
+
+    private sealed class NewTableModel
+    {
+        [Required(ErrorMessage = "Podaj nazwę gry.")]
+        [StringLength(200, ErrorMessage = "Nazwa może mieć maksymalnie 200 znaków.")]
+        public string Name { get; set; } = string.Empty;
+
+        public TableKind Kind { get; set; } = TableKind.Small;
+
+        [Range(typeof(decimal), "0", "5", ErrorMessage = "Trudność musi mieścić się w zakresie 0–5.")]
+        public decimal Difficulty { get; set; } = 2.5m;
+
+        [Range(1, 20, ErrorMessage = "Maksymalna liczba graczy: 1–20.")]
+        public int MaxPlayers { get; set; } = 4;
+
+        public string? BggUrl { get; set; }
+    }
+}
