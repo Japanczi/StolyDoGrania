@@ -1,15 +1,18 @@
-using StolyDoGrania.Data.Table;
-
-namespace StolyDoGrania;
-
-/// <summary>Jeden zapisany uczestnik na konkretnym miejscu przy stole (tabela TableSlots).</summary>
-public class TableSlot
+namespace StolyDoGrania.Data.Table
 {
-    public int TableId { get; set; }
-    public PlayTable Table { get; set; } = null!;
+    /// <summary>Jeden zapisany uczestnik na konkretnym miejscu przy stole (tabela TableSlots).</summary>
+    public class TableSlot
+    {
+        public int PlayTableId { get; set; }
+        public PlayTable PlayTable { get; set; } = null!;
 
-    /// <summary>Numer miejsca (1..MaxPlayers).</summary>
-    public int SlotNumber { get; set; }
+        /// <summary>Numer miejsca (1..MaxPlayers).</summary>
+        public int SlotNumber { get; set; }
 
-    public string ParticipantName { get; set; } = string.Empty;
+        /// <summary>Nazwa wyświetlana przy miejscu.</summary>
+        public string ParticipantName { get; set; } = string.Empty;
+
+        /// <summary>Id zalogowanego użytkownika, który zajął to miejsce (tylko on może je zwolnić).</summary>
+        public string? UserId { get; set; }
+    }
 }

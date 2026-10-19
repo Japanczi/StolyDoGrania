@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace StolyDoGrania.Migrations
 {
     /// <inheritdoc />
-    public partial class CreateIdentitySchema : Migration
+    public partial class Poczatkowa : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -48,6 +48,25 @@ namespace StolyDoGrania.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Games",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Difficulty = table.Column<decimal>(type: "TEXT", precision: 3, scale: 2, nullable: false),
+                    MaxPlayers = table.Column<int>(type: "INTEGER", nullable: false),
+                    BggUrl = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    Cover = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    CoverContentType = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Games", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -175,6 +194,47 @@ namespace StolyDoGrania.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "PlayTables",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    GameId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Start = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    MaxPlayers = table.Column<int>(type: "INTEGER", nullable: false),
+                    TakenSlots = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PlayTables", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PlayTables_Games_GameId",
+                        column: x => x.GameId,
+                        principalTable: "Games",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TableSlots",
+                columns: table => new
+                {
+                    PlayTableId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SlotNumber = table.Column<int>(type: "INTEGER", nullable: false),
+                    ParticipantName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TableSlots", x => new { x.PlayTableId, x.SlotNumber });
+                    table.ForeignKey(
+                        name: "FK_TableSlots_PlayTables_PlayTableId",
+                        column: x => x.PlayTableId,
+                        principalTable: "PlayTables",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
@@ -216,6 +276,17 @@ namespace StolyDoGrania.Migrations
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Games_Name",
+                table: "Games",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PlayTables_GameId",
+                table: "PlayTables",
+                column: "GameId");
         }
 
         /// <inheritdoc />
@@ -240,10 +311,19 @@ namespace StolyDoGrania.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "TableSlots");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "PlayTables");
+
+            migrationBuilder.DropTable(
+                name: "Games");
         }
     }
 }

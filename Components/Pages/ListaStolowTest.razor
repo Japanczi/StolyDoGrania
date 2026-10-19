@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using System.Net
+@using System.Security.Claims
 @using System.Text
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using StolyDoGrania.Data
@@ -16,9 +18,14 @@
 
 <p><a href="">&larr; Strona główna</a></p>
 
-<button type="button" class="btn btn-primary mb-3" @onclick="ToggleForm">
-    @(showForm ? "Anuluj" : "Dodaj stół")
-</button>
+<div class="d-flex gap-2 mb-3">
+    <button type="button" class="btn btn-primary" @onclick="ToggleTableForm">
+        @(showTableForm ? "Anuluj" : "Dodaj stół")
+    </button>
+    <button type="button" class="btn btn-outline-primary" @onclick="() => OpenGameModal(string.Empty)">
+        Dodaj grę do katalogu
+    </button>
+</div>
 
 @if (statusMessage is not null)
 {
@@ -28,83 +35,106 @@
     </div>
 }
 
-@if (showForm)
+@if (slotError is not null)
+{
+    <div class="alert alert-warning alert-dismissible" role="alert">
+        @slotError
+        <button type="button" class="btn-close" aria-label="Zamknij" @onclick="() => slotError = null"></button>
+    </div>
+}
+
+@* ---------- Formularz: nowy stół ---------- *@
+@if (showTableForm)
 {
     <div class="card mb-4">
         <div class="card-body">
             <h5 class="card-title">Nowy stół</h5>
 
-            <EditForm Model="model" OnValidSubmit="AddTableAsync">
+            <EditForm Model="tableModel" OnValidSubmit="AddTableAsync">
                 <DataAnnotationsValidator />
                 <ValidationSummary class="text-danger" />
 
-                @if (formError is not null)
+                @if (tableError is not null)
                 {
-                    <div class="alert alert-danger" role="alert">@formError</div>
+                    <div class="alert alert-danger" role="alert">@tableError</div>
                 }
 
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <label class="form-label">Okładka</label>
-                        <div>
-                            <img src="@CoverPreviewSrc" alt="Podgląd okładki"
-                                 class="img-thumbnail" style="width:200px;height:200px;object-fit:cover;" />
-                        </div>
-                        <div class="mt-2 d-flex gap-2 flex-wrap">
-                            @if (customCover is null)
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="tbl-game">Gra</label>
+
+                        @* ComboBox: wpisywanie filtruje katalog; brak wyników = opcja dodania nowej gry *@
+                        <div class="position-relative">
+                            <input id="tbl-game" class="form-control" autocomplete="off" maxlength="200"
+                                   placeholder="Wpisz nazwę gry"
+                                   value="@gameQuery"
+                                   @oninput="OnGameQueryInput"
+                                   @onfocus="() => gameListOpen = true"
+                                   @onkeydown="OnGameKeyDown" />
+
+                            @if (gameListOpen)
                             {
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RandomizeColor">Losuj kolor</button>
-                            }
-                            else
-                            {
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearCustomCover">Przywróć placeholder</button>
+                                var matches = GameMatches.ToList();
+                                var query = gameQuery.Trim();
+                                <div class="list-group position-absolute w-100 shadow" style="z-index:1050;max-height:260px;overflow:auto;">
+                                    @if (matches.Count > 0)
+                                    {
+                                        @foreach (var g in matches)
+                                        {
+                                            <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                                                    @onclick="() => SelectGame(g)">
+                                                @if (CoverSrc(g.Cover, g.CoverContentType) is { } optSrc)
+                                                {
+                                                    <img src="@optSrc" alt="" style="width:24px;height:24px;object-fit:cover;" />
+                                                }
+                                                <span>@g.Name</span>
+                                            </button>
+                                        }
+                                    }
+                                    else if (query.Length > 0)
+                                    {
+                                        <button type="button" class="list-group-item list-group-item-action text-primary"
+                                                @onclick="() => OpenGameModal(query)">
+                                            ➕ Dodaj nową grę „@query”
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <div class="list-group-item text-muted">Katalog jest pusty – wpisz nazwę gry, aby dodać nową.</div>
+                                    }
+                                </div>
                             }
                         </div>
-                        <InputFile OnChange="OnCoverSelected" class="form-control form-control-sm mt-2"
-                                   accept="image/png,image/jpeg,image/webp,image/gif" />
-                        <div class="form-text">Własny obraz: PNG, JPEG, WebP lub GIF, maks. 2 MB.</div>
+                        @if (selectedGame is not null)
+                        {
+                            <div class="form-text text-success">Wybrano z katalogu: @selectedGame.Name</div>
+                        }
                     </div>
-
-                    <div class="col-md-8">
-                        <div class="mb-3">
-                            <label class="form-label" for="tbl-name">Nazwa gry</label>
-                            <input id="tbl-name" class="form-control" maxlength="200"
-                                   @bind="model.Name" @bind:event="oninput" />
-                        </div>
-
-                        <div class="row">
-                            <div class="col-sm-6 mb-3">
-                                <label class="form-label" for="tbl-kind">Rodzaj stołu</label>
-                                <select id="tbl-kind" class="form-select" @bind="model.Kind">
-                                    <option value="@TableKind.Small">Mały</option>
-                                    <option value="@TableKind.Big">Duży</option>
-                                    <option value="@TableKind.Other">Inny</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-3 mb-3">
-                                <label class="form-label" for="tbl-diff">Trudność (0–5)</label>
-                                <input id="tbl-diff" type="number" class="form-control" step="0.1" min="0" max="5"
-                                       @bind="model.Difficulty" />
-                            </div>
-                            <div class="col-sm-3 mb-3">
-                                <label class="form-label" for="tbl-max">Maks. graczy</label>
-                                <input id="tbl-max" type="number" class="form-control" step="1" min="1" max="20"
-                                       @bind="model.MaxPlayers" />
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="tbl-bgg">Link do gry (BGG)</label>
-                            <input id="tbl-bgg" class="form-control" maxlength="500" @bind="model.BggUrl" />
-                        </div>
-
-                        <button type="submit" class="btn btn-success" disabled="@saving">Dodaj stół</button>
+                    <div class="col-md-4">
+                        <label class="form-label" for="tbl-start">Start</label>
+                        <input id="tbl-start" type="datetime-local" class="form-control" @bind="tableModel.Start" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="tbl-max">Miejsc</label>
+                        <input id="tbl-max" type="number" class="form-control" step="1" min="1" max="20" @bind="tableModel.MaxPlayers" />
                     </div>
                 </div>
+
+                <button type="submit" class="btn btn-success mt-3" disabled="@saving">Dodaj stół</button>
             </EditForm>
         </div>
     </div>
 }
+
+@* ---------- Lista stołów (jeden pod drugim) ---------- *@
+<h2 class="h4">Stoły</h2>
+
+<datalist id="known-names">
+    @foreach (var n in KnownNames)
+    {
+        <option value="@n"></option>
+    }
+</datalist>
 
 @if (tables is null)
 {
@@ -116,64 +146,244 @@ else if (tables.Count == 0)
 }
 else
 {
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
-        @foreach (var t in tables)
-        {
-            <div class="col">
-                <div class="card h-100">
-                    @if (CoverSrc(t.Cover, t.CoverContentType) is { } src)
-                    {
-                        <img src="@src" class="card-img-top" alt="Okładka: @t.Name" style="object-fit:cover;max-height:200px;" />
-                    }
-                    <div class="card-body">
-                        <h5 class="card-title">@t.Name</h5>
-                        <p class="card-text mb-2">
-                            <span class="badge text-bg-secondary">@KindLabel(t.Kind)</span>
-                            <span class="badge text-bg-light border">Trudność: @t.Difficulty.ToString("0.00")</span>
-                        </p>
-                        <p class="card-text mb-2">
-                            Start: @(t.Start == default ? "nie ustalono" : t.Start.ToString("dd.MM.yyyy HH:mm"))<br />
-                            Zapisani: @t.ParticipantAmount / @t.AvailableSlots
-                            @if (t.IsFull)
-                            {
-                                <span class="badge text-bg-danger">Pełny</span>
-                            }
-                            @if (t.TakenSlots > 0)
-                            {
-                                <br /><small class="text-muted">Zajęte przez operatora: @t.TakenSlots</small>
-                            }
-                        </p>
+    @foreach (var t in tables)
+    {
+        var cols = Math.Min(4, Math.Max(1, t.MaxPlayers));
+        var alreadyIn = isLoggedIn && t.Participants.Any(p => p.UserId == userId && p.ParticipantName == displayName);
 
-                        <ul class="list-group list-group-flush mb-2">
-                            @for (var slot = 1; slot <= t.MaxPlayers; slot++)
-                            {
-                                var name = t.Slots.GetValueOrDefault(slot);
-                                <li class="list-group-item px-0 py-1">
-                                    @slot.
-                                    @if (t.IsSlotTaken(slot))
-                                    {
-                                        <span class="text-danger">Zajęte</span>
-                                    }
-                                    else if (name is not null)
-                                    {
-                                        @name
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">wolne</span>
-                                    }
-                                </li>
-                            }
-                        </ul>
+        <div class="card mb-3">
+            <div class="card-body d-flex flex-wrap align-items-start gap-4">
 
-                        @if (t.BggUrl is not null)
+                @* nazwa *@
+                <div style="width:180px;">
+                    <h5 class="mb-1">@t.Game.Name</h5>
+                    <div class="small text-muted">@(t.Start == default ? "Termin nie ustalony" : t.Start.ToString("dd.MM.yyyy HH:mm"))</div>
+                    <div class="small">
+                        Zapisani: @t.ParticipantAmount / @t.AvailableSlots
+                        @if (t.IsFull)
                         {
-                            <a href="@t.BggUrl" target="_blank" rel="noopener noreferrer">BoardGameGeek</a>
+                            <span class="badge text-bg-danger">Pełny</span>
                         }
                     </div>
                 </div>
+
+                @* okładka *@
+                <div style="width:80px;">
+                    @if (CoverSrc(t.Game.Cover, t.Game.CoverContentType) is { } src)
+                    {
+                        <img src="@src" alt="Okładka: @t.Game.Name" style="width:80px;height:80px;object-fit:cover;" class="rounded" />
+                    }
+                    else
+                    {
+                        <div class="bg-secondary-subtle rounded" style="width:80px;height:80px;"></div>
+                    }
+                </div>
+
+                @* rodzaj stołu *@
+                <div style="width:90px;">
+                    <div class="small text-muted">Stół</div>
+                    <span class="badge text-bg-secondary">@KindLabel(t.Game.Kind)</span>
+                </div>
+
+                @* trudność *@
+                <div style="width:90px;">
+                    <div class="small text-muted">Trudność</div>
+                    @t.Game.Difficulty.ToString("0.00")
+                </div>
+
+                @* link do BGG *@
+                <div style="width:90px;">
+                    <div class="small text-muted">BGG</div>
+                    @if (t.Game.BggUrl is not null)
+                    {
+                        <a href="@t.Game.BggUrl" target="_blank" rel="noopener noreferrer">Link</a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">–</span>
+                    }
+                </div>
+
+                @* sloty dla graczy: grid, maks. 4 kolumny *@
+                <div style="@($"display:grid;grid-template-columns:repeat({cols}, max-content);gap:.5rem;")">
+                    @foreach (var s in Enumerable.Range(1, t.MaxPlayers))
+                    {
+                        var occupant = t.Participants.FirstOrDefault(p => p.SlotNumber == s);
+                        var isTaken = t.IsSlotTaken(s);
+                        var isMine = occupant is not null && isLoggedIn && occupant.UserId == userId;
+
+                        <div class="d-flex align-items-center gap-1">
+                            @* ComboBox 100x50 px *@
+                            @if (isTaken)
+                            {
+                                <input class="form-control form-control-sm text-danger" style="width:100px;height:50px;"
+                                       value="Zajęte" disabled aria-label="Miejsce @s zajęte" />
+                            }
+                            else if (occupant is not null)
+                            {
+                                <input class="form-control form-control-sm" style="width:100px;height:50px;"
+                                       value="@occupant.ParticipantName" title="@occupant.ParticipantName" readonly
+                                       aria-label="Miejsce @s" />
+                            }
+                            else
+                            {
+                                <input class="form-control form-control-sm" style="width:100px;height:50px;"
+                                       list="known-names" placeholder="wolne" maxlength="100"
+                                       readonly="@(!isLoggedIn)"
+                                       title="@(isLoggedIn ? "Wpisz nazwę gracza i zatwierdź" : "Zaloguj się, aby zająć miejsce")"
+                                       aria-label="Miejsce @s wolne"
+                                       @onchange="e => AddNamedAsync(t.Id, s, e.Value?.ToString())" />
+                            }
+
+                            @* przyciski tylko dla zalogowanych *@
+                            @if (isLoggedIn)
+                            {
+                                @if (isMine)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-danger" style="height:50px;white-space:nowrap;"
+                                            @onclick="() => RemoveMineAsync(t.Id, s)">
+                                        @(occupant!.ParticipantName == displayName ? "Usuń mnie" : "Usuń")
+                                    </button>
+                                }
+                                else if (!isTaken && occupant is null && !alreadyIn)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" style="height:50px;white-space:nowrap;"
+                                            @onclick="() => AddMeAsync(t.Id, s)">
+                                        Dodaj mnie
+                                    </button>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
             </div>
+        </div>
+    }
+}
+
+@* ---------- Katalog gier ---------- *@
+<h2 class="h4 mt-5">Katalog gier</h2>
+
+@if (games is null)
+{
+    <p><em>Ładowanie...</em></p>
+}
+else if (games.Count == 0)
+{
+    <div class="alert alert-info">Katalog jest pusty.</div>
+}
+else
+{
+    <ul class="list-group">
+        @foreach (var g in games)
+        {
+            <li class="list-group-item d-flex align-items-center gap-3">
+                @if (CoverSrc(g.Cover, g.CoverContentType) is { } gsrc)
+                {
+                    <img src="@gsrc" alt="Okładka: @g.Name" style="width:48px;height:48px;object-fit:cover;" />
+                }
+                <div class="flex-grow-1">
+                    <strong>@g.Name</strong><br />
+                    <small class="text-muted">
+                        @KindLabel(g.Kind) · trudność @g.Difficulty.ToString("0.00") · do @g.MaxPlayers graczy
+                    </small>
+                </div>
+                @if (g.BggUrl is not null)
+                {
+                    <a href="@g.BggUrl" target="_blank" rel="noopener noreferrer">BGG</a>
+                }
+            </li>
         }
+    </ul>
+}
+
+@* ---------- Okno (modal): nowa gra ---------- *@
+@if (showGameModal)
+{
+    <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" style="background-color:rgba(0,0,0,.5);">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nowa gra</h5>
+                    <button type="button" class="btn-close" aria-label="Zamknij" @onclick="CloseGameModal"></button>
+                </div>
+
+                <EditForm Model="gameModel" OnValidSubmit="AddGameAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="modal-body">
+                        <ValidationSummary class="text-danger" />
+
+                        @if (gameError is not null)
+                        {
+                            <div class="alert alert-danger" role="alert">@gameError</div>
+                        }
+
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Okładka</label>
+                                <div>
+                                    <img src="@CoverPreviewSrc" alt="Podgląd okładki"
+                                         class="img-thumbnail" style="width:200px;height:200px;object-fit:cover;" />
+                                </div>
+                                <div class="mt-2 d-flex gap-2 flex-wrap">
+                                    @if (customCover is null)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="RandomizeColor">Losuj kolor</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearCustomCover">Przywróć placeholder</button>
+                                    }
+                                </div>
+                                <InputFile OnChange="OnCoverSelected" class="form-control form-control-sm mt-2"
+                                           accept="image/png,image/jpeg,image/webp,image/gif" />
+                                <div class="form-text">Własny obraz: PNG, JPEG, WebP lub GIF, maks. 2 MB.</div>
+                            </div>
+
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label class="form-label" for="game-name">Nazwa gry</label>
+                                    <input id="game-name" class="form-control" maxlength="200"
+                                           @bind="gameModel.Name" @bind:event="oninput" />
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-sm-6 mb-3">
+                                        <label class="form-label" for="game-kind">Rodzaj potrzebnego stołu</label>
+                                        <select id="game-kind" class="form-select" @bind="gameModel.Kind">
+                                            <option value="@TableKind.Small">Mały</option>
+                                            <option value="@TableKind.Big">Duży</option>
+                                            <option value="@TableKind.Other">Inny</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-sm-3 mb-3">
+                                        <label class="form-label" for="game-diff">Trudność (0–5)</label>
+                                        <input id="game-diff" type="number" class="form-control" step="0.1" min="0" max="5"
+                                               @bind="gameModel.Difficulty" />
+                                    </div>
+                                    <div class="col-sm-3 mb-3">
+                                        <label class="form-label" for="game-max">Maks. graczy</label>
+                                        <input id="game-max" type="number" class="form-control" step="1" min="1" max="20"
+                                               @bind="gameModel.MaxPlayers" />
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label" for="game-bgg">Link do gry (BGG)</label>
+                                    <input id="game-bgg" class="form-control" maxlength="500" @bind="gameModel.BggUrl" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CloseGameModal">Anuluj</button>
+                        <button type="submit" class="btn btn-success" disabled="@saving">Dodaj grę</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
     </div>
 }
 
@@ -181,49 +391,273 @@ else
     private const long MaxCoverBytes = 2 * 1024 * 1024;
     private static readonly string[] AllowedCoverTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
-    private List<PlayTable>? tables;
-    private NewTableModel model = new();
-    private bool showForm;
-    private bool saving;
-    private string? formError;
-    private string? statusMessage;
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
-    // Okładka: albo placeholder (kwadrat w losowym kolorze z tytułem), albo własny obraz.
+    private List<Game>? games;
+    private List<PlayTable>? tables;
+
+    // zalogowany użytkownik
+    private bool isLoggedIn;
+    private string? userId;
+    private string displayName = string.Empty;
+
+    private bool showTableForm;
+    private bool showGameModal;
+    private bool saving;
+    private string? statusMessage;
+    private string? slotError;
+    private string? gameError;
+    private string? tableError;
+
+    private TableModel tableModel = new();
+    private GameModel gameModel = new();
+
+    // ComboBox wyboru gry w formularzu stołu
+    private string gameQuery = string.Empty;
+    private bool gameListOpen;
+    private Game? selectedGame;
+
+    // Okładka nowej gry: placeholder (kwadrat w losowym kolorze z tytułem) albo własny obraz.
     private int coverHue;
     private byte[]? customCover;
     private string? customCoverType;
 
     protected override async Task OnInitializedAsync()
     {
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            isLoggedIn = user.Identity?.IsAuthenticated == true;
+            if (isLoggedIn)
+            {
+                userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                var name = user.Identity?.Name ?? string.Empty;
+                // nie pokazujemy publicznie pełnego adresu e-mail
+                var at = name.IndexOf('@');
+                displayName = at > 0 ? name[..at] : name;
+            }
+        }
+
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
-        tables = await Db.Tables
+        games = await Db.Games
             .AsNoTracking()
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+
+        tables = await Db.PlayTables
+            .AsNoTracking()
+            .Include(t => t.Game)
             .Include(t => t.Participants)
-            .OrderBy(t => t.Name)
+            .OrderBy(t => t.Start)
             .ToListAsync();
     }
 
-    private void ToggleForm()
+    private IEnumerable<string> KnownNames =>
+        tables?.SelectMany(t => t.Participants).Select(p => p.ParticipantName).Distinct().OrderBy(n => n)
+        ?? Enumerable.Empty<string>();
+
+    // ---------- sloty ----------
+
+    private Task AddMeAsync(int tableId, int slot) => AddParticipantAsync(tableId, slot, displayName);
+
+    private async Task AddNamedAsync(int tableId, int slot, string? rawName)
     {
-        if (!showForm)
+        if (string.IsNullOrWhiteSpace(rawName))
         {
-            ResetForm();
+            return;
         }
-        showForm = !showForm;
+        await AddParticipantAsync(tableId, slot, rawName.Trim());
     }
 
-    private void ResetForm()
+    private async Task AddParticipantAsync(int tableId, int slot, string name)
     {
-        model = new NewTableModel { BggUrl = Nav.BaseUri };
+        slotError = null;
+        if (!isLoggedIn || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        if (name.Length > 100)
+        {
+            name = name[..100];
+        }
+
+        try
+        {
+            var table = await Db.PlayTables
+                .Include(t => t.Participants)
+                .FirstOrDefaultAsync(t => t.Id == tableId);
+
+            if (table is null || slot < 1 || slot > table.AvailableSlots)
+            {
+                slotError = "Nie można zająć tego miejsca.";
+                return;
+            }
+
+            if (table.Participants.Any(p => p.SlotNumber == slot))
+            {
+                slotError = "To miejsce zostało właśnie zajęte przez kogoś innego.";
+                return;
+            }
+
+            table.Participants.Add(new TableSlot { SlotNumber = slot, ParticipantName = name, UserId = userId });
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            slotError = "Nie udało się zająć miejsca (być może ktoś był szybszy). Spróbuj ponownie.";
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            await LoadAsync();
+        }
+    }
+
+    private async Task RemoveMineAsync(int tableId, int slot)
+    {
+        slotError = null;
+        if (!isLoggedIn)
+        {
+            return;
+        }
+
+        try
+        {
+            var entry = await Db.TableSlots
+                .FirstOrDefaultAsync(s => s.PlayTableId == tableId && s.SlotNumber == slot && s.UserId == userId);
+
+            if (entry is null)
+            {
+                slotError = "Nie znaleziono Twojego wpisu na tym miejscu.";
+                return;
+            }
+
+            Db.TableSlots.Remove(entry);
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            slotError = "Nie udało się zwolnić miejsca. Spróbuj ponownie.";
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            await LoadAsync();
+        }
+    }
+
+    // ---------- formularz stołu + ComboBox gry ----------
+
+    private void ToggleTableForm()
+    {
+        if (!showTableForm)
+        {
+            tableModel = new TableModel { Start = DateTime.Today.AddDays(1).AddHours(18) };
+            tableError = null;
+            gameQuery = string.Empty;
+            selectedGame = null;
+            gameListOpen = false;
+        }
+        showTableForm = !showTableForm;
+    }
+
+    private IEnumerable<Game> GameMatches =>
+        (games ?? new List<Game>())
+            .Where(g => g.Name.Contains(gameQuery.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            .Take(8);
+
+    private void OnGameQueryInput(ChangeEventArgs e)
+    {
+        gameQuery = e.Value?.ToString() ?? string.Empty;
+        gameListOpen = true;
+
+        var exact = games?.FirstOrDefault(g => string.Equals(g.Name, gameQuery.Trim(), StringComparison.OrdinalIgnoreCase));
+        SetSelectedGame(exact);
+    }
+
+    private void OnGameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            gameListOpen = false;
+        }
+    }
+
+    private void SelectGame(Game game)
+    {
+        gameQuery = game.Name;
+        gameListOpen = false;
+        SetSelectedGame(game);
+    }
+
+    private void SetSelectedGame(Game? game)
+    {
+        selectedGame = game;
+        if (game is not null)
+        {
+            tableModel.MaxPlayers = game.MaxPlayers;
+        }
+    }
+
+    private async Task AddTableAsync()
+    {
+        tableError = null;
+
+        if (selectedGame is null)
+        {
+            tableError = "Wybierz grę z listy albo dodaj nową.";
+            return;
+        }
+
+        var table = new PlayTable
+        {
+            GameId = selectedGame.Id,
+            Start = tableModel.Start,
+            MaxPlayers = tableModel.MaxPlayers
+            // Participants (Slots) na starcie są puste; TakenSlots = 0.
+        };
+
+        saving = true;
+        try
+        {
+            Db.PlayTables.Add(table);
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            tableError = "Nie udało się zapisać stołu w bazie danych.";
+            return;
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            saving = false;
+        }
+
+        statusMessage = $"Dodano stół do gry „{selectedGame.Name}” na {tableModel.Start:dd.MM.yyyy HH:mm}.";
+        showTableForm = false;
+        await LoadAsync();
+    }
+
+    // ---------- okno nowej gry ----------
+
+    private void OpenGameModal(string prefilledName)
+    {
+        gameModel = new GameModel { Name = prefilledName, BggUrl = Nav.BaseUri };
         customCover = null;
         customCoverType = null;
-        formError = null;
+        gameError = null;
+        gameListOpen = false;
         RandomizeColor();
+        showGameModal = true;
     }
+
+    private void CloseGameModal() => showGameModal = false;
 
     private void RandomizeColor() => coverHue = Random.Shared.Next(360);
 
@@ -235,18 +669,18 @@ else
 
     private async Task OnCoverSelected(InputFileChangeEventArgs e)
     {
-        formError = null;
+        gameError = null;
         var file = e.File;
 
         if (!AllowedCoverTypes.Contains(file.ContentType))
         {
-            formError = "Okładka musi być obrazem PNG, JPEG, WebP lub GIF.";
+            gameError = "Okładka musi być obrazem PNG, JPEG, WebP lub GIF.";
             return;
         }
 
         if (file.Size > MaxCoverBytes)
         {
-            formError = "Okładka może mieć maksymalnie 2 MB.";
+            gameError = "Okładka może mieć maksymalnie 2 MB.";
             return;
         }
 
@@ -258,21 +692,38 @@ else
         customCoverType = file.ContentType;
     }
 
-    private async Task AddTableAsync()
-    {
-        formError = null;
+    private string BuildPlaceholderSvg(string title) =>
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"300\" viewBox=\"0 0 300 300\">" +
+        $"<rect width=\"300\" height=\"300\" fill=\"hsl({coverHue}, 60%, 40%)\"/>" +
+        "<text x=\"150\" y=\"150\" text-anchor=\"middle\" dominant-baseline=\"middle\" fill=\"white\" font-family=\"sans-serif\">" +
+        WebUtility.HtmlEncode(title) +
+        "</text></svg>";
 
-        var name = model.Name.Trim();
+    private string CoverPreviewSrc => customCover is not null
+        ? CoverSrc(customCover, customCoverType)!
+        : CoverSrc(Encoding.UTF8.GetBytes(BuildPlaceholderSvg(gameModel.Name.Trim())), "image/svg+xml")!;
+
+    private async Task AddGameAsync()
+    {
+        gameError = null;
+
+        var name = gameModel.Name.Trim();
 
         Uri? bggUrl = null;
-        if (!string.IsNullOrWhiteSpace(model.BggUrl))
+        if (!string.IsNullOrWhiteSpace(gameModel.BggUrl))
         {
-            if (!Uri.TryCreate(model.BggUrl.Trim(), UriKind.Absolute, out bggUrl)
+            if (!Uri.TryCreate(gameModel.BggUrl.Trim(), UriKind.Absolute, out bggUrl)
                 || (bggUrl.Scheme != Uri.UriSchemeHttp && bggUrl.Scheme != Uri.UriSchemeHttps))
             {
-                formError = "Link do gry musi być poprawnym adresem http(s).";
+                gameError = "Link do gry musi być poprawnym adresem http(s).";
                 return;
             }
+        }
+
+        if (await Db.Games.AnyAsync(g => g.Name.ToLower() == name.ToLower()))
+        {
+            gameError = $"Gra „{name}” jest już w katalogu.";
+            return;
         }
 
         byte[] cover;
@@ -288,27 +739,26 @@ else
             coverContentType = "image/svg+xml";
         }
 
-        var table = new PlayTable
+        var game = new Game
         {
             Name = name,
-            Kind = model.Kind,
-            Difficulty = Math.Round(model.Difficulty, 2),
-            MaxPlayers = model.MaxPlayers,
+            Kind = gameModel.Kind,
+            Difficulty = Math.Round(gameModel.Difficulty, 2),
+            MaxPlayers = gameModel.MaxPlayers,
             BggUrl = bggUrl,
             Cover = cover,
             CoverContentType = coverContentType
-            // Id nadaje baza; Participants (Slots) na starcie są puste.
         };
 
         saving = true;
         try
         {
-            Db.Tables.Add(table);
+            Db.Games.Add(game);
             await Db.SaveChangesAsync();
         }
         catch (DbUpdateException)
         {
-            formError = "Nie udało się zapisać stołu w bazie danych.";
+            gameError = "Nie udało się zapisać gry w bazie danych (być może taka nazwa już istnieje).";
             return;
         }
         finally
@@ -317,23 +767,23 @@ else
             saving = false;
         }
 
-        statusMessage = $"Dodano stół „{name}”.";
-        showForm = false;
+        statusMessage = $"Dodano grę „{name}” do katalogu.";
+        showGameModal = false;
         await LoadAsync();
+
+        // Jeśli gra powstała z poziomu formularza stołu – od razu ją wybierz.
+        if (showTableForm)
+        {
+            var created = games?.FirstOrDefault(g => g.Id == game.Id);
+            if (created is not null)
+            {
+                gameQuery = created.Name;
+                SetSelectedGame(created);
+            }
+        }
     }
 
-    // --- okładka / prezentacja ---
-
-    private string BuildPlaceholderSvg(string title) =>
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"300\" viewBox=\"0 0 300 300\">" +
-        $"<rect width=\"300\" height=\"300\" fill=\"hsl({coverHue}, 60%, 40%)\"/>" +
-        "<text x=\"150\" y=\"150\" text-anchor=\"middle\" dominant-baseline=\"middle\" fill=\"white\" font-family=\"sans-serif\">" +
-        WebUtility.HtmlEncode(title) +
-        "</text></svg>";
-
-    private string CoverPreviewSrc => customCover is not null
-        ? CoverSrc(customCover, customCoverType)!
-        : CoverSrc(Encoding.UTF8.GetBytes(BuildPlaceholderSvg(model.Name.Trim())), "image/svg+xml")!;
+    // ---------- prezentacja ----------
 
     private static string? CoverSrc(byte[]? cover, string? contentType) =>
         cover is { Length: > 0 }
@@ -347,7 +797,9 @@ else
         _ => "Inny"
     };
 
-    private sealed class NewTableModel
+    // ---------- modele formularzy ----------
+
+    private sealed class GameModel
     {
         [Required(ErrorMessage = "Podaj nazwę gry.")]
         [StringLength(200, ErrorMessage = "Nazwa może mieć maksymalnie 200 znaków.")]
@@ -362,5 +814,13 @@ else
         public int MaxPlayers { get; set; } = 4;
 
         public string? BggUrl { get; set; }
+    }
+
+    private sealed class TableModel
+    {
+        public DateTime Start { get; set; }
+
+        [Range(1, 20, ErrorMessage = "Liczba miejsc: 1–20.")]
+        public int MaxPlayers { get; set; } = 4;
     }
 }

@@ -11,8 +11,8 @@ using StolyDoGrania.Data;
 namespace StolyDoGrania.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261018194725_DodanieStolow")]
-    partial class DodanieStolow
+    [Migration("20261019171622_Poczatkowa")]
+    partial class Poczatkowa
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -240,6 +240,49 @@ namespace StolyDoGrania.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaxPlayers")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("Start")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TakenSlots")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId");
+
+                    b.ToTable("PlayTables", (string)null);
+                });
+
+            modelBuilder.Entity("StolyDoGrania.Data.Table.TableSlot", b =>
+                {
+                    b.Property<int>("PlayTableId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SlotNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ParticipantName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PlayTableId", "SlotNumber");
+
+                    b.ToTable("TableSlots", (string)null);
+                });
+
+            modelBuilder.Entity("StolyDoGrania.Game", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("BggUrl")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -268,33 +311,12 @@ namespace StolyDoGrania.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("Start")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("TakenSlots")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
 
-                    b.ToTable("Tables", (string)null);
-                });
+                    b.HasIndex("Name")
+                        .IsUnique();
 
-            modelBuilder.Entity("StolyDoGrania.TableSlot", b =>
-                {
-                    b.Property<int>("TableId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SlotNumber")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ParticipantName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("TableId", "SlotNumber");
-
-                    b.ToTable("TableSlots", (string)null);
+                    b.ToTable("Games", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -399,20 +421,36 @@ namespace StolyDoGrania.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("StolyDoGrania.TableSlot", b =>
+            modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.Table.PlayTable", "Table")
+                    b.HasOne("StolyDoGrania.Game", "Game")
+                        .WithMany("Tables")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("StolyDoGrania.Data.Table.TableSlot", b =>
+                {
+                    b.HasOne("StolyDoGrania.Data.Table.PlayTable", "PlayTable")
                         .WithMany("Participants")
-                        .HasForeignKey("TableId")
+                        .HasForeignKey("PlayTableId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Table");
+                    b.Navigation("PlayTable");
                 });
 
             modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
                 {
                     b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("StolyDoGrania.Game", b =>
+                {
+                    b.Navigation("Tables");
                 });
 #pragma warning restore 612, 618
         }

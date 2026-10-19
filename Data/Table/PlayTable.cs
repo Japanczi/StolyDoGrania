@@ -1,43 +1,20 @@
 namespace StolyDoGrania.Data.Table;
 
-/// <summary>Rodzaj stołu.</summary>
-public enum TableKind
-{
-    Small,
-    Big,
-    Other
-}
-
-/// <summary>Stół do gry planszowej.</summary>
+/// <summary>Stół na konkretny termin – gra z katalogu + start + zapisani uczestnicy.</summary>
 public class PlayTable
 {
     private int _takenSlots;
 
     public int Id { get; set; }
 
-    /// <summary>Nazwa stołu (np. nazwa gry).</summary>
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>Rodzaj stołu (mały / duży / inny).</summary>
-    public TableKind Kind { get; set; } = TableKind.Other;
+    public int GameId { get; set; }
+    public Game Game { get; set; } = null!;
 
     /// <summary>Data i godzina rozpoczęcia gry.</summary>
     public DateTime Start { get; set; }
 
-    /// <summary>Maksymalna liczba graczy (wszystkie miejsca przy stole).</summary>
+    /// <summary>Liczba miejsc przy stole (domyślnie kopiowana z gry przy tworzeniu stołu).</summary>
     public int MaxPlayers { get; set; }
-
-    /// <summary>Link do gry na BoardGameGeek.</summary>
-    public Uri? BggUrl { get; set; }
-
-    /// <summary>Poziom trudności (np. "weight" z BGG, skala 1–5).</summary>
-    public decimal Difficulty { get; set; }
-
-    /// <summary>Okładka gry jako osadzony obraz (surowe bajty).</summary>
-    public byte[]? Cover { get; set; }
-
-    /// <summary>Typ MIME okładki, np. "image/jpeg".</summary>
-    public string? CoverContentType { get; set; }
 
     /// <summary>
     /// Liczba miejsc oznaczonych przez operatora stołu jako "Zajęte" (niedostępne do zapisu).
@@ -54,34 +31,20 @@ public class PlayTable
         }
     }
 
-    /// <summary>Zapisani uczestnicy – to jest to, co trafia do tabeli TableSlots.</summary>
+    /// <summary>Zapisani uczestnicy – trafia do tabeli TableSlots.</summary>
     public List<TableSlot> Participants { get; set; } = new();
 
-    /// <summary>
-    /// Widok "numer miejsca → nazwa uczestnika". Tylko do odczytu;
-    /// zmiany robi się przez <see cref="Join"/> i <see cref="Leave"/>.
-    /// </summary>
+    /// <summary>Widok "numer miejsca → nazwa uczestnika" (tylko do odczytu; zmiany przez Join/Leave).</summary>
     public Dictionary<int, string> Slots =>
         Participants.OrderBy(p => p.SlotNumber).ToDictionary(p => p.SlotNumber, p => p.ParticipantName);
 
-    /// <summary>Liczba zapisanych uczestników.</summary>
     public int ParticipantAmount => Participants.Count;
-
-    /// <summary>Miejsca dostępne do zapisu (MaxPlayers minus miejsca zajęte przez operatora).</summary>
     public int AvailableSlots => Math.Max(0, MaxPlayers - TakenSlots);
-
-    /// <summary>Miejsca, na które można się jeszcze zapisać.</summary>
     public int FreeSlots => Math.Max(0, AvailableSlots - ParticipantAmount);
-
     public bool IsFull => FreeSlots == 0;
 
-    /// <summary>Czy dane miejsce jest oznaczone jako "Zajęte" przez operatora.</summary>
     public bool IsSlotTaken(int slot) => slot > AvailableSlots && slot <= MaxPlayers;
 
-    /// <summary>
-    /// Ustala liczbę miejsc "Zajęte". Zwraca false (nic nie zmieniając), gdy wartość jest
-    /// spoza zakresu 0..MaxPlayers albo kolidowałaby z już zapisanymi uczestnikami.
-    /// </summary>
     public bool TrySetTakenSlots(int count, out string? error)
     {
         error = null;
@@ -103,10 +66,6 @@ public class PlayTable
         return true;
     }
 
-    /// <summary>
-    /// Zapisuje uczestnika na pierwsze wolne miejsce spośród dostępnych (pomija miejsca "Zajęte").
-    /// Zwraca numer miejsca lub null, gdy brak wolnych miejsc.
-    /// </summary>
     public int? Join(string participantName)
     {
         if (string.IsNullOrWhiteSpace(participantName))
@@ -124,7 +83,6 @@ public class PlayTable
         return null;
     }
 
-    /// <summary>Wypisuje uczestnika z danego miejsca.</summary>
     public bool Leave(int slot)
     {
         var entry = Participants.FirstOrDefault(p => p.SlotNumber == slot);
