@@ -1,0 +1,199 @@
+﻿@page "/admin/users"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = AppRoles.Admin)]
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using StolyDoGrania.Data
+@inject UserManager<ApplicationUser> UserManager
+@inject ApplicationDbContext Db
+
+<PageTitle>Użytkownicy</PageTitle>
+<h1>Zarządzanie użytkownikami</h1>
+
+@if (status is not null)
+{
+    <div class="alert alert-success alert-dismissible">
+        @status
+        <button type="button" class="btn-close" @onclick="() => status = null"></button>
+    </div>
+}
+@if (error is not null)
+{
+    <div class="alert alert-danger alert-dismissible">
+        @error
+        <button type="button" class="btn-close" @onclick="() => error = null"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Dodaj użytkownika</h5>
+        <EditForm Model="newUser" OnValidSubmit="AddUserAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="nu-email">E-mail</label>
+                    <InputText id="nu-email" class="form-control" @bind-Value="newUser.Email" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="nu-pass">Hasło</label>
+                    <InputText id="nu-pass" type="password" class="form-control" @bind-Value="newUser.Password" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="nu-role">Rola</label>
+                    <InputSelect id="nu-role" class="form-select" @bind-Value="newUser.Role">
+                        @foreach (var r in AppRoles.All)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success w-100">Dodaj</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (rows is null)
+{
+    <p><em>Ładowanie...</em></p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead><tr><th>E-mail</th><th style="width:180px">Rola</th><th style="width:220px"></th></tr></thead>
+        <tbody>
+            @foreach (var u in rows)
+            {
+                var isSelf = u.Id == currentUserId;
+                <tr>
+                    <td>@u.Email @if (isSelf) {
+                        <span class="badge text-bg-secondary">to Ty</span>
+                    }
+                </td>
+                <td>
+                    <select class="form-select form-select-sm" disabled="@isSelf"
+                            value="@u.Role" @onchange="e => ChangeRoleAsync(u.Id, e.Value?.ToString())">
+                        @foreach (var r in AppRoles.All)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </td>
+                <td class="text-end">
+                    @if (!isSelf)
+                    {
+                        @if (confirmDeleteId == u.Id)
+                        {
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteUserAsync(u.Id)">Potwierdź usunięcie</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => confirmDeleteId = null">Anuluj</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => confirmDeleteId = u.Id">Usuń</button>
+                        }
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+}
+
+@code {
+    private record UserRow(string Id, string Email, string Role);
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private List<UserRow>? rows;
+    private string? currentUserId, status, error, confirmDeleteId;
+    private NewUserModel newUser = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+            currentUserId = (await AuthState).User.FindFirstValue(ClaimTypes.NameIdentifier);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var users = await UserManager.Users.AsNoTracking().OrderBy(u => u.Email).ToListAsync();
+        var list = new List<UserRow>();
+        foreach (var u in users)
+        {
+            var roles = await UserManager.GetRolesAsync(u);
+            list.Add(new UserRow(u.Id, u.Email ?? u.UserName ?? u.Id,
+                roles.Contains(AppRoles.Admin) ? AppRoles.Admin : AppRoles.User));
+        }
+        rows = list;
+    }
+
+    private async Task AddUserAsync()
+    {
+        status = error = null;
+        var user = new ApplicationUser { UserName = newUser.Email, Email = newUser.Email, EmailConfirmed = true };
+        var result = await UserManager.CreateAsync(user, newUser.Password);
+        if (!result.Succeeded)
+        {
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+        await UserManager.AddToRoleAsync(user, newUser.Role);
+        status = $"Dodano użytkownika {newUser.Email}.";
+        newUser = new();
+        await LoadAsync();
+    }
+
+    private async Task ChangeRoleAsync(string id, string? newRole)
+    {
+        status = error = null;
+        if (newRole is null || !AppRoles.All.Contains(newRole) || id == currentUserId) return;
+
+        var user = await UserManager.FindByIdAsync(id);
+        if (user is null) { error = "Nie znaleziono użytkownika."; return; }
+
+        var current = await UserManager.GetRolesAsync(user);
+        if (current.Count > 0) await UserManager.RemoveFromRolesAsync(user, current);
+        var result = await UserManager.AddToRoleAsync(user, newRole);
+        if (!result.Succeeded)
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+        else
+        {
+            await UserManager.UpdateSecurityStampAsync(user); // wymusza ponowne zalogowanie z nową rolą
+            status = $"Zmieniono rolę użytkownika {user.Email} na {newRole}.";
+        }
+        await LoadAsync();
+    }
+
+    private async Task DeleteUserAsync(string id)
+    {
+        status = error = null;
+        confirmDeleteId = null;
+        if (id == currentUserId) { error = "Nie możesz usunąć własnego konta."; return; }
+
+        var user = await UserManager.FindByIdAsync(id);
+        if (user is null) { error = "Nie znaleziono użytkownika."; return; }
+
+        // TableSlots.UserId nie jest kluczem obcym – zwalniamy miejsca usuwanego użytkownika
+        await Db.TableSlots.Where(s => s.UserId == id).ExecuteDeleteAsync();
+
+        var result = await UserManager.DeleteAsync(user);
+        status = result.Succeeded ? $"Usunięto użytkownika {user.Email}." : null;
+        if (!result.Succeeded) error = string.Join(" ", result.Errors.Select(e => e.Description));
+        await LoadAsync();
+    }
+
+    private sealed class NewUserModel
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required, StringLength(100, MinimumLength = 6)] public string Password { get; set; } = "";
+        public string Role { get; set; } = AppRoles.User;
+    }
+}
