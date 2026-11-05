@@ -11,14 +11,14 @@ using StolyDoGrania.Data;
 namespace StolyDoGrania.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261019171622_Poczatkowa")]
-    partial class Poczatkowa
+    [Migration("20261104202052_AddTableCreatorAndKind")]
+    partial class AddTableCreatorAndKind
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
@@ -240,8 +240,19 @@ namespace StolyDoGrania.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CreatorUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("GameId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Small");
 
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("INTEGER");
@@ -270,6 +281,10 @@ namespace StolyDoGrania.Migrations
                     b.Property<string>("ParticipantName")
                         .IsRequired()
                         .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
                     b.HasKey("PlayTableId", "SlotNumber");

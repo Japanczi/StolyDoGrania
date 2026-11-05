@@ -29,6 +29,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.ToTable("PlayTables");
             e.HasKey(t => t.Id);
+            // The store default keeps existing rows valid: an empty string would not convert back to the enum.
+            e.Property(t => t.Kind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(TableKind.Small);
+            e.Property(t => t.OwnerUserId).HasMaxLength(450);
             e.HasOne(t => t.Game)
                 .WithMany(g => g.Tables)
                 .HasForeignKey(t => t.GameId)

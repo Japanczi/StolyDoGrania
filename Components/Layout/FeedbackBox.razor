@@ -1,0 +1,91 @@
+@inject IWebHostEnvironment Env
+@inject NavigationManager Nav
+
+@* Debug tool: renders and saves only in the Development environment. *@
+@if (Env.IsDevelopment())
+{
+    @if (open)
+    {
+        <section class="feedback-box" aria-label="Uwagi do strony">
+            <div class="feedback-head">
+                <strong>Uwagi (debug)</strong>
+                <button type="button" class="btn-close" aria-label="Zwiń" @onclick="() => open = false"></button>
+            </div>
+
+            <textarea class="form-control" rows="4" maxlength="@MaxLength" aria-label="Treść uwagi"
+                      placeholder="Co poprawić na tej stronie?"
+                      @bind="comment" @bind:event="oninput"></textarea>
+
+            <div class="feedback-foot">
+                <span class="feedback-status @(failed ? "text-danger" : "text-success")" role="status">@status</span>
+                <button type="button" class="btn btn-primary btn-sm"
+                        disabled="@(string.IsNullOrWhiteSpace(comment) || saving)" @onclick="SaveAsync">
+                    Zapisz uwagę
+                </button>
+            </div>
+        </section>
+    }
+    else
+    {
+        <button type="button" class="btn btn-primary btn-sm feedback-toggle" @onclick="() => open = true">
+            💬 Uwagi
+        </button>
+    }
+}
+
+@code {
+    private const int MaxLength = 4000;
+
+    /// <summary>Display name stored with the comment; null for anonymous users.</summary>
+    [Parameter] public string? UserName { get; set; }
+
+    private bool open;
+    private bool saving;
+    private bool failed;
+    private string comment = string.Empty;
+    private string? status;
+
+    private async Task SaveAsync()
+    {
+        if (!Env.IsDevelopment() || string.IsNullOrWhiteSpace(comment) || saving)
+        {
+            return;
+        }
+
+        saving = true;
+        var now = DateTime.Now;
+        // One file per comment, so saves never have to share or lock a file.
+        var fileName = $"{now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}.md";
+        var content = $"""
+            ---
+            date: {now:yyyy-MM-dd HH:mm:ss}
+            page: /{Nav.ToBaseRelativePath(Nav.Uri)}
+            user: {UserName ?? "(niezalogowany)"}
+            ---
+
+            {comment.Trim()}
+
+            """;
+
+        try
+        {
+            var folder = Path.Combine(Env.ContentRootPath, "Claude_Resources", "Feedback");
+            Directory.CreateDirectory(folder);
+            await File.WriteAllTextAsync(Path.Combine(folder, fileName), content);
+
+            comment = string.Empty;
+            failed = false;
+            status = $"Zapisano o {now:HH:mm:ss}.";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The typed text stays in the box, so nothing is lost and it can be retried.
+            failed = true;
+            status = "Nie udało się zapisać uwagi.";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

@@ -5,7 +5,7 @@
 namespace StolyDoGrania.Migrations
 {
     /// <inheritdoc />
-    public partial class DodawanieStolowIGierMod : Migration
+    public partial class AddUserIdToTableSlots : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

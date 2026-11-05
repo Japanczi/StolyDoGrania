@@ -11,8 +11,8 @@ using StolyDoGrania.Data;
 namespace StolyDoGrania.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261019181008_DodawanieStolowIGierMod")]
-    partial class DodawanieStolowIGierMod
+    [Migration("20261103214035_AddUserIdToTableSlots")]
+    partial class AddUserIdToTableSlots
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

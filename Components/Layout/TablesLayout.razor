@@ -1,0 +1,41 @@
+@inherits LayoutComponentBase
+
+@* Full-width layout without the sidebar: the table list needs the whole screen. *@
+<div class="tables-layout" data-bs-theme="dark">
+    <header class="tables-bar">
+        <a class="tables-brand" href="">StolyDoGrania</a>
+
+        <AuthorizeView>
+            <Authorized>
+                <span class="tables-user">@ShortName(context.User.Identity?.Name)</span>
+                <form action="Account/Logout" method="post">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="stoly" />
+                    <button type="submit" class="btn btn-link btn-sm">Wyloguj</button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <a class="btn btn-link btn-sm" href="Account/Login?ReturnUrl=stoly">Zaloguj się</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </header>
+
+    <main class="tables-main">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Wystąpił nieoczekiwany błąd.
+    <a href="." class="reload">Odśwież</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    // A full e-mail address is never displayed.
+    private static string ShortName(string? name)
+    {
+        var at = name?.IndexOf('@') ?? -1;
+        return at > 0 ? name![..at] : name ?? string.Empty;
+    }
+}

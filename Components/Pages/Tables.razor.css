@@ -1,0 +1,331 @@
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .5rem;
+}
+
+    .toolbar h1 {
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+.table-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-x: auto;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 62px minmax(150px, 1.2fr) 64px 84px 96px 60px 52px 76px 76px minmax(280px, 3fr);
+    min-width: 1022px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #3b3b40;
+}
+
+.table-head {
+    border-radius: 0;
+    background: none;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    opacity: .7;
+}
+
+    .table-head .cell {
+        min-height: 0;
+        padding-block: .1rem;
+    }
+
+.cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 68px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.cell-game {
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Action buttons fill a column top to bottom, then start a new one. */
+.cell-actions {
+    position: relative;
+}
+
+.actions {
+    /* Absolute: gives the wrapping column a definite height that follows the row's. */
+    position: absolute;
+    inset: 4px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 2px;
+}
+
+.action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    font-size: .625rem;
+    line-height: 1;
+}
+
+.action-delete {
+    background: #55555c;
+}
+
+    .action-delete:hover {
+        background: #77777f;
+    }
+
+.action-placeholder {
+    background: #14532d;
+}
+
+.action-anchor {
+    display: flex;
+}
+
+/*
+    Fixed without offsets: it stays where it would naturally sit, beside its button,
+    and isn't clipped by the row's overflow. The margin moves it past the button.
+*/
+.action-popup {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    width: 220px;
+    margin-left: 30px;
+    padding: .5rem .6rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+    font-size: .8125rem;
+    text-align: left;
+}
+
+.action-popup-buttons {
+    display: flex;
+    gap: .35rem;
+}
+
+.cell-difficulty {
+    font-weight: 600;
+}
+
+.cell-cover {
+    padding: 0;
+    background: #000;
+}
+
+.cell-slots {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.table-row a {
+    color: #8ab4f8;
+}
+
+.game-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.thumb {
+    flex: none;
+    width: 68px;
+    height: 68px;
+    object-fit: cover;
+}
+
+.thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    overflow: hidden;
+    color: #fff;
+    font-size: .625rem;
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.kind-small {
+    background: #2f6b4f;
+}
+
+.kind-big {
+    background: #8c4545;
+}
+
+.kind-other {
+    background: #55555c;
+}
+
+.hour-unset {
+    background: #d60000;
+    color: #fff;
+}
+
+.cell-input {
+    width: 100%;
+    min-width: 0;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: .875rem;
+    text-align: center;
+}
+
+    .cell-input:hover {
+        border-color: rgba(255, 255, 255, .4);
+    }
+
+/* Player slots */
+.slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Grows with the player's name, up to 300% of the base width. */
+    flex: none;
+    min-width: 60px;
+    max-width: 180px;
+    height: 60px;
+    padding: 2px 4px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    font-size: .6875rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+}
+
+.slot-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+button.slot:not(:disabled):not(.slot-inert) {
+    cursor: pointer;
+}
+
+    button.slot:not(:disabled):not(.slot-inert):hover {
+        filter: brightness(1.15);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, .5);
+    }
+
+.slot-inert {
+    cursor: context-menu;
+}
+
+button.slot:focus-visible {
+    outline: 2px solid #8ab4f8;
+    outline-offset: 1px;
+}
+
+.slot-free {
+    background: #fff;
+    color: #555;
+}
+
+.slot-taken {
+    background: #ad2f69;
+    color: #fff;
+}
+
+.slot-blocked {
+    background: #fa8072;
+    color: #3a1410;
+}
+
+.slot-owner {
+    border-color: #d4af37;
+    background: #560c33;
+    color: #fff;
+}
+
+/* Add-player popup */
+.popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+.add-player {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: 260px;
+    height: 320px;
+    padding: .6rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+}
+
+.add-player-title {
+    font-size: .875rem;
+}
+
+.add-player-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.add-player-option {
+    flex: none;
+    padding: .25rem .5rem;
+    border: 0;
+    border-radius: 4px;
+    background: #3b3b40;
+    color: inherit;
+    font-size: .8125rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+    .add-player-option:hover {
+        background: #55555c;
+    }
+
+.add-player-empty {
+    font-size: .8125rem;
+    opacity: .7;
+}
+
+.add-player-free {
+    display: flex;
+    gap: .35rem;
+}

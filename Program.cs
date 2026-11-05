@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -30,12 +31,28 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
         options.SignIn.RequireConfirmedAccount = true;
         options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+
+        // Local development only: allows the temporary admin/admin account.
+        if (builder.Environment.IsDevelopment())
+        {
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequiredLength = 5;
+
+            // Lets the seeded test users have full Polish names as usernames.
+            options.User.AllowedUserNameCharacters += " ąćęłńóśźżĄĆĘŁŃÓŚŹŻ";
+        }
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+builder.Services.AddSingleton<NormalUserMode>();
+builder.Services.AddSingleton<IClaimsTransformation, NormalUserModeClaimsTransformation>();
 
 var app = builder.Build();
 

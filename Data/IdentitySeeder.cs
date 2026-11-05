@@ -5,6 +5,36 @@ namespace StolyDoGrania.Data;
 
 public static class IdentitySeeder
 {
+    private const string TestUserPassword = "gracz";
+
+    // A mix of short and long names, for checking how the UI scales.
+    private static readonly string[] TestUserNames =
+    [
+        "Jan Nowak",
+        "Zofia Wiśniewska",
+        "Grzegorz Brzęczyszczykiewicz",
+        "Małgorzata Szczepańska-Dąbrowska"
+    ];
+
+    private static async Task SeedTestUsersAsync(UserManager<ApplicationUser> userManager, ILogger logger)
+    {
+        for (var i = 0; i < TestUserNames.Length; i++)
+        {
+            if (await userManager.FindByNameAsync(TestUserNames[i]) is not null)
+            {
+                continue;
+            }
+
+            var user = new ApplicationUser { UserName = TestUserNames[i], Email = $"gracz{i + 1}@example.com", EmailConfirmed = true };
+            var result = await userManager.CreateAsync(user, TestUserPassword);
+            if (!result.Succeeded)
+            {
+                logger.LogError("Nie udało się utworzyć użytkownika testowego {Name}: {Errors}",
+                    TestUserNames[i], string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+    }
+
     public static async Task SeedAsync(IServiceProvider services, IConfiguration config)
     {
         using var scope = services.CreateScope();
@@ -22,19 +52,20 @@ public static class IdentitySeeder
                 await roleManager.CreateAsync(new IdentityRole(role));
         }
 
-        // Konto admina (dane z konfiguracji / user-secrets)
+        // Admin account (values come from configuration / user-secrets)
+        var userName = config["Admin:UserName"];
         var email = config["Admin:Email"];
         var password = config["Admin:Password"];
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            logger.LogWarning("Brak Admin:Email / Admin:Password w konfiguracji – pomijam tworzenie admina.");
+            logger.LogWarning("Brak Admin:UserName / Admin:Email / Admin:Password w konfiguracji – pomijam tworzenie admina.");
         }
         else
         {
-            var admin = await userManager.FindByEmailAsync(email);
+            var admin = await userManager.FindByNameAsync(userName);
             if (admin is null)
             {
-                admin = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
+                admin = new ApplicationUser { UserName = userName, Email = email, EmailConfirmed = true };
                 var result = await userManager.CreateAsync(admin, password);
                 if (!result.Succeeded)
                 {
@@ -48,6 +79,12 @@ public static class IdentitySeeder
             {
                 await userManager.AddToRoleAsync(admin, AppRoles.Admin);
             }
+        }
+
+        // Development only: these accounts have a publicly known password.
+        if (sp.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        {
+            await SeedTestUsersAsync(userManager, logger);
         }
 
         // Istniejący użytkownicy bez żadnej roli dostają "User"

@@ -15,7 +15,7 @@ namespace StolyDoGrania.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
@@ -240,8 +240,19 @@ namespace StolyDoGrania.Migrations
                     b.Property<int>("GameId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Small");
+
                     b.Property<int>("MaxPlayers")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("OwnerUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("Start")
                         .HasColumnType("TEXT");

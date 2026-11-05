@@ -1,0 +1,36 @@
+.feedback-toggle {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 900;
+}
+
+.feedback-box {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: min(640px, 100%);
+    padding: .75rem;
+    transform: translateX(-50%);
+    border: 1px solid #55555c;
+    border-bottom: 0;
+    border-radius: .5rem .5rem 0 0;
+    background: #1f1f22;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, .5);
+}
+
+.feedback-head,
+.feedback-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.feedback-status {
+    font-size: .875rem;
+}
