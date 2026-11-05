@@ -1,0 +1,9 @@
+TOOLS - FEATURES
+Feature tracker for the design tools. Listed on the prompt "review features".
+Created: 2026-11-05
+
+== Implemented ==
+(none yet)
+
+== To do ==
+(none yet)

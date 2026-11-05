@@ -1,0 +1,18 @@
+TOOLS - INFORMATION
+Persistent information about the tools developed for designing the StolyDoGrania application.
+Created: 2026-11-05
+
+== Conventions ==
+- Tool resources and persistent information live in Claude_Resources/Tools/.
+- This file holds general information, decisions and notes about the tools.
+- Features.txt tracks what is implemented and what is to be done.
+- Both files are updated as the work progresses.
+- Prompt "review features": list the features already implemented and those still to be done, based on Features.txt.
+- Work is experimental: when suitable, Claude asks whether to branch from the conversation.
+- Claude_Resources/ is git-ignored except for Claude_Resources/Tools/, so this folder is versioned (to allow rolling back experiments).
+
+== Tools ==
+(none yet)
+
+== Decisions ==
+(none yet)

@@ -368,8 +368,9 @@ BGGToken.txt
 # Claude Code project instructions
 CLAUDE.md
 
-# Local reference material for Claude
-Claude_Resources/
+# Local reference material for Claude (design tool files are versioned)
+Claude_Resources/*
+!Claude_Resources/Tools/
 
 # Local SQLite database
 Data/app.db
