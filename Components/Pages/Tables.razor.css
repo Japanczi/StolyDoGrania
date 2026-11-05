@@ -170,6 +170,89 @@
     overflow-wrap: anywhere;
 }
 
+/* The row for adding a table: its cells line up with the columns of the tables above. */
+.table-draft {
+    outline: 1px dashed #77777f;
+    outline-offset: -1px;
+}
+
+.draft-panel {
+    min-width: 1022px;
+    padding: .5rem .75rem;
+    border-radius: 6px;
+    background: #2c2c30;
+}
+
+/* As wide as the longest title, so the links line up in a column. */
+.candidate-list {
+    display: inline-flex;
+    flex-direction: column;
+    gap: .25rem;
+    max-width: 100%;
+}
+
+.candidate-name {
+    flex: 1;
+    text-align: left;
+}
+
+.candidate-link {
+    flex: none;
+}
+
+.draft-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+}
+
+.draft-cover {
+    position: relative;
+    width: 68px;
+    height: 68px;
+}
+
+/* A quarter of the cover's area. */
+.cover-upload {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50%;
+    height: 50%;
+    margin: 0;
+    background: #d3d3d3;
+    color: #222;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+    .cover-upload:hover {
+        background: #e8e8e8;
+    }
+
+    .cover-upload:focus-within {
+        outline: 2px solid #8ab4f8;
+    }
+
+/* White backing: the logo's dark lettering wouldn't be legible on the page background. */
+.bgg-credit {
+    display: inline-block;
+    margin-top: .5rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #fff;
+}
+
+    .bgg-credit img {
+        display: block;
+        height: 40px;
+    }
+
 .kind-small {
     background: #2f6b4f;
 }
@@ -201,6 +284,11 @@
 
     .cell-input:hover {
         border-color: rgba(255, 255, 255, .4);
+    }
+
+    .cell-input option {
+        background: #fff;
+        color: #000;
     }
 
 /* Player slots */

@@ -1,0 +1,74 @@
+@* Quarter-hour picker. All the options are visible at once, so there's nothing to scroll. *@
+<button type="button" class="hour-button" aria-label="@AriaLabel" aria-haspopup="dialog" aria-expanded="@(open ? "true" : "false")" @onclick="Open">
+    @(Value?.ToString("HH:mm") ?? "--:--")
+</button>
+
+@if (open)
+{
+    <div class="hour-backdrop" @onclick="Close"></div>
+
+    @* Sizes come from the stylesheet; min() and max() keep the popup on screen wherever the click happened. *@
+    <div @ref="popup" class="hour-popup" role="dialog" tabindex="-1" aria-label="@AriaLabel" @onkeydown="OnKeyDown"
+         style="left:max(0px, min(@(x)px, calc(100vw - 410px)));top:max(0px, min(@(y)px, calc(100vh - 360px)));">
+        <div class="hour-grid">
+            @foreach (var option in Options)
+            {
+                <button type="button" class="hour-option @(option == Value ? "hour-option-selected" : "")" @onclick="() => PickAsync(option)">
+                    @option.ToString("HH:mm")
+                </button>
+            }
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" @onclick="() => PickAsync(null)">Bez godziny</button>
+    </div>
+}
+
+@code {
+    private static readonly TimeOnly[] Options =
+        Enumerable.Range(0, 24 * 4).Select(i => new TimeOnly(i / 4, i % 4 * 15)).ToArray();
+
+    [Parameter] public TimeOnly? Value { get; set; }
+
+    [Parameter] public EventCallback<TimeOnly?> ValueChanged { get; set; }
+
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = string.Empty;
+
+    private bool open;
+    private double x;
+    private double y;
+    private ElementReference popup;
+    private bool focusPopup;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Focus has to be inside the popup for Escape to reach it.
+        if (focusPopup)
+        {
+            focusPopup = false;
+            await popup.FocusAsync();
+        }
+    }
+
+    private void Open(MouseEventArgs e)
+    {
+        x = e.ClientX;
+        y = e.ClientY;
+        open = true;
+        focusPopup = true;
+    }
+
+    private void Close() => open = false;
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+        }
+    }
+
+    private async Task PickAsync(TimeOnly? hour)
+    {
+        Close();
+        await ValueChanged.InvokeAsync(hour);
+    }
+}

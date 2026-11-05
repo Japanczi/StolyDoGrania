@@ -1,13 +1,16 @@
 @page "/stoly"
 @layout TablesLayout
 @rendermode InteractiveServer
-@using System.ComponentModel.DataAnnotations
 @using System.Globalization
 @using System.Security.Claims
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.Options
 @using StolyDoGrania.Data
+@using StolyDoGrania.Data.Bgg
 @using StolyDoGrania.Data.Table
 @inject ApplicationDbContext Db
+@inject BggClient Bgg
+@inject IOptions<TableSettings> Settings
 @inject NormalUserMode Mode
 @inject NavigationManager Nav
 
@@ -15,13 +18,7 @@
 
 <div class="toolbar">
     <h1>Stoły</h1>
-    @if (isLoggedIn)
-    {
-        <button type="button" class="btn btn-primary btn-sm" @onclick="ToggleForm">
-            @(formOpen ? "Anuluj" : "Nowy stół")
-        </button>
-    }
-    else
+    @if (!isLoggedIn)
     {
         <a class="btn btn-outline-light btn-sm" href="Account/Login?ReturnUrl=stoly">Zaloguj się, aby tworzyć stoły i zajmować miejsca</a>
     }
@@ -50,77 +47,11 @@
     </div>
 }
 
-@if (formOpen)
-{
-    <div class="card mb-2">
-        <div class="card-body">
-            <EditForm Model="newTable" OnValidSubmit="CreateTableAsync">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger" />
-
-                @if (formError is not null)
-                {
-                    <div class="alert alert-danger py-2" role="alert">@formError</div>
-                }
-
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label" for="new-name">Gra</label>
-                        <input id="new-name" class="form-control form-control-sm" list="catalog-names" maxlength="200" autocomplete="off"
-                               @bind="newTable.GameName" @bind:after="ApplyCatalogDefaults" />
-                        <datalist id="catalog-names">
-                            @foreach (var entry in catalog)
-                            {
-                                <option value="@entry.Name"></option>
-                            }
-                        </datalist>
-                    </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label" for="new-kind">Stół</label>
-                        <select id="new-kind" class="form-select form-select-sm" @bind="newTable.Kind">
-                            <option value="@TableKind.Small">@KindLabel(TableKind.Small)</option>
-                            <option value="@TableKind.Big">@KindLabel(TableKind.Big)</option>
-                            <option value="@TableKind.Other">@KindLabel(TableKind.Other)</option>
-                        </select>
-                    </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label" for="new-hour">Godzina</label>
-                        <input id="new-hour" type="time" class="form-control form-control-sm" @bind="newTable.Hour" />
-                    </div>
-                    <div class="col-6 col-md-1">
-                        <label class="form-label" for="new-max">Graczy</label>
-                        <input id="new-max" class="form-control form-control-sm" value="@newTable.MaxPlayers" disabled title="Liczba wylosowana (1–6)" />
-                    </div>
-                    <div class="col-6 col-md-1">
-                        <label class="form-label" for="new-taken">Zajęte</label>
-                        <input id="new-taken" type="number" class="form-control form-control-sm" min="0" max="@newTable.MaxPlayers" @bind="newTable.TakenSlots" />
-                    </div>
-                    <div class="col-6 col-md-1">
-                        <label class="form-label" for="new-difficulty">Trudność</label>
-                        @* Difficulty belongs to the game, so a catalog game keeps its stored value. *@
-                        <input id="new-difficulty" type="number" class="form-control form-control-sm" min="0" max="5" step="0.01"
-                               disabled="@(FindInCatalog(newTable.GameName) is not null)" @bind="newTable.Difficulty" />
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-success btn-sm w-100" disabled="@busy">Utwórz stół</button>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="new-cover">Własna okładka (opcjonalnie)</label>
-                        <InputFile id="new-cover" OnChange="OnCoverSelected" class="form-control form-control-sm"
-                                   accept="image/png,image/jpeg,image/webp,image/gif" />
-                        <div class="form-text">PNG, JPEG, WebP lub GIF, maks. 2 MB.</div>
-                    </div>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-}
-
 @if (tables is null)
 {
     <p><em>Ładowanie...</em></p>
 }
-else if (tables.Count == 0)
+else if (tables.Count == 0 && !isLoggedIn)
 {
     <div class="alert alert-info py-2">Nie ma jeszcze żadnych stołów.</div>
 }
@@ -152,7 +83,7 @@ else
                         @if (canManage)
                         {
                             <div class="action-anchor">
-                                <button type="button" class="action-button action-delete" title="Usuń stół" aria-label="Usuń stół: @t.Game.Name"
+                                <button type="button" class="action-button action-delete" title="Usuń stół" aria-label="Usuń stół: @t.DisplayTitle"
                                         @onclick="() => OpenDeleteConfirm(t.Id)">❌</button>
                                 @if (confirmDeleteId == t.Id)
                                 {
@@ -160,7 +91,7 @@ else
 
                                     @* Any action button's popup goes in an .action-anchor like this, right after its button. *@
                                     <div class="action-popup" role="dialog" aria-label="Usuń stół" @onkeydown="OnDeleteConfirmKeyDown">
-                                        <span>Usunąć stół „@t.Game.Name”?</span>
+                                        <span>Usunąć stół „@t.DisplayTitle”?</span>
                                         <div class="action-popup-buttons">
                                             <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteTableAsync(t.Id)">Tak</button>
                                             <button @ref="deleteCancelButton" type="button" class="btn btn-secondary btn-sm" @onclick="CloseDeleteConfirm">Nie</button>
@@ -179,14 +110,14 @@ else
                 </div>
 
                 <div class="cell cell-game">
-                    <span class="game-name">@t.Game.Name</span>
+                    <span class="game-name">@t.DisplayTitle</span>
                 </div>
 
                 <div class="cell">
                     @if (canManage)
                     {
-                        <input @key="takenInputVersion" type="number" class="cell-input" min="0" max="@t.MaxPlayers"
-                               value="@t.TakenSlots" aria-label="Liczba miejsc oznaczonych jako zajęte: @t.Game.Name"
+                        <input @key="takenInputVersion" type="number" class="cell-input" min="0" max="@t.MaxTakenSlots"
+                               value="@t.TakenSlots" aria-label="Liczba miejsc oznaczonych jako zajęte: @t.DisplayTitle"
                                @onchange="e => SetTakenSlotsAsync(t.Id, e.Value?.ToString())" />
                     }
                     else if (t.TakenSlots > 0)
@@ -198,7 +129,7 @@ else
                 <div class="cell @KindClass(t.Kind)">
                     @if (canManage)
                     {
-                        <select class="cell-input" value="@t.Kind" aria-label="Rodzaj stołu: @t.Game.Name"
+                        <select class="cell-input" value="@t.Kind" aria-label="Rodzaj stołu: @t.DisplayTitle"
                                 @onchange="e => SetKindAsync(t.Id, e.Value?.ToString())">
                             <option value="@TableKind.Small">@KindLabel(TableKind.Small)</option>
                             <option value="@TableKind.Big">@KindLabel(TableKind.Big)</option>
@@ -214,9 +145,9 @@ else
                 <div class="cell @(t.HasStartTime ? "" : "hour-unset")" title="@(t.HasStartTime ? null : "Godzina nie została ustalona")">
                     @if (canManage)
                     {
-                        <input type="time" class="cell-input" value="@(t.HasStartTime ? t.Start.ToString("HH:mm") : "")"
-                               aria-label="Godzina spotkania: @t.Game.Name"
-                               @onchange="e => SetHourAsync(t.Id, e.Value?.ToString())" />
+                        <HourPicker Value="@(t.HasStartTime ? TimeOnly.FromDateTime(t.Start) : null)"
+                                    ValueChanged="hour => SetHourAsync(t.Id, hour)"
+                                    AriaLabel="@($"Godzina spotkania: {t.DisplayTitle}")" />
                     }
                     else
                     {
@@ -237,12 +168,12 @@ else
                 <div class="cell cell-cover">
                     @if (CoverSrc(t.Game) is { } src)
                     {
-                        <img class="thumb" src="@src" alt="Okładka: @t.Game.Name" />
+                        <img class="thumb" src="@src" alt="Okładka: @t.DisplayTitle" />
                     }
                     else
                     {
-                        <div class="thumb thumb-placeholder" style="background-color:hsl(@PlaceholderHue(t.Game.Name), 55%, 35%);" aria-hidden="true">
-                            @t.Game.Name
+                        <div class="thumb thumb-placeholder" style="background-color:hsl(@PlaceholderHue(t.DisplayTitle), 55%, 35%);" aria-hidden="true">
+                            @t.DisplayTitle
                         </div>
                     }
                 </div>
@@ -293,8 +224,164 @@ else
                 </div>
             </div>
         }
+
+        @if (isLoggedIn)
+        {
+            @* Only the name until it's looked up, then the rest of a table's columns. Not a <form>: Enter must not create a table. *@
+            <div class="table-row table-draft">
+                <div class="cell"></div>
+
+                <div class="cell cell-game">
+                    <input id="new-name" class="form-control form-control-sm" list="catalog-names" maxlength="200" autocomplete="off"
+                           placeholder="Nazwa gry" aria-label="Nazwa gry nowego stołu"
+                           @bind="newTable.GameName" @bind:after="OnGameNameChangedAsync" />
+                    <datalist id="catalog-names">
+                        @foreach (var catalogName in catalogNames)
+                        {
+                            <option value="@catalogName"></option>
+                        }
+                    </datalist>
+                    <div class="draft-actions">
+                        <button type="button" class="btn btn-success btn-sm" disabled="@(busy || bggBusy)" @onclick="CreateTableAsync">Utwórz stół</button>
+                        @if (!string.IsNullOrWhiteSpace(newTable.GameName))
+                        {
+                            @if (Bgg.IsConfigured)
+                            {
+                                <button type="button" class="btn btn-outline-light btn-sm" title="Szukaj tej gry na BoardGameGeek, np. innego wydania"
+                                        disabled="@bggBusy" @onclick="SearchBggManuallyAsync">BGG</button>
+                            }
+                            <button type="button" class="btn btn-outline-light btn-sm" @onclick="ResetDraft">Anuluj</button>
+                        }
+                    </div>
+                </div>
+
+                @if (DraftDetailsVisible)
+                {
+                    var draftCover = selectedCoverSrc ?? CoverSrc(newCover, newCoverType);
+
+                    <div class="cell">
+                        <input id="new-taken" type="number" class="cell-input" min="0" max="@newTable.MaxPlayers"
+                               aria-label="Liczba miejsc oznaczonych jako zajęte" @bind="newTable.TakenSlots" />
+                    </div>
+
+                    <div class="cell @KindClass(newTable.Kind)">
+                        <select id="new-kind" class="cell-input" aria-label="Rodzaj stołu" @bind="newTable.Kind">
+                            <option value="@TableKind.Small">@KindLabel(TableKind.Small)</option>
+                            <option value="@TableKind.Big">@KindLabel(TableKind.Big)</option>
+                            <option value="@TableKind.Other">@KindLabel(TableKind.Other)</option>
+                        </select>
+                    </div>
+
+                    <div class="cell @(newTable.Hour is null ? "hour-unset" : "")">
+                        <HourPicker @bind-Value="newTable.Hour" AriaLabel="Godzina spotkania" />
+                    </div>
+
+                    <div id="new-max" class="cell" title="@(selectedGame?.BggId is not null ? "Liczba graczy z BGG" : "Liczba wylosowana (1–6)")">@newTable.MaxPlayers</div>
+
+                    <div class="cell">
+                        @if (selectedGame?.BggId is { } draftBggId)
+                        {
+                            <a href="https://boardgamegeek.com/boardgame/@draftBggId" target="_blank" rel="noopener noreferrer">Link</a>
+                        }
+                        else
+                        {
+                            <span>–</span>
+                        }
+                    </div>
+
+                    @* Difficulty belongs to the game, so a catalog game keeps its stored value. *@
+                    @if (selectedGame is not null)
+                    {
+                        <div id="new-difficulty" class="cell cell-difficulty" style="@DifficultyStyle(selectedGame.Difficulty)">@DifficultyLabel(selectedGame.Difficulty)</div>
+                    }
+                    else
+                    {
+                        <div class="cell">
+                            @* lang: shows a dot rather than a comma, whatever the browser's language. *@
+                            <input id="new-difficulty" type="number" lang="en" class="cell-input" min="0" max="5" step="0.01"
+                                   aria-label="Trudność" @bind="newTable.Difficulty" />
+                        </div>
+                    }
+
+                    <div class="cell cell-cover">
+                        <div class="draft-cover">
+                            @if (draftCover is not null)
+                            {
+                                <img class="thumb" src="@draftCover" alt="Okładka: @newTable.GameName" />
+                            }
+                            else
+                            {
+                                <div class="thumb thumb-placeholder" style="background-color:hsl(@PlaceholderHue(newTable.GameName), 55%, 35%);" aria-hidden="true">
+                                    @newTable.GameName
+                                </div>
+                            }
+
+                            @if (CanUploadDraftCover)
+                            {
+                                <label class="cover-upload" title="Dodaj okładkę (PNG, JPEG, WebP lub GIF, maks. 2 MB)">
+                                    <span aria-hidden="true">🗁</span>
+                                    <InputFile id="new-cover" OnChange="OnCoverSelected" class="visually-hidden" aria-label="Dodaj okładkę"
+                                               accept="image/png,image/jpeg,image/webp,image/gif" />
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (bggBusy || bggNote is not null || candidates is not null || formError is not null || (DraftDetailsVisible && selectedGame?.BggId is not null))
+            {
+                <div class="draft-panel">
+                    @if (formError is not null)
+                    {
+                        <div class="alert alert-danger py-2 mb-2" role="alert">@formError</div>
+                    }
+
+                    @if (bggBusy)
+                    {
+                        <div role="status">
+                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                            Wczytuję dane z BoardGameGeek...
+                        </div>
+                    }
+
+                    @if (bggNote is not null)
+                    {
+                        <div class="form-text mt-0" role="status">@bggNote</div>
+                    }
+
+                    @if (candidates is not null)
+                    {
+                        <div class="form-text mt-0 mb-1">@candidatesTitle</div>
+                        <div class="candidate-list">
+                            @foreach (var candidate in candidates)
+                            {
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-light candidate-name" disabled="@(bggBusy || busy)" @onclick="() => PickCandidateAsync(candidate)">
+                                        @candidate.Name@(candidate.Year is { } year ? $" ({year})" : "")
+                                    </button>
+                                    <a class="btn btn-outline-light candidate-link" href="https://boardgamegeek.com/boardgame/@candidate.BggId" target="_blank" rel="noopener noreferrer"
+                                       title="Zobacz na BoardGameGeek" aria-label="Zobacz na BoardGameGeek: @candidate.Name">↗</a>
+                                </div>
+                            }
+                            <button type="button" class="btn btn-outline-light btn-sm" @onclick="RejectCandidatesAsync">Żadna z tych</button>
+                        </div>
+                    }
+
+                    @if (DraftDetailsVisible && selectedGame is { BggId: not null } found)
+                    {
+                        <div class="form-text mt-0" role="status">Znaleziono na BoardGameGeek: @CatalogLabel(found)</div>
+                    }
+                </div>
+            }
+        }
     </div>
 }
+
+@* Required by BGG's XML API terms for public-facing uses. *@
+<a class="bgg-credit" href="https://boardgamegeek.com/" target="_blank" rel="noopener noreferrer" title="Dane gier: BoardGameGeek">
+    <img src="images/powered-by-bgg.png" alt="Powered by BoardGameGeek" />
+</a>
 
 @if (addTarget is not null)
 {
@@ -342,14 +429,14 @@ else
 @code {
     private const string AddPlayerHint = "Prawy przycisk: dodaj gracza";
     private const string AssignOwnerHint = "Prawy przycisk: wybierz właściciela";
-    private const long MaxCoverBytes = 2 * 1024 * 1024;
-    private static readonly string[] AllowedCoverTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    private const int MaxListedCandidates = 20;
     private static readonly Uri DefaultBggUrl = new("https://boardgamegeek.com/");
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private List<PlayTable>? tables;
     private List<CatalogEntry> catalog = [];
+    private List<string> catalogNames = [];
 
     private bool isLoggedIn;
     private bool isAdmin;
@@ -359,7 +446,6 @@ else
     private string? displayName;
 
     private bool busy;
-    private bool formOpen;
     private int? confirmDeleteId;
     private ElementReference deleteCancelButton;
     private bool focusDeleteCancel;
@@ -370,6 +456,17 @@ else
     private NewTableModel newTable = new();
     private byte[]? newCover;
     private string? newCoverType;
+
+    // Game lookup in the new table form.
+    private int drawnMaxPlayers;
+    private bool bggBusy;
+    private string? bggNote;
+    private List<GameCandidate>? candidates;
+    private string? candidatesTitle;
+    private CatalogEntry? selectedGame;
+    private string? selectedCoverSrc;
+    // Bumped by each lookup, so that a reply to an outdated one (BGG can take seconds) is ignored.
+    private int lookupVersion;
 
     // Add-player popup (owner's right-click on a slot).
     private AddPlayerTarget? addTarget;
@@ -398,6 +495,7 @@ else
             }
         }
 
+        ResetDraft();
         await LoadAsync();
     }
 
@@ -452,8 +550,17 @@ else
         catalog = await Db.Games
             .AsNoTracking()
             .OrderBy(g => g.Name)
-            .Select(g => new CatalogEntry(g.Name, g.Kind, g.Difficulty))
+            .Select(g => new CatalogEntry(
+                g.Id, g.Name, g.Kind, g.Difficulty, g.MaxPlayers, g.BggId, g.YearPublished,
+                g.Cover != null && g.CoverContentType != "image/svg+xml",
+                g.AlternateNames.Select(a => a.Name).ToList()))
             .ToListAsync();
+
+        catalogNames = catalog
+            .SelectMany(g => g.AlternateNames.Prepend(g.Name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
     }
 
     /// <summary>Runs a write, shows its error (if any) and reloads. Ignores clicks while another write is running.</summary>
@@ -658,7 +765,7 @@ else
 
             Db.PlayTables.Remove(table);
             await Db.SaveChangesAsync();
-            statusMessage = $"Usunięto stół: {table.Game.Name}.";
+            statusMessage = $"Usunięto stół: {table.DisplayTitle}.";
             return null;
         }, "Nie udało się usunąć stołu.");
     }
@@ -691,49 +798,339 @@ else
             return null;
         }), "Nie udało się zapisać rodzaju stołu.");
 
-    private Task SetHourAsync(int tableId, string? rawValue) =>
+    private Task SetHourAsync(int tableId, TimeOnly? hour) =>
         WriteAsync(() => EditAsOwnerAsync(tableId, table =>
         {
-            if (string.IsNullOrEmpty(rawValue))
-            {
-                table.SetStartTime(null);
-                return null;
-            }
-            if (!TimeOnly.TryParse(rawValue, out var time))
-            {
-                return "Niepoprawna godzina.";
-            }
-            table.SetStartTime(time);
+            table.SetStartTime(hour);
             return null;
         }), "Nie udało się zapisać godziny.");
 
     // ---------- new table form ----------
 
-    private void ToggleForm()
+    // The name is only bound once the field loses focus, so the lookup has started by the time this is checked.
+    private bool DraftDetailsVisible => !bggBusy && candidates is null && !string.IsNullOrWhiteSpace(newTable.GameName);
+
+    // Only for a game BGG doesn't have, and which has no cover yet.
+    private bool CanUploadDraftCover => selectedGame is null || selectedGame is { BggId: null, HasCover: false };
+
+    private void ResetDraft()
     {
-        if (!formOpen)
-        {
-            // Early development: always random, BGG will provide the player count later.
-            // Drawn here rather than on save, because "Zajęte" has to fit within it.
-            newTable = new NewTableModel { MaxPlayers = Random.Shared.Next(1, 7) };
-            newCover = null;
-            newCoverType = null;
-            formError = null;
-        }
-        formOpen = !formOpen;
+        // Games not found on BGG still use a random count during early development.
+        // Drawn here rather than on save, because "Zajęte" has to fit within it.
+        drawnMaxPlayers = Random.Shared.Next(1, 7);
+        newTable = new NewTableModel { MaxPlayers = drawnMaxPlayers };
+        newCover = null;
+        newCoverType = null;
+        formError = null;
+        ResetLookup();
     }
 
     private CatalogEntry? FindInCatalog(string? name) =>
         catalog.FirstOrDefault(g => string.Equals(g.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    private void ApplyCatalogDefaults()
+    // ---------- game lookup: the catalog's titles first, then BGG ----------
+
+    private void ResetLookup()
     {
-        if (FindInCatalog(newTable.GameName) is { } known)
+        lookupVersion++;
+        bggBusy = false;
+        bggNote = null;
+        candidates = null;
+        candidatesTitle = null;
+        selectedGame = null;
+        selectedCoverSrc = null;
+    }
+
+    private async Task OnGameNameChangedAsync()
+    {
+        var hadSelection = selectedGame is not null;
+        ResetLookup();
+        formError = null;
+        newCover = null;
+        newCoverType = null;
+        newTable.MaxPlayers = drawnMaxPlayers;
+        if (hadSelection)
         {
-            newTable.Kind = known.Kind;
-            newTable.Difficulty = known.Difficulty;
+            newTable.Difficulty = 0;
+        }
+
+        var name = newTable.GameName.Trim();
+        if (name.Length == 0)
+        {
+            return;
+        }
+
+        // Hand-added games aren't considered yet: they're only used when BGG has nothing.
+        var matches = catalog
+            .Where(g => g.BggId is not null
+                && (string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase)
+                    || g.AlternateNames.Contains(name, StringComparer.OrdinalIgnoreCase)))
+            .ToList();
+
+        switch (matches)
+        {
+            // Its cover couldn't be downloaded last time: try again.
+            case [{ BggId: { } bggId, HasCover: false }]:
+                await RunBggLookupAsync(version => ImportFromBggAsync(bggId, version));
+                break;
+            case [var match]:
+                await SelectCatalogGameAsync(match);
+                break;
+            case []:
+                await RunBggLookupAsync(version => SearchBggAsync(name, version, pickSingleExactMatch: true));
+                break;
+            default:
+                ShowCandidates("Ta nazwa pasuje do kilku gier w katalogu. Wybierz właściwą:",
+                    matches.Select(g => new GameCandidate(g.Name, g.Year, g.BggId ?? 0)));
+                break;
         }
     }
+
+    /// <summary>The fallback for when BGG has nothing: an existing hand-added game of this name, if there is one.</summary>
+    private async Task UseHandAddedGameAsync()
+    {
+        if (FindInCatalog(newTable.GameName) is { BggId: null } handAdded)
+        {
+            await SelectCatalogGameAsync(handAdded);
+        }
+    }
+
+    /// <summary>Lets the user reach BGG even when the catalog already has a match, e.g. to choose another edition.</summary>
+    private async Task SearchBggManuallyAsync()
+    {
+        var name = newTable.GameName.Trim();
+
+        // Ignored while busy: leaving the name field to click this button has already started a lookup.
+        if (bggBusy || name.Length == 0)
+        {
+            return;
+        }
+
+        await RunBggLookupAsync(version => SearchBggAsync(name, version, pickSingleExactMatch: false));
+    }
+
+    private async Task RunBggLookupAsync(Func<int, Task> lookup)
+    {
+        if (!Bgg.IsConfigured)
+        {
+            await UseHandAddedGameAsync();
+            return;
+        }
+
+        var version = ++lookupVersion;
+        bggBusy = true;
+        bggNote = null;
+        try
+        {
+            await lookup(version);
+        }
+        catch (BggUnavailableException)
+        {
+            if (version == lookupVersion)
+            {
+                bggNote = "Nie udało się połączyć z BoardGameGeek. Spróbuj ponownie przyciskiem BGG albo dodaj grę ręcznie.";
+                await UseHandAddedGameAsync();
+            }
+        }
+        finally
+        {
+            if (version == lookupVersion)
+            {
+                bggBusy = false;
+            }
+        }
+    }
+
+    private async Task SearchBggAsync(string name, int version, bool pickSingleExactMatch)
+    {
+        var results = await Bgg.SearchAsync(name);
+        if (version != lookupVersion)
+        {
+            return;
+        }
+
+        var exactMatches = results.Where(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (results.Count == 0)
+        {
+            bggNote = "Nie znaleziono tej gry na BoardGameGeek. Możesz dodać ją ręcznie.";
+            await UseHandAddedGameAsync();
+        }
+        else if (pickSingleExactMatch && (exactMatches.Count == 1 || results.Count == 1))
+        {
+            await ImportFromBggAsync(exactMatches.Count == 1 ? exactMatches[0].Id : results[0].Id, version);
+        }
+        else
+        {
+            var title = results.Count > MaxListedCandidates
+                ? $"Znaleziono {results.Count} gier na BoardGameGeek, poniżej pierwsze {MaxListedCandidates}. Wybierz właściwą lub zawęź nazwę:"
+                : "Wybierz właściwą grę lub wydanie z BoardGameGeek:";
+
+            // Exact title matches first, newest editions first within each group.
+            ShowCandidates(title, results
+                .OrderByDescending(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(r => r.Year)
+                .Take(MaxListedCandidates)
+                .Select(r => new GameCandidate(r.Name, r.Year, r.Id)));
+        }
+    }
+
+    private void ShowCandidates(string title, IEnumerable<GameCandidate> list)
+    {
+        candidatesTitle = title;
+        candidates = list.ToList();
+    }
+
+    private async Task RejectCandidatesAsync()
+    {
+        candidates = null;
+        candidatesTitle = null;
+
+        // A game picked earlier stays when the BGG button's list is dismissed.
+        if (selectedGame is null)
+        {
+            bggNote = "Gra zostanie dodana ręcznie.";
+            await UseHandAddedGameAsync();
+        }
+    }
+
+    private async Task PickCandidateAsync(GameCandidate candidate)
+    {
+        if (bggBusy || busy)
+        {
+            return;
+        }
+
+        await RunBggLookupAsync(version => ImportFromBggAsync(candidate.BggId, version));
+    }
+
+    /// <summary>Adds a BGG game to the catalog, so that it (and its cover) only has to be downloaded once.</summary>
+    private async Task ImportFromBggAsync(int bggId, int version)
+    {
+        var cached = catalog.FirstOrDefault(g => g.BggId == bggId);
+        if (cached is { HasCover: true })
+        {
+            await SelectCatalogGameAsync(cached);
+            return;
+        }
+
+        var details = await Bgg.GetGameAsync(bggId);
+        if (details is null)
+        {
+            if (version == lookupVersion)
+            {
+                bggNote = "BoardGameGeek nie zwrócił danych tej gry.";
+            }
+            return;
+        }
+
+        var cover = details.ThumbnailUrl is { } url ? await Bgg.DownloadCoverAsync(url) : null;
+        if (version != lookupVersion)
+        {
+            return;
+        }
+
+        var kind = newTable.Kind;
+        await WriteAsync(async () =>
+        {
+            await SaveBggGameAsync(details, cover, kind);
+            return null;
+        }, "Nie udało się zapisać gry w katalogu.");
+
+        if (version != lookupVersion)
+        {
+            return;
+        }
+
+        if (catalog.FirstOrDefault(g => g.BggId == bggId) is { } imported)
+        {
+            await SelectCatalogGameAsync(imported);
+        }
+        else if (errorMessage is null)
+        {
+            bggNote = "Nie udało się zapisać gry w katalogu. Spróbuj ponownie.";
+        }
+    }
+
+    private async Task SaveBggGameAsync(BggGameDetails details, BggCover? cover, TableKind kind)
+    {
+        var existing = catalog.FirstOrDefault(g => g.BggId == details.Id);
+
+        // BGG takes priority: a game added by hand under one of the BGG titles becomes that BGG game.
+        var handAdded = existing is not null
+            ? null
+            : catalog.FirstOrDefault(g => g.BggId is null
+                && (string.Equals(g.Name, details.Name, StringComparison.OrdinalIgnoreCase)
+                    || details.AlternateNames.Contains(g.Name, StringComparer.OrdinalIgnoreCase)));
+
+        var game = (existing ?? handAdded) is { } entry
+            ? await Db.Games.Include(g => g.AlternateNames).FirstOrDefaultAsync(g => g.Id == entry.Id)
+            : null;
+
+        if (game is null)
+        {
+            game = new Game { Name = UniqueCatalogName(details, ignoredGameId: null), Kind = kind };
+            Db.Games.Add(game);
+        }
+        else if (handAdded is not null)
+        {
+            game.Name = UniqueCatalogName(details, ignoredGameId: handAdded.Id);
+        }
+
+        game.ApplyBggData(details, cover);
+        await Db.SaveChangesAsync();
+    }
+
+    // Catalog names are unique, but BGG lists separate editions under the same name.
+    private string UniqueCatalogName(BggGameDetails details, int? ignoredGameId)
+    {
+        string[] options = details.Year is { } year
+            ? [details.Name, $"{details.Name} ({year})"]
+            : [details.Name];
+
+        return options.FirstOrDefault(name => FindInCatalog(name) is not { } taken || taken.Id == ignoredGameId)
+            ?? $"{details.Name} [BGG {details.Id}]";
+    }
+
+    private static string CatalogLabel(CatalogEntry game) =>
+        game.Year is { } year && !game.Name.Contains($"({year})") ? $"{game.Name} ({year})" : game.Name;
+
+    private async Task SelectCatalogGameAsync(CatalogEntry game)
+    {
+        // The name field keeps what the user typed: that's the title the table will show.
+        newTable.Kind = game.Kind;
+        newTable.Difficulty = game.Difficulty;
+        newTable.MaxPlayers = game is { BggId: not null, MaxPlayers: > 0 } ? game.MaxPlayers : drawnMaxPlayers;
+
+        selectedGame = game;
+        selectedCoverSrc = null;
+        candidates = null;
+        candidatesTitle = null;
+        formError = TooManySpotsError();
+
+        // Only a preview, so it's skipped rather than risking two queries on one DbContext.
+        if (game.HasCover && !busy)
+        {
+            busy = true;
+            try
+            {
+                var cover = await Db.Games.AsNoTracking()
+                    .Where(g => g.Id == game.Id)
+                    .Select(g => new { g.Cover, g.CoverContentType })
+                    .FirstOrDefaultAsync();
+                selectedCoverSrc = CoverSrc(cover?.Cover, cover?.CoverContentType);
+            }
+            finally
+            {
+                busy = false;
+            }
+        }
+    }
+
+    private string? TooManySpotsError() =>
+        newTable.MaxPlayers > Settings.Value.MaximumSpotsAllowed
+            ? $"Nie można tworzyć stołów dla gier z więcej niż {Settings.Value.MaximumSpotsAllowed} miejscami."
+            : null;
 
     private async Task OnCoverSelected(InputFileChangeEventArgs e)
     {
@@ -741,19 +1138,24 @@ else
         newCover = null;
         newCoverType = null;
 
-        if (!AllowedCoverTypes.Contains(e.File.ContentType))
+        if (!CanUploadDraftCover)
+        {
+            return;
+        }
+
+        if (!Game.AllowedCoverTypes.Contains(e.File.ContentType))
         {
             formError = "Okładka musi być obrazem PNG, JPEG, WebP lub GIF.";
             return;
         }
 
-        if (e.File.Size > MaxCoverBytes)
+        if (e.File.Size > Game.MaxCoverBytes)
         {
             formError = "Okładka może mieć maksymalnie 2 MB.";
             return;
         }
 
-        await using var stream = e.File.OpenReadStream(MaxCoverBytes);
+        await using var stream = e.File.OpenReadStream(Game.MaxCoverBytes);
         using var buffer = new MemoryStream();
         await stream.CopyToAsync(buffer);
 
@@ -771,6 +1173,49 @@ else
             return;
         }
 
+        // Clicking the button right after editing the name starts a new lookup first.
+        if (bggBusy)
+        {
+            formError = "Poczekaj na wynik wyszukiwania na BoardGameGeek.";
+            return;
+        }
+
+        if (candidates is not null)
+        {
+            formError = "Wybierz grę z listy albo kliknij „Żadna z tych”.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newTable.GameName))
+        {
+            formError = "Podaj nazwę gry.";
+            return;
+        }
+
+        if (newTable.GameName.Trim().Length > 200)
+        {
+            formError = "Nazwa może mieć maksymalnie 200 znaków.";
+            return;
+        }
+
+        if (TooManySpotsError() is { } tooManySpots)
+        {
+            formError = tooManySpots;
+            return;
+        }
+
+        if (newTable.TakenSlots < 0)
+        {
+            formError = "Liczba zajętych miejsc nie może być ujemna.";
+            return;
+        }
+
+        if (newTable.Difficulty is < 0 or > 5)
+        {
+            formError = "Trudność musi mieścić się w zakresie 0–5.";
+            return;
+        }
+
         if (newTable.TakenSlots >= newTable.MaxPlayers)
         {
             formError = "Przy stole musi zostać co najmniej jedno miejsce dla Ciebie.";
@@ -782,8 +1227,8 @@ else
 
         await WriteAsync(async () =>
         {
-            var known = FindInCatalog(name);
-            var game = known is null ? null : await Db.Games.FirstOrDefaultAsync(g => g.Name == known.Name);
+            var known = selectedGame ?? FindInCatalog(name);
+            var game = known is null ? null : await Db.Games.FirstOrDefaultAsync(g => g.Id == known.Id);
 
             if (game is null)
             {
@@ -798,8 +1243,8 @@ else
                 Db.Games.Add(game);
             }
 
-            // An upload replaces a generated placeholder, but never someone else's uploaded cover.
-            if (newCover is not null && (game.Cover is null || game.CoverContentType == "image/svg+xml"))
+            // Checked here too, not just by hiding the button.
+            if (newCover is not null && game.CanUploadCover)
             {
                 game.Cover = newCover;
                 game.CoverContentType = newCoverType;
@@ -808,6 +1253,7 @@ else
             var table = new PlayTable
             {
                 Game = game,
+                GameTitle = name,
                 Kind = newTable.Kind,
                 MaxPlayers = newTable.MaxPlayers,
                 TakenSlots = newTable.TakenSlots,
@@ -830,7 +1276,7 @@ else
         if (created)
         {
             statusMessage = $"Utworzono stół: {name}.";
-            formOpen = false;
+            ResetDraft();
         }
     }
 
@@ -843,9 +1289,11 @@ else
         : slot == PlayTable.OwnerSlot && table.OwnerUserId is not null ? "Zajmij to miejsce – zostaniesz właścicielem stołu"
         : "Zajmij to miejsce";
 
-    private static string? CoverSrc(Game game) =>
-        game.Cover is { Length: > 0 }
-            ? $"data:{game.CoverContentType ?? "image/jpeg"};base64,{Convert.ToBase64String(game.Cover)}"
+    private static string? CoverSrc(Game game) => CoverSrc(game.Cover, game.CoverContentType);
+
+    private static string? CoverSrc(byte[]? cover, string? contentType) =>
+        cover is { Length: > 0 }
+            ? $"data:{contentType ?? "image/jpeg"};base64,{Convert.ToBase64String(cover)}"
             : null;
 
     // Derived from the name, so a game keeps its colour across restarts (string.GetHashCode would not).
@@ -853,7 +1301,7 @@ else
 
     // 0 means "not rated": BGG weights start at 1.
     private static string DifficultyLabel(decimal difficulty) =>
-        difficulty > 0 ? difficulty.ToString("0.00", CultureInfo.GetCultureInfo("pl-PL")) : "–";
+        difficulty > 0 ? difficulty.ToString("0.####", CultureInfo.InvariantCulture) : "–";
 
     // Heat scale over the 0–5 range: green (easy) through yellow and orange to red (hard).
     private static string? DifficultyStyle(decimal difficulty) =>
@@ -873,26 +1321,24 @@ else
         _ => "kind-other"
     };
 
-    private sealed record CatalogEntry(string Name, TableKind Kind, decimal Difficulty);
+    private sealed record CatalogEntry(
+        int Id, string Name, TableKind Kind, decimal Difficulty, int MaxPlayers, int? BggId, int? Year, bool HasCover, List<string> AlternateNames);
+    private sealed record GameCandidate(string Name, int? Year, int BggId);
     private sealed record PlayerOption(string UserId, string DisplayName);
     private sealed record AddPlayerTarget(int TableId, int Slot, int X, int Y);
 
     private sealed class NewTableModel
     {
-        [Required(ErrorMessage = "Podaj nazwę gry.")]
-        [StringLength(200, ErrorMessage = "Nazwa może mieć maksymalnie 200 znaków.")]
         public string GameName { get; set; } = string.Empty;
 
         public TableKind Kind { get; set; } = TableKind.Small;
 
         public TimeOnly? Hour { get; set; }
 
-        public int MaxPlayers { get; init; }
+        public int MaxPlayers { get; set; }
 
-        [Range(0, 20, ErrorMessage = "Liczba zajętych miejsc: 0–20.")]
         public int TakenSlots { get; set; }
 
-        [Range(typeof(decimal), "0", "5", ErrorMessage = "Trudność musi mieścić się w zakresie 0–5.")]
         public decimal Difficulty { get; set; }
     }
 }

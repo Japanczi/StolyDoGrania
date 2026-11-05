@@ -13,6 +13,12 @@ public class PlayTable
     public int GameId { get; set; }
     public Game Game { get; set; } = null!;
 
+    /// <summary>The title as typed when creating the table; null for tables created before this was stored.</summary>
+    public string? GameTitle { get; set; }
+
+    /// <summary>The name to show for this table's game.</summary>
+    public string DisplayTitle => GameTitle ?? Game.Name;
+
     /// <summary>Data i godzina rozpoczęcia gry.</summary>
     public DateTime Start { get; set; }
 
@@ -30,7 +36,7 @@ public class PlayTable
 
     /// <summary>
     /// Liczba miejsc oznaczonych przez operatora stołu jako "Zajęte" (niedostępne do zapisu).
-    /// Zajęte są miejsca o najwyższych numerach: (AvailableSlots + 1)..MaxPlayers.
+    /// Zajęte są wolne miejsca o najwyższych numerach, z pominięciem miejsc z uczestnikami (<see cref="IsSlotTaken"/>).
     /// Do zmiany po utworzeniu stołu użyj <see cref="TrySetTakenSlots"/>.
     /// </summary>
     public int TakenSlots
@@ -55,7 +61,16 @@ public class PlayTable
     public int FreeSlots => Math.Max(0, AvailableSlots - ParticipantAmount);
     public bool IsFull => FreeSlots == 0;
 
-    public bool IsSlotTaken(int slot) => slot > AvailableSlots && slot <= MaxPlayers;
+    /// <summary>Unoccupied seats that may be marked as taken; a table's owner seat is never one of them.</summary>
+    private IEnumerable<int> MarkableSlots =>
+        Enumerable.Range(1, MaxPlayers)
+            .Where(n => Participants.All(p => p.SlotNumber != n) && (OwnerUserId is null || n != OwnerSlot));
+
+    /// <summary>The largest allowed value of <see cref="TakenSlots"/>.</summary>
+    public int MaxTakenSlots => MarkableSlots.Count();
+
+    /// <summary>Marks fill the highest-numbered markable seats, passing over seated players.</summary>
+    public bool IsSlotTaken(int slot) => MarkableSlots.OrderDescending().Take(TakenSlots).Contains(slot);
 
     public bool IsOwner(string? userId) => userId is not null && OwnerUserId == userId;
 
@@ -74,7 +89,7 @@ public class PlayTable
     {
         error = null;
 
-        if (slot < 1 || slot > AvailableSlots)
+        if (slot < 1 || slot > MaxPlayers || IsSlotTaken(slot))
         {
             error = "Nie można zająć tego miejsca.";
             return false;
@@ -111,22 +126,9 @@ public class PlayTable
     {
         error = null;
 
-        if (count < 0 || count > MaxPlayers)
+        if (count < 0 || count > MaxTakenSlots)
         {
-            error = $"Liczba zajętych miejsc musi mieścić się w zakresie 0–{MaxPlayers}.";
-            return false;
-        }
-
-        if (OwnerUserId is not null && count == MaxPlayers)
-        {
-            error = "Pierwsze miejsce musi pozostać dostępne dla właściciela stołu.";
-            return false;
-        }
-
-        var newAvailable = MaxPlayers - count;
-        if (Participants.Any(p => p.SlotNumber > newAvailable))
-        {
-            error = "Zajęte miejsca kolidowałyby z już zapisanymi uczestnikami – najpierw ich wypisz.";
+            error = $"Liczba zajętych miejsc musi mieścić się w zakresie 0–{MaxTakenSlots}.";
             return false;
         }
 
@@ -136,8 +138,7 @@ public class PlayTable
 
     /// <summary>
     /// Owner's action: seats someone else, either a registered user or a free-text name (null user id).
-    /// A slot marked as taken gets released; since marked slots are always the highest-numbered,
-    /// the player lands on the lowest marked slot rather than necessarily the one that was chosen.
+    /// Using a slot marked as taken lowers the counter by one; the other marks stay where they are.
     /// </summary>
     public bool TryAddPlayer(int slot, string participantName, string? playerUserId, out string? error)
     {
@@ -168,16 +169,14 @@ public class PlayTable
             return false;
         }
 
-        var isMarked = IsSlotTaken(slot);
-        if (!isMarked && Participants.Any(p => p.SlotNumber == slot))
+        if (Participants.Any(p => p.SlotNumber == slot))
         {
             error = "To miejsce zostało właśnie zajęte przez kogoś innego.";
             return false;
         }
 
-        if (isMarked)
+        if (IsSlotTaken(slot))
         {
-            slot = AvailableSlots + 1;
             _takenSlots--;
         }
 
@@ -233,9 +232,9 @@ public class PlayTable
         if (string.IsNullOrWhiteSpace(participantName))
             throw new ArgumentException("Nazwa uczestnika nie może być pusta.", nameof(participantName));
 
-        for (var slot = 1; slot <= AvailableSlots; slot++)
+        for (var slot = 1; slot <= MaxPlayers; slot++)
         {
-            if (Participants.All(p => p.SlotNumber != slot))
+            if (!IsSlotTaken(slot) && Participants.All(p => p.SlotNumber != slot))
             {
                 Participants.Add(new TableSlot { SlotNumber = slot, ParticipantName = participantName.Trim() });
                 return slot;

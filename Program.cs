@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using StolyDoGrania.Components;
 using StolyDoGrania.Components.Account;
 using StolyDoGrania.Data;
+using StolyDoGrania.Data.Bgg;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +54,15 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 
 builder.Services.AddSingleton<NormalUserMode>();
 builder.Services.AddSingleton<IClaimsTransformation, NormalUserModeClaimsTransformation>();
+
+builder.Services.Configure<TableSettings>(builder.Configuration.GetSection(TableSettings.SectionName));
+
+builder.Services.AddHttpClient(BggClient.HttpClientName, client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("StolyDoGrania/1.0");
+});
+builder.Services.AddSingleton<BggClient>();
 
 var app = builder.Build();
 

@@ -1,0 +1,63 @@
+.hour-button {
+    width: 100%;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: .875rem;
+}
+
+    .hour-button:hover {
+        border-color: rgba(255, 255, 255, .4);
+    }
+
+.hour-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+/* The offsets in the markup depend on this size: keep them in step. */
+.hour-popup {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: 400px;
+    height: 350px;
+    padding: .5rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    outline: none;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+    color: #fff;
+}
+
+/* Two hours per row. */
+.hour-grid {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+}
+
+.hour-option {
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: #3b3b40;
+    color: inherit;
+    font-size: .75rem;
+}
+
+    .hour-option:hover {
+        background: #55555c;
+    }
+
+.hour-option-selected,
+.hour-option-selected:hover {
+    background: #ad2f69;
+}

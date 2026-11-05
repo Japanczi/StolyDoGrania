@@ -231,6 +231,20 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("StolyDoGrania.Data.Table.GameAlternateName", b =>
+                {
+                    b.Property<int>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("GameId", "Name");
+
+                    b.ToTable("GameAlternateNames", (string)null);
+                });
+
             modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
                 {
                     b.Property<int>("Id")
@@ -239,6 +253,10 @@ namespace StolyDoGrania.Migrations
 
                     b.Property<int>("GameId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("GameTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -295,6 +313,9 @@ namespace StolyDoGrania.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("BggId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("BggUrl")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -307,7 +328,7 @@ namespace StolyDoGrania.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Difficulty")
-                        .HasPrecision(3, 2)
+                        .HasPrecision(5, 4)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
@@ -323,7 +344,13 @@ namespace StolyDoGrania.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("YearPublished")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("BggId")
+                        .IsUnique();
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -433,6 +460,15 @@ namespace StolyDoGrania.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("StolyDoGrania.Data.Table.GameAlternateName", b =>
+                {
+                    b.HasOne("StolyDoGrania.Game", null)
+                        .WithMany("AlternateNames")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
                 {
                     b.HasOne("StolyDoGrania.Game", "Game")
@@ -462,6 +498,8 @@ namespace StolyDoGrania.Migrations
 
             modelBuilder.Entity("StolyDoGrania.Game", b =>
                 {
+                    b.Navigation("AlternateNames");
+
                     b.Navigation("Tables");
                 });
 #pragma warning restore 612, 618
