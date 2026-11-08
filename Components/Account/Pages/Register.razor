@@ -28,7 +28,13 @@
             <hr />
             <ValidationSummary class="text-danger" role="alert" />
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <InputText @bind-Value="Input.UserName" id="Input.UserName" class="form-control" autocomplete="username" aria-required="true" placeholder="nazwa" />
+                <label for="Input.UserName">Nazwa użytkownika</label>
+                <div class="form-text">Widoczna dla innych graczy. 3–20 znaków: litery, cyfry, „.”, „_”, „-”.</div>
+                <ValidationMessage For="() => Input.UserName" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="email" aria-required="true" placeholder="name@example.com" />
                 <label for="Input.Email">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
@@ -63,7 +69,16 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null ? null : $"Błąd: {string.Join(", ", identityErrors.Select(Describe))}";
+
+    // Polish text for the errors a user can fix themselves; the rest keep Identity's description.
+    private static string Describe(IdentityError error) => error.Code switch
+    {
+        nameof(IdentityErrorDescriber.DuplicateUserName) => "Ta nazwa użytkownika jest już zajęta.",
+        nameof(IdentityErrorDescriber.DuplicateEmail) => "Ten adres e-mail jest już zarejestrowany.",
+        nameof(IdentityErrorDescriber.InvalidUserName) => "Nazwa użytkownika zawiera niedozwolone znaki.",
+        _ => error.Description,
+    };
 
     protected override void OnInitialized()
     {
@@ -74,7 +89,7 @@
     {
         var user = CreateUser();
 
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+        await UserStore.SetUserNameAsync(user, Input.UserName.Trim(), CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
         var result = await UserManager.CreateAsync(user, Input.Password);
@@ -134,6 +149,13 @@
 
     private sealed class InputModel
     {
+        // No '@' allowed, so a user name can never be mistaken for an e-mail address at login.
+        [Required(ErrorMessage = "Podaj nazwę użytkownika.")]
+        [RegularExpression(@"^\s*[a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ_.\-]{3,20}\s*$",
+            ErrorMessage = "Nazwa użytkownika: 3–20 znaków – litery, cyfry, „.”, „_” lub „-”.")]
+        [Display(Name = "Nazwa użytkownika")]
+        public string UserName { get; set; } = "";
+
         [Required]
         [EmailAddress]
         [Display(Name = "Email")]

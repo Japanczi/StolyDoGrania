@@ -121,7 +121,13 @@
 
             // This doesn't count login failures towards account lockout
             // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            // Accept an e-mail too: user names can't contain '@', so map it to the account's user name.
+            var userName = Input.Email.Trim();
+            if (userName.Contains('@') && await UserManager.FindByEmailAsync(userName) is { UserName: { } byEmail })
+            {
+                userName = byEmail;
+            }
+            result = await SignInManager.PasswordSignInAsync(userName, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         }
 
         if (result.Succeeded)

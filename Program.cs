@@ -37,6 +37,10 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         options.SignIn.RequireConfirmedAccount = true;
         options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
 
+        // User name and e-mail are separate; login accepts either, so e-mails must be unique.
+        options.User.RequireUniqueEmail = true;
+        options.User.AllowedUserNameCharacters += "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ";
+
         // Local development only: allows the temporary admin/admin account.
         if (builder.Environment.IsDevelopment())
         {
@@ -47,7 +51,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             options.Password.RequiredLength = 5;
 
             // Lets the seeded test users have full Polish names as usernames.
-            options.User.AllowedUserNameCharacters += " ąćęłńóśźżĄĆĘŁŃÓŚŹŻ";
+            options.User.AllowedUserNameCharacters += " ";
         }
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()

@@ -46,6 +46,9 @@
             return;
         }
 
+        // Older accounts used the e-mail as user name; only those keep the two in sync.
+        var userNameIsEmail = string.Equals(user.UserName, user.Email, StringComparison.OrdinalIgnoreCase);
+
         var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
         var result = await UserManager.ChangeEmailAsync(user, Email, code);
         if (!result.Succeeded)
@@ -54,13 +57,14 @@
             return;
         }
 
-        // In our UI email and user name are one and the same, so when we update the email
-        // we need to update the user name.
-        var setUserNameResult = await UserManager.SetUserNameAsync(user, Email);
-        if (!setUserNameResult.Succeeded)
+        if (userNameIsEmail)
         {
-            message = "Error changing user name.";
-            return;
+            var setUserNameResult = await UserManager.SetUserNameAsync(user, Email);
+            if (!setUserNameResult.Succeeded)
+            {
+                message = "Error changing user name.";
+                return;
+            }
         }
 
         await SignInManager.RefreshSignInAsync(user);
