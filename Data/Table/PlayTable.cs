@@ -74,6 +74,49 @@ public class PlayTable
 
     public bool IsOwner(string? userId) => userId is not null && OwnerUserId == userId;
 
+    /// <summary>
+    /// Creates a new table owned by <paramref name="ownerUserId"/>, who is seated in <see cref="OwnerSlot"/>.
+    /// The spots limit from settings is checked by the caller.
+    /// </summary>
+    public static bool TryCreate(
+        Game game, string gameTitle, TableKind kind, int maxPlayers, int takenSlots, TimeOnly? hour,
+        string ownerUserId, string ownerName,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out PlayTable? table, out string? error)
+    {
+        table = null;
+
+        if (maxPlayers < 1)
+        {
+            error = "Stół musi mieć co najmniej jedno miejsce.";
+            return false;
+        }
+
+        if (takenSlots < 0 || takenSlots >= maxPlayers)
+        {
+            error = "Przy stole musi zostać co najmniej jedno miejsce dla Ciebie.";
+            return false;
+        }
+
+        var created = new PlayTable
+        {
+            Game = game,
+            GameTitle = gameTitle,
+            Kind = kind,
+            MaxPlayers = maxPlayers,
+            TakenSlots = takenSlots,
+            OwnerUserId = ownerUserId
+        };
+        created.SetStartTime(hour);
+
+        if (!created.TryTakeSlot(OwnerSlot, ownerName, ownerUserId, out error))
+        {
+            return false;
+        }
+
+        table = created;
+        return true;
+    }
+
     /// <summary>Sets the meeting hour, keeping the existing date; null clears it.</summary>
     public void SetStartTime(TimeOnly? time) =>
         Start = time is { } value

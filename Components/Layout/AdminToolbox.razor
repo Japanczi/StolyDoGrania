@@ -1,14 +1,17 @@
 @* Admin tools for the whole list of tables. UI only: the page's handlers run the actions and check permissions. *@
+@using StolyDoGrania.Components.Pages
 <div class="admin-toolbox">
     @if (open)
     {
-        <section class="toolbox-panel" aria-label="Narzędzia administratora" @onkeydown="OnKeyDown">
+        <section class="toolbox-panel" aria-label="Narzędzia administratora">
             <div class="toolbox-item">
-                <button type="button" class="toolbox-button" disabled="@(Busy || TableCount == 0)"
-                        title="@(TableCount == 0 ? "Lista stołów jest pusta" : "Usuń wszystkie stoły z listy")"
-                        @onclick="OpenConfirm">
-                    Wyczyść listę stołów
-                </button>
+                @* Two clicks: the first arms it (green, names the count), the second clears the list. *@
+                <ConfirmButton Class="toolbox-button" Disabled="@(Busy || TableCount == 0)" OnConfirm="OnClearTables"
+                               Title="Usuń wszystkie stoły z listy" DisabledTitle="Lista stołów jest pusta"
+                               ArmedTitle="Kliknij ponownie, aby usunąć wszystkie stoły">
+                    <ChildContent>Wyczyść listę stołów</ChildContent>
+                    <ArmedContent>✓ Kliknij ponownie – usunie @TableCount @TablesWord(TableCount)</ArmedContent>
+                </ConfirmButton>
 
                 @* A button rather than a checkbox: its state always comes from the saved setting, even after a failed save. *@
                 <button type="button" role="switch" class="toolbox-switch" aria-checked="@(AutoReset ? "true" : "false")"
@@ -18,17 +21,6 @@
                     <span class="switch-label">Auto</span>
                 </button>
             </div>
-
-            @if (confirming)
-            {
-                <div class="toolbox-confirm" role="alertdialog" aria-label="Wyczyść listę stołów">
-                    <span>Usunąć wszystkie stoły (@TableCount)? Tego nie można cofnąć.</span>
-                    <div class="toolbox-confirm-buttons">
-                        <button type="button" class="btn btn-danger btn-sm" disabled="@Busy" @onclick="ConfirmClearAsync">Tak</button>
-                        <button @ref="cancelButton" type="button" class="btn btn-secondary btn-sm" @onclick="() => confirming = false">Nie</button>
-                    </div>
-                </div>
-            }
         </section>
     }
 
@@ -55,42 +47,13 @@
     [Parameter] public EventCallback<bool> OnAutoResetChanged { get; set; }
 
     private bool open;
-    private bool confirming;
-    private bool focusCancel;
-    private ElementReference cancelButton;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (focusCancel)
-        {
-            focusCancel = false;
-            await cancelButton.FocusAsync();
-        }
-    }
+    // Closing the panel removes the button, which also disarms it.
+    private void Toggle() => open = !open;
 
-    private void Toggle()
-    {
-        open = !open;
-        confirming = false;
-    }
-
-    private void OpenConfirm()
-    {
-        confirming = true;
-        focusCancel = true;
-    }
-
-    private async Task ConfirmClearAsync()
-    {
-        confirming = false;
-        await OnClearTables.InvokeAsync();
-    }
-
-    private void OnKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            confirming = false;
-        }
-    }
+    // Polish plural: 1 stół, 2–4 stoły (except 12–14), otherwise stołów.
+    private static string TablesWord(int n) =>
+        n == 1 ? "stół"
+        : n % 10 is >= 2 and <= 4 && n % 100 is not (>= 12 and <= 14) ? "stoły"
+        : "stołów";
 }

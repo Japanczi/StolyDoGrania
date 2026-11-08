@@ -71,7 +71,8 @@
     gap: 2px;
 }
 
-.action-button {
+.action-button,
+.action-anchor ::deep .confirm-delete {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -84,11 +85,12 @@
     line-height: 1;
 }
 
-.action-delete {
+/* The delete button is the shared ConfirmDeleteButton component (it styles its own armed ✅ state). */
+.action-anchor ::deep .confirm-delete {
     background: #55555c;
 }
 
-    .action-delete:hover {
+    .action-anchor ::deep .confirm-delete:hover:not(.armed) {
         background: #77777f;
     }
 
@@ -225,6 +227,38 @@
     justify-content: center;
     gap: 2px;
 }
+
+/* "Ostatnio:" – the last names used to create tables, as small chips at the bottom of the game cell. */
+.recent-phrases {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 3px;
+    margin-top: 2px;
+    font-size: .6875rem;
+}
+
+.recent-label {
+    color: #a0a0a6;
+}
+
+.recent-phrase {
+    max-width: 100%;
+    padding: 0 .4rem;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, .06);
+    color: #d7d7d7;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .recent-phrase:hover:not(:disabled) {
+        border-color: rgba(255, 255, 255, .5);
+        color: #fff;
+    }
 
 .draft-cover {
     position: relative;
@@ -433,4 +467,27 @@ button.slot:focus-visible {
     align-items: flex-end;
     gap: .75rem;
     max-height: calc(100vh - 2rem);
+}
+
+/* A table just created from "Baza gier": golden outline that fades out, so the eye finds it. */
+.table-new {
+    outline: 2px solid #e0b94a;
+    outline-offset: -2px;
+    animation: table-new-fade 4s ease-out 1.5s forwards;
+}
+
+    .table-new:focus {
+        outline: 2px solid #e0b94a;
+    }
+
+@keyframes table-new-fade {
+    to {
+        outline-color: transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .table-new {
+        animation: none;
+    }
 }

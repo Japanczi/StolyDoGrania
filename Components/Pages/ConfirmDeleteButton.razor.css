@@ -1,0 +1,7 @@
+/* The armed check fills the button's height: 2em of the button's own (small) font size. */
+.confirm-check {
+    font-size: 2em;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+}

@@ -11,6 +11,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<PlayTable> PlayTables => Set<PlayTable>();
     public DbSet<TableSlot> TableSlots => Set<TableSlot>();
     public DbSet<BoardSettings> BoardSettings => Set<BoardSettings>();
+    public DbSet<TablePhrase> TablePhrases => Set<TablePhrase>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -65,6 +66,20 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasKey(s => new { s.PlayTableId, s.SlotNumber });
             e.Property(s => s.ParticipantName).IsRequired().HasMaxLength(100);
             e.Property(s => s.UserId).HasMaxLength(450);
+        });
+
+        builder.Entity<TablePhrase>(e =>
+        {
+            e.ToTable("TablePhrases");
+            e.Property(p => p.Phrase).IsRequired().HasMaxLength(TablePhrase.MaxLength);
+            e.Property(p => p.UserId).HasMaxLength(450);
+            // Newest first is the only query.
+            e.HasIndex(p => p.CreatedUtc);
+            // The phrase stays when its game is deleted from Baza gier.
+            e.HasOne(p => p.Game)
+                .WithMany()
+                .HasForeignKey(p => p.GameId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<BoardSettings>(e =>

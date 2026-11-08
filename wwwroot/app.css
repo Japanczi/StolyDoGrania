@@ -38,8 +38,55 @@ html, body {
     border-color: #1861ac;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+/* Buttons show the focus ring for keyboard focus only, so it doesn't cover the pressed shading after a click. */
+.btn:focus-visible, .btn-link.nav-link:focus-visible, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+/*
+    App-wide button states, for every box-shaped button (Bootstrap .btn and the app's own buttons):
+    - hover: pseudo-3D shading, lit from above (light top edge, dark bottom edge, small drop shadow);
+    - pressed: nudged 1px down and shaded inwards, as if pushed in;
+    - disabled: dimmed, with no hover or pressed effect.
+    Only box-shadow and the "translate" property are used, so every button keeps its own colours and
+    any positioning transform (e.g. the centred feedback toggle). :where() keeps specificity low, so a
+    component's own box-shadow (focus rings, the armed confirm glow) still wins.
+    Text-like controls (links, menu entries, sort headers, close ✕, the Auto switch) are left out.
+    Player slots keep their own hover ring and are never dimmed: a disabled slot means a taken seat.
+*/
+.board-theme {
+    --btn-raised: inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 -2px 0 rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .45);
+    --btn-pressed: inset 0 2px 4px rgba(0, 0, 0, .5), inset 0 -1px 0 rgba(255, 255, 255, .08);
+    --btn-disabled-opacity: .45;
+}
+
+/* Bootstrap declares this on .btn itself, so it's overridden there: .btn dims like the app's own buttons. */
+.board-theme .btn {
+    --bs-btn-disabled-opacity: var(--btn-disabled-opacity);
+}
+
+.board-theme :where(button, .btn, .cover-upload):not(:where(.btn-close, .btn-link, .drawer-link, .drawer-close, .sort-btn, .toolbox-switch)) {
+    transition: color .15s, background-color .15s, border-color .15s, box-shadow .08s, translate .08s;
+}
+
+.board-theme :where(button, .btn, .cover-upload):not(:where(.btn-close, .btn-link, .drawer-link, .drawer-close, .sort-btn, .toolbox-switch, .slot)):where(:hover:not(:disabled, .disabled)) {
+    box-shadow: var(--btn-raised);
+}
+
+.board-theme :where(button, .btn, .cover-upload):not(:where(.btn-close, .btn-link, .drawer-link, .drawer-close, .sort-btn, .toolbox-switch, .slot-inert)):where(:active:not(:disabled, .disabled)) {
+    translate: 0 1px;
+    box-shadow: var(--btn-pressed);
+}
+
+.board-theme :where(button):not(:where(.btn-close, .btn-link, .drawer-link, .drawer-close, .sort-btn, .slot)):disabled {
+    opacity: var(--btn-disabled-opacity);
+    cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .board-theme :where(button, .btn, .cover-upload) {
+        transition: none;
+    }
 }
 
 /* No page scrolling behind the open menu drawer (see MainLayout). */

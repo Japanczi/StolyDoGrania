@@ -1,0 +1,126 @@
+@implements IDisposable
+
+@*
+    Two-click button for destructive actions: the first click arms it (solid green, ArmedContent),
+    the second one fires OnConfirm. It disarms on Escape, a click anywhere else, or after a few seconds.
+    (No focusout: Safari can blur a button when it is clicked, which would disarm it before the confirming click.)
+    The caller sizes and colours the unarmed button through ::deep on its Class; this component styles the armed state.
+*@
+@if (armed)
+{
+    <div class="confirm-backdrop" @onclick="Disarm" @oncontextmenu="Disarm" @oncontextmenu:preventDefault></div>
+}
+<button @ref="button" type="button" class="confirm-button @Class @(armed ? "armed" : null)" disabled="@Disabled"
+        title="@(Disabled ? DisabledTitle ?? Title : armed ? ArmedTitle : Title)"
+        aria-label="@(armed ? ArmedAriaLabel : AriaLabel)"
+        @onclick="OnClickAsync" @onkeydown="OnKeyDown">@(armed ? ArmedContent : ChildContent)</button>
+
+@code {
+    private static readonly TimeSpan ArmedFor = TimeSpan.FromSeconds(4);
+
+    private ElementReference button;
+    private bool armed;
+    private bool focusAfterArming;
+    private CancellationTokenSource? timeout;
+
+    /// <summary>Called on the confirming (second) click.</summary>
+    [Parameter, EditorRequired] public EventCallback OnConfirm { get; set; }
+
+    /// <summary>Content of the unarmed button.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Content while armed, waiting for the confirming click.</summary>
+    [Parameter, EditorRequired] public RenderFragment? ArmedContent { get; set; }
+
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? ArmedTitle { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? ArmedAriaLabel { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? DisabledTitle { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Disabled)
+        {
+            Disarm();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Focused explicitly: some browsers (Safari) don't focus a clicked button, and Escape needs focus.
+        if (focusAfterArming)
+        {
+            focusAfterArming = false;
+            await button.FocusAsync();
+        }
+    }
+
+    private async Task OnClickAsync()
+    {
+        if (Disabled)
+        {
+            return;
+        }
+
+        if (!armed)
+        {
+            Arm();
+            return;
+        }
+
+        Disarm();
+        await OnConfirm.InvokeAsync();
+    }
+
+    private void Arm()
+    {
+        armed = true;
+        focusAfterArming = true;
+
+        timeout?.Cancel();
+        timeout?.Dispose();
+        timeout = new CancellationTokenSource();
+        _ = DisarmLaterAsync(timeout.Token);
+    }
+
+    private async Task DisarmLaterAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(ArmedFor, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        await InvokeAsync(() =>
+        {
+            Disarm();
+            StateHasChanged();
+        });
+    }
+
+    private void Disarm()
+    {
+        armed = false;
+        timeout?.Cancel();
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Disarm();
+        }
+    }
+
+    public void Dispose()
+    {
+        timeout?.Cancel();
+        timeout?.Dispose();
+    }
+}

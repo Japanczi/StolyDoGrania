@@ -1,0 +1,373 @@
+@page "/gry"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.Options
+@using StolyDoGrania.Data
+@using StolyDoGrania.Data.Table
+@using static StolyDoGrania.Components.Pages.GameDisplay
+@inject ApplicationDbContext Db
+@inject IOptions<TableSettings> Settings
+@inject NavigationManager Nav
+
+<PageTitle>Baza gier</PageTitle>
+
+<div class="toolbar">
+    <h1>Baza gier</h1>
+    @if (games is not null)
+    {
+        <span class="count">@CountLabel</span>
+    }
+    <input type="search" class="form-control form-control-sm search" placeholder="Szukaj gry…" aria-label="Szukaj gry"
+           @bind="search" @bind:event="oninput" />
+</div>
+
+@if (actionError is not null)
+{
+    <div class="alert alert-danger alert-dismissible py-2">
+        @actionError
+        <button type="button" class="btn-close py-2" aria-label="Zamknij" @onclick="() => actionError = null"></button>
+    </div>
+}
+@if (statusMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible py-2">
+        @statusMessage
+        <button type="button" class="btn-close py-2" aria-label="Zamknij" @onclick="() => statusMessage = null"></button>
+    </div>
+}
+
+@if (loadError is not null)
+{
+    <div class="alert alert-danger">@loadError</div>
+}
+else if (games is null)
+{
+    <p class="text-secondary">Wczytywanie…</p>
+}
+else if (games.Count == 0)
+{
+    <p class="text-secondary">Katalog gier jest pusty. Gry trafiają tu po utworzeniu stołu na stronie <a href="">Zapisy na gry</a>.</p>
+}
+else
+{
+    <div class="game-list @(isAdmin ? "with-actions" : null)" role="table" aria-label="Katalog gier">
+        <div class="game-row game-head" role="row">
+            @if (isAdmin)
+            {
+                <div class="cell cell-actions" role="columnheader"><span class="visually-hidden">Akcje</span></div>
+            }
+            <div class="cell cell-cover" role="columnheader">Okładka</div>
+            @SortHeader("Nazwa", SortColumn.Name, "cell-name")
+            <div class="cell cell-create" role="columnheader">Nowy stół</div>
+            @SortHeader("Rodzaj stołu", SortColumn.Kind, "cell-kind")
+            @SortHeader("Gracze", SortColumn.Players, "cell-num cell-players")
+            @SortHeader("Trudność", SortColumn.Difficulty, "cell-num cell-difficulty")
+            @SortHeader("Stoły", SortColumn.Tables, "cell-num cell-tables")
+            <div class="cell cell-bgg" role="columnheader">BGG</div>
+        </div>
+
+        @foreach (var g in Visible)
+        {
+            <div class="game-row" role="row" @key="g.Id">
+                @if (isAdmin)
+                {
+                    <div class="cell cell-actions" role="cell">
+                        @* Two clicks: ❌ arms it (✅), the second click deletes. A game with tables can't be removed (the DB restricts it too). *@
+                        <ConfirmDeleteButton ItemName="@g.Name" Title="Usuń grę z bazy" ArmedTitle="Kliknij ponownie, aby usunąć grę"
+                                             Disabled="@(busy || g.TableCount > 0)"
+                                             DisabledTitle="@(g.TableCount > 0 ? "Nie można usunąć gry, przy której są stoły" : null)"
+                                             OnConfirm="() => DeleteGameAsync(g.Id)" />
+                    </div>
+                }
+                <div class="cell cell-cover" role="cell">
+                    @if (g.CoverSrc is { } src)
+                    {
+                        <img class="thumb" src="@src" alt="Okładka: @g.Name" loading="lazy" />
+                    }
+                    else
+                    {
+                        <div class="thumb thumb-placeholder" style="background-color:hsl(@PlaceholderHue(g.Name), 55%, 35%);" aria-hidden="true">@g.Name</div>
+                    }
+                </div>
+                <div class="cell cell-name" role="cell">
+                    <span class="game-name">@g.Name</span>
+                    @if (g.Year is { } year)
+                    {
+                        <span class="game-year">(@year)</span>
+                    }
+                </div>
+                <div class="cell cell-create" role="cell">
+                    @if (!isLoggedIn)
+                    {
+                        <a class="btn btn-outline-light btn-sm" href="Account/Login?ReturnUrl=gry" title="Zaloguj się, aby tworzyć stoły">Utwórz stół</a>
+                    }
+                    else if (TooManySpots(g.MaxPlayers))
+                    {
+                        <button type="button" class="btn btn-success btn-sm" disabled
+                                title="Gra ma więcej niż @Settings.Value.MaximumSpotsAllowed miejsc">Utwórz stół</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-success btn-sm" disabled="@busy"
+                                title="Utwórz stół z tą grą i przejdź do niego" @onclick="() => CreateTableAsync(g.Id)">Utwórz stół</button>
+                    }
+                </div>
+                <div class="cell cell-kind" role="cell"><span class="kind @KindClass(g.Kind)">@KindLabel(g.Kind)</span></div>
+                <div class="cell cell-num cell-players" role="cell">@g.MaxPlayers</div>
+                <div class="cell cell-num cell-difficulty" role="cell" style="@DifficultyStyle(g.Difficulty)">@DifficultyLabel(g.Difficulty)</div>
+                <div class="cell cell-num cell-tables" role="cell">@g.TableCount</div>
+                <div class="cell cell-bgg" role="cell">
+                    @if (g.BggId is not null && g.BggUrl is not null)
+                    {
+                        <a href="@g.BggUrl" target="_blank" rel="noopener noreferrer">Link</a>
+                    }
+                    else
+                    {
+                        <span class="text-secondary" title="Gra dodana ręcznie – nie ma jej na BGG">–</span>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!Visible.Any())
+        {
+            <p class="text-secondary mt-2">Brak gier pasujących do „@search”.</p>
+        }
+    </div>
+}
+
+@code {
+    private enum SortColumn { Name, Kind, Players, Difficulty, Tables }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private List<GameRow>? games;
+    private string? loadError;
+    private string? actionError;
+    private string? statusMessage;
+    private string search = string.Empty;
+    private SortColumn sortBy = SortColumn.Name;
+    private bool descending;
+    private bool busy;
+
+    private bool isLoggedIn;
+    private bool isAdmin;
+    private string? userId;
+    private string? displayName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            isLoggedIn = user.Identity?.IsAuthenticated == true;
+            if (isLoggedIn)
+            {
+                // Normal user mode hides the Admin role through claims transformation, so this respects it.
+                isAdmin = user.IsInRole(AppRoles.Admin);
+                userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+                displayName = UserNames.Short(user.Identity?.Name);
+            }
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var rows = await Db.Games
+                .AsNoTracking()
+                .Select(g => new
+                {
+                    g.Id, g.Name, g.Kind, g.MaxPlayers, g.Difficulty, g.BggId, g.BggUrl, g.YearPublished,
+                    g.Cover, g.CoverContentType,
+                    TableCount = g.Tables.Count,
+                    AlternateNames = g.AlternateNames.Select(a => a.Name).ToList()
+                })
+                .ToListAsync();
+
+            // Cover data URIs are built once here, not on every render.
+            games = rows
+                .Select(r => new GameRow(
+                    r.Id, r.Name, r.Kind, r.MaxPlayers, r.Difficulty, r.BggId, r.BggUrl, r.YearPublished,
+                    CoverSrc(r.Cover, r.CoverContentType), r.TableCount, r.AlternateNames))
+                .ToList();
+        }
+        catch (System.Data.Common.DbException)
+        {
+            loadError = "Nie udało się wczytać listy gier. Spróbuj odświeżyć stronę.";
+        }
+    }
+
+    private bool TooManySpots(int maxPlayers) => maxPlayers > Settings.Value.MaximumSpotsAllowed;
+
+    /// <summary>Creates a table with the game's defaults (owner seated, no hour yet) and opens it on the board.</summary>
+    private async Task CreateTableAsync(int gameId)
+    {
+        actionError = null;
+        statusMessage = null;
+
+        if (busy)
+        {
+            return;
+        }
+
+        if (userId is null || displayName is null)
+        {
+            actionError = "Zaloguj się, aby utworzyć stół.";
+            return;
+        }
+
+        busy = true;
+        int? createdId = null;
+        try
+        {
+            var game = await Db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+            if (game is null)
+            {
+                actionError = "Tej gry nie ma już w bazie.";
+            }
+            else if (TooManySpots(game.MaxPlayers))
+            {
+                actionError = $"Nie można tworzyć stołów dla gier z więcej niż {Settings.Value.MaximumSpotsAllowed} miejscami.";
+            }
+            else if (!PlayTable.TryCreate(game, game.Name, game.Kind, game.MaxPlayers, takenSlots: 0, hour: null,
+                         userId, displayName, out var table, out var createError))
+            {
+                actionError = createError;
+            }
+            else
+            {
+                Db.PlayTables.Add(table);
+                // Saved together with the table; feeds the "Ostatnio" names under the board's game field.
+                Db.TablePhrases.Add(TablePhrase.For(table, userId));
+                await Db.SaveChangesAsync();
+                createdId = table.Id;
+            }
+        }
+        catch (DbUpdateException)
+        {
+            actionError = "Nie udało się zapisać stołu w bazie danych.";
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            busy = false;
+        }
+
+        if (createdId is { } id)
+        {
+            // The board focuses and highlights the new table.
+            Nav.NavigateTo($"?nowy={id}");
+        }
+    }
+
+    private async Task DeleteGameAsync(int gameId)
+    {
+        actionError = null;
+        statusMessage = null;
+
+        // Checked on the server too, not just by hiding the button.
+        if (busy || !isAdmin)
+        {
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            var game = await Db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+            if (game is null)
+            {
+                actionError = "Tej gry nie ma już w bazie.";
+            }
+            else if (await Db.PlayTables.AnyAsync(t => t.GameId == gameId))
+            {
+                actionError = $"Nie można usunąć gry „{game.Name}”, bo są przy niej stoły. Najpierw usuń te stoły.";
+            }
+            else
+            {
+                // Alternate names go with it (cascade).
+                Db.Games.Remove(game);
+                await Db.SaveChangesAsync();
+                statusMessage = $"Usunięto grę: {game.Name}.";
+            }
+        }
+        catch (DbUpdateException)
+        {
+            actionError = "Nie udało się usunąć gry. Możliwe, że ktoś właśnie utworzył przy niej stół.";
+        }
+        finally
+        {
+            Db.ChangeTracker.Clear();
+            await LoadAsync();
+            busy = false;
+        }
+    }
+
+    private IEnumerable<GameRow> Visible
+    {
+        get
+        {
+            var term = search.Trim();
+            // Alternate names aren't shown, but searching by them still works.
+            var filtered = (games ?? []).Where(g => term.Length == 0
+                || g.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)
+                || g.AlternateNames.Any(a => a.Contains(term, StringComparison.CurrentCultureIgnoreCase)));
+
+            IOrderedEnumerable<GameRow> sorted = sortBy switch
+            {
+                SortColumn.Kind => Order(filtered, g => g.Kind),
+                SortColumn.Players => Order(filtered, g => g.MaxPlayers),
+                SortColumn.Difficulty => Order(filtered, g => g.Difficulty),
+                SortColumn.Tables => Order(filtered, g => g.TableCount),
+                _ => Order(filtered, g => g.Name, StringComparer.CurrentCultureIgnoreCase)
+            };
+            // Ties are always broken by name, A–Z.
+            return sorted.ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase);
+        }
+    }
+
+    private IOrderedEnumerable<GameRow> Order<TKey>(IEnumerable<GameRow> source, Func<GameRow, TKey> key, IComparer<TKey>? comparer = null) =>
+        descending ? source.OrderByDescending(key, comparer) : source.OrderBy(key, comparer);
+
+    private string CountLabel
+    {
+        get
+        {
+            var shown = Visible.Count();
+            var total = games?.Count ?? 0;
+            return shown == total ? $"{total} {GamesWord(total)}" : $"{shown} z {total}";
+        }
+    }
+
+    // Polish plural: 1 gra, 2–4 gry (except 12–14), otherwise gier.
+    private static string GamesWord(int n) =>
+        n == 1 ? "gra"
+        : n % 10 is >= 2 and <= 4 && n % 100 is not (>= 12 and <= 14) ? "gry"
+        : "gier";
+
+    private void SortOn(SortColumn column)
+    {
+        // Clicking the active column flips the direction; a new column starts A–Z / lowest first.
+        descending = sortBy == column && !descending;
+        sortBy = column;
+    }
+
+    private RenderFragment SortHeader(string label, SortColumn column, string cssClass) => __builder =>
+    {
+        var active = sortBy == column;
+        <div class="cell @cssClass" role="columnheader" aria-sort="@(active ? (descending ? "descending" : "ascending") : "none")">
+            <button type="button" class="sort-btn @(active ? "active" : null)" @onclick="() => SortOn(column)" title="Sortuj: @label">
+                @label <span class="sort-arrow" aria-hidden="true">@(active ? (descending ? "▼" : "▲") : "")</span>
+            </button>
+        </div>
+    };
+
+    private sealed record GameRow(
+        int Id, string Name, TableKind Kind, int MaxPlayers, decimal Difficulty, int? BggId, Uri? BggUrl, int? Year,
+        string? CoverSrc, int TableCount, List<string> AlternateNames);
+}

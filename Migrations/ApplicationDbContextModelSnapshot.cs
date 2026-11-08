@@ -308,6 +308,36 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("PlayTables", (string)null);
                 });
 
+            modelBuilder.Entity("StolyDoGrania.Data.Table.TablePhrase", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("GameId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedUtc");
+
+                    b.HasIndex("GameId");
+
+                    b.ToTable("TablePhrases", (string)null);
+                });
+
             modelBuilder.Entity("StolyDoGrania.Data.Table.TableSlot", b =>
                 {
                     b.Property<int>("PlayTableId")
@@ -499,6 +529,16 @@ namespace StolyDoGrania.Migrations
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("StolyDoGrania.Data.Table.TablePhrase", b =>
+                {
+                    b.HasOne("StolyDoGrania.Game", "Game")
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Game");
                 });

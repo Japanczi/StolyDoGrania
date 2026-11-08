@@ -8,6 +8,7 @@
 @using StolyDoGrania.Data
 @using StolyDoGrania.Data.Bgg
 @using StolyDoGrania.Data.Table
+@using static StolyDoGrania.Components.Pages.GameDisplay
 @inject ApplicationDbContext Db
 @inject BggClient Bgg
 @inject IOptions<TableSettings> Settings
@@ -78,27 +79,16 @@ else
             var hasSeat = t.Participants.Any(p => p.UserId == userId);
             var canManage = isOwner || isAdmin;
 
-            <div class="table-row" @key="t.Id">
+            <div class="table-row @(t.Id == highlightTableId ? "table-new" : null)" @key="t.Id" @ref="rowRefs[t.Id]"
+                 tabindex="@(t.Id == highlightTableId ? "-1" : null)">
                 <div class="cell cell-actions">
                     <div class="actions">
                         @if (canManage)
                         {
                             <div class="action-anchor">
-                                <button type="button" class="action-button action-delete" title="Usuń stół" aria-label="Usuń stół: @t.DisplayTitle"
-                                        @onclick="() => OpenDeleteConfirm(t.Id)">❌</button>
-                                @if (confirmDeleteId == t.Id)
-                                {
-                                    <div class="popup-backdrop" @onclick="CloseDeleteConfirm"></div>
-
-                                    @* Any action button's popup goes in an .action-anchor like this, right after its button. *@
-                                    <div class="action-popup" role="dialog" aria-label="Usuń stół" @onkeydown="OnDeleteConfirmKeyDown">
-                                        <span>Usunąć stół „@t.DisplayTitle”?</span>
-                                        <div class="action-popup-buttons">
-                                            <button type="button" class="btn btn-danger btn-sm" disabled="@busy" @onclick="() => DeleteTableAsync(t.Id)">Tak</button>
-                                            <button @ref="deleteCancelButton" type="button" class="btn btn-secondary btn-sm" @onclick="CloseDeleteConfirm">Nie</button>
-                                        </div>
-                                    </div>
-                                }
+                                @* Two clicks: ❌ arms it (✅), the second click deletes. *@
+                                <ConfirmDeleteButton ItemName="@t.DisplayTitle" Title="Usuń stół" ArmedTitle="Kliknij ponownie, aby usunąć stół"
+                                                     Disabled="@busy" OnConfirm="() => DeleteTableAsync(t.Id)" />
                             </div>
 
                             <div class="action-anchor">
@@ -108,6 +98,7 @@ else
                                 {
                                     <div class="popup-backdrop" @onclick="CloseRename"></div>
 
+                                    @* Any action button's popup goes in an .action-anchor like this, right after its button. *@
                                     <div class="action-popup action-popup-wide" role="dialog" aria-label="Zmień grę" @onkeydown="OnRenameKeyDown">
                                         <label for="rename-name">Nazwa gry</label>
                                         <input @ref="renameInput" id="rename-name" class="form-control form-control-sm" list="catalog-names" maxlength="200" autocomplete="off"
@@ -291,6 +282,18 @@ else
                             <button type="button" class="btn btn-outline-light btn-sm" @onclick="ResetDraft">Anuluj</button>
                         }
                     </div>
+                    @if (recentPhrases.Count > 0)
+                    {
+                        @* The last names used to create tables (all users); a click fills the field and looks the game up. *@
+                        <div class="recent-phrases" role="group" aria-label="Ostatnio używane nazwy gier">
+                            <span class="recent-label">Ostatnio:</span>
+                            @foreach (var phrase in recentPhrases)
+                            {
+                                <button type="button" class="recent-phrase" title="Użyj nazwy: @phrase" disabled="@(busy || bggBusy)"
+                                        @onclick="() => UseRecentPhraseAsync(phrase)">@phrase</button>
+                            }
+                        </div>
+                    }
                 </div>
 
                 @if (DraftDetailsVisible)
@@ -421,9 +424,20 @@ else
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    /// <summary>Id of a table just created on another page; it is focused and highlighted.</summary>
+    [SupplyParameterFromQuery(Name = "nowy")] private int? NewTableId { get; set; }
+
+    private int? highlightTableId;
+    private readonly Dictionary<int, ElementReference> rowRefs = new();
+
     private List<PlayTable>? tables;
     private List<CatalogEntry> catalog = [];
     private List<string> catalogNames = [];
+
+    private const int RecentPhraseCount = 5;
+
+    /// <summary>The newest distinct names used to create tables (all users), newest first.</summary>
+    private List<string> recentPhrases = [];
 
     private bool isLoggedIn;
     private bool isAdmin;
@@ -434,9 +448,6 @@ else
 
     private bool busy;
     private bool autoReset;
-    private int? confirmDeleteId;
-    private ElementReference deleteCancelButton;
-    private bool focusDeleteCancel;
     private string? statusMessage;
     private string? errorMessage;
     private string? formError;
@@ -491,10 +502,25 @@ else
 
         ResetDraft();
         await LoadAsync();
+
+        // Arrived from "Baza gier" right after creating a table there.
+        if (NewTableId is { } newId && tables?.FirstOrDefault(t => t.Id == newId) is { } created)
+        {
+            highlightTableId = newId;
+            statusMessage = $"Utworzono stół: {created.DisplayTitle}.";
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Runs once the circuit is up (not during prerendering); focusing the row scrolls it into view.
+        if (firstRender && highlightTableId is { } id && rowRefs.TryGetValue(id, out var row))
+        {
+            await row.FocusAsync();
+            // Drop the parameter, so a refresh doesn't announce the table again.
+            Nav.NavigateTo("", replace: true);
+        }
+
         if (focusFreeText)
         {
             focusFreeText = false;
@@ -503,12 +529,6 @@ else
             {
                 await freeTextInput.FocusAsync();
             }
-        }
-
-        if (focusDeleteCancel)
-        {
-            focusDeleteCancel = false;
-            await deleteCancelButton.FocusAsync();
         }
 
         if (focusRenameInput)
@@ -560,6 +580,17 @@ else
             .SelectMany(g => g.AlternateNames.Prepend(g.Name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        // Only the draft row shows them. A margin of rows, so that repeats can be dropped (ignoring case) and 5 still remain.
+        recentPhrases = !isLoggedIn ? [] : (await Db.TablePhrases
+                .AsNoTracking()
+                .OrderByDescending(p => p.CreatedUtc)
+                .Select(p => p.Phrase)
+                .Take(50)
+                .ToListAsync())
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .Take(RecentPhraseCount)
             .ToList();
 
         autoReset = isAdmin && await Db.BoardSettings.AsNoTracking().AnyAsync(s => s.AutoResetEnabled);
@@ -852,26 +883,8 @@ else
         }
     }
 
-    private void OpenDeleteConfirm(int tableId)
-    {
-        confirmDeleteId = tableId;
-        focusDeleteCancel = true;
-    }
-
-    private void CloseDeleteConfirm() => confirmDeleteId = null;
-
-    private void OnDeleteConfirmKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            CloseDeleteConfirm();
-        }
-    }
-
     private async Task DeleteTableAsync(int tableId)
     {
-        confirmDeleteId = null;
-
         await WriteAsync(async () =>
         {
             // The permission check is part of the query; the game stays in the catalog.
@@ -1053,6 +1066,13 @@ else
         candidatesTitle = null;
         selectedGame = null;
         selectedCoverSrc = null;
+    }
+
+    // Same as typing the name and leaving the field.
+    private async Task UseRecentPhraseAsync(string phrase)
+    {
+        newTable.GameName = phrase;
+        await OnGameNameChangedAsync();
     }
 
     private async Task OnGameNameChangedAsync()
@@ -1458,24 +1478,16 @@ else
                 game.CoverContentType = newCoverType;
             }
 
-            var table = new PlayTable
-            {
-                Game = game,
-                GameTitle = name,
-                Kind = newTable.Kind,
-                MaxPlayers = newTable.MaxPlayers,
-                TakenSlots = newTable.TakenSlots,
-                OwnerUserId = userId
-            };
-            table.SetStartTime(newTable.Hour);
-
             // The owner automatically gets the first slot.
-            if (!table.TryTakeSlot(PlayTable.OwnerSlot, displayName, userId, out var seatError))
+            if (!PlayTable.TryCreate(game, name, newTable.Kind, newTable.MaxPlayers, newTable.TakenSlots, newTable.Hour,
+                    userId, displayName, out var table, out var createError))
             {
-                return seatError;
+                return createError;
             }
 
             Db.PlayTables.Add(table);
+            // Saved together with the table; feeds the "Ostatnio" names under the board's game field.
+            Db.TablePhrases.Add(TablePhrase.For(table, userId));
             await Db.SaveChangesAsync();
             created = true;
             return null;
@@ -1496,38 +1508,6 @@ else
         : table.IsOwner(userId) ? (slot == PlayTable.OwnerSlot ? "Zajmij to miejsce" : "Jako właściciel stołu możesz zająć tylko pierwsze miejsce")
         : slot == PlayTable.OwnerSlot && table.OwnerUserId is not null ? "Zajmij to miejsce – zostaniesz właścicielem stołu"
         : "Zajmij to miejsce";
-
-    private static string? CoverSrc(Game game) => CoverSrc(game.Cover, game.CoverContentType);
-
-    private static string? CoverSrc(byte[]? cover, string? contentType) =>
-        cover is { Length: > 0 }
-            ? $"data:{contentType ?? "image/jpeg"};base64,{Convert.ToBase64String(cover)}"
-            : null;
-
-    // Derived from the name, so a game keeps its colour across restarts (string.GetHashCode would not).
-    private static int PlaceholderHue(string name) => name.Sum(c => (int)c) * 47 % 360;
-
-    // 0 means "not rated": BGG weights start at 1.
-    private static string DifficultyLabel(decimal difficulty) =>
-        difficulty > 0 ? difficulty.ToString("0.####", CultureInfo.InvariantCulture) : "–";
-
-    // Heat scale over the 0–5 range: green (easy) through yellow and orange to red (hard).
-    private static string? DifficultyStyle(decimal difficulty) =>
-        difficulty > 0 ? $"background-color:hsl({(int)(120 - difficulty * 24)}, 85%, 68%);color:#222;" : null;
-
-    private static string KindLabel(TableKind kind) => kind switch
-    {
-        TableKind.Small => "Mały",
-        TableKind.Big => "Duży",
-        _ => "Inny"
-    };
-
-    private static string KindClass(TableKind kind) => kind switch
-    {
-        TableKind.Small => "kind-small",
-        TableKind.Big => "kind-big",
-        _ => "kind-other"
-    };
 
     private sealed record CatalogEntry(
         int Id, string Name, TableKind Kind, decimal Difficulty, int MaxPlayers, int? BggId, int? Year, bool HasCover, List<string> AlternateNames);
