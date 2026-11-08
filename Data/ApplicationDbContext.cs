@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Planszowkarz.Data.Import;
 using Planszowkarz.Data.Table;
 
 namespace Planszowkarz.Data;
@@ -51,6 +52,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(t => t.OwnerUserId).HasMaxLength(450);
             e.Property(t => t.GameTitle).HasMaxLength(200);
             e.Ignore(t => t.DisplayTitle);
+            e.Ignore(t => t.IsImported);
+            e.Property(t => t.ImportKey).HasMaxLength(SheetTableRow.MaxKeyLength);
+            e.HasIndex(t => t.ImportKey).IsUnique();
             e.HasOne(t => t.Game)
                 .WithMany(g => g.Tables)
                 .HasForeignKey(t => t.GameId)

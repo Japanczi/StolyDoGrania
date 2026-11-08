@@ -8,6 +8,7 @@ using Planszowkarz.Components.Account;
 using Planszowkarz.Data;
 using Planszowkarz.Data.Bgg;
 using Planszowkarz.Data.Email;
+using Planszowkarz.Data.Import;
 using Planszowkarz.Data.Table;
 using Planszowkarz.Tools;
 
@@ -84,6 +85,11 @@ builder.Services.AddScoped<BoardResetter>();
 builder.Services.AddSingleton<FeedbackArchive>();
 builder.Services.AddSingleton<DiskUsage>();
 builder.Services.AddHostedService<WeeklyBoardResetService>();
+
+builder.Services.Configure<SheetImportSettings>(builder.Configuration.GetSection(SheetImportSettings.SectionName));
+builder.Services.AddHttpClient(SheetImportService.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<SheetBoardSync>();
+builder.Services.AddHostedService<SheetImportService>();
 
 // In production HTTPS ends at the hosting proxy (Mikrus / Cloudflare), which forwards plain HTTP.
 // Trust its X-Forwarded-Proto/For headers so generated links (e.g. confirmation e-mails) use https://.

@@ -281,6 +281,10 @@ namespace Planszowkarz.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImportKey")
+                        .HasMaxLength(220)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -304,6 +308,9 @@ namespace Planszowkarz.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GameId");
+
+                    b.HasIndex("ImportKey")
+                        .IsUnique();
 
                     b.ToTable("PlayTables", (string)null);
                 });
@@ -344,6 +351,9 @@ namespace Planszowkarz.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("SlotNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsImported")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ParticipantName")
@@ -427,6 +437,9 @@ namespace Planszowkarz.Migrations
                     b.Property<decimal>("Difficulty")
                         .HasPrecision(5, 4)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsFromSheet")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Kind")
                         .IsRequired()

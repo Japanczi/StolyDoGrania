@@ -15,6 +15,9 @@ namespace Planszowkarz.Data.Table
         /// <summary>Id zalogowanego użytkownika, który zajął to miejsce (tylko on może je zwolnić).</summary>
         public string? UserId { get; set; }
 
+        /// <summary>True for a seat copied from the sign-up sheet; the sheet import owns it and may change or remove it.</summary>
+        public bool IsImported { get; set; }
+
         /// <summary>
         /// Query filter for slots the user may free: their own slot, any slot at a table they own, or any slot for an admin.
         /// An expression so the check runs in the database query, not only in the UI.

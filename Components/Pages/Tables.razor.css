@@ -26,6 +26,28 @@
     background: #3b3b40;
 }
 
+/* Separates the app's tables from those imported from the sheet; as wide as the rows, so it scrolls with them. */
+.import-divider {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 1054px;
+    /* Two empty text lines of breathing room above the divider. */
+    margin-block: 3rem .25rem;
+    color: #f0b429;
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-align: center;
+}
+
+    .import-divider::before,
+    .import-divider::after {
+        content: "";
+        flex: 1;
+        border-top: 2px solid #f0b429;
+    }
+
 .table-head {
     border-radius: 0;
     background: none;

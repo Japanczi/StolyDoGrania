@@ -76,8 +76,10 @@ else
             <div class="cell cell-slots">Miejsca</div>
         </div>
 
-        @foreach (var t in tables)
-        {
+        @{
+            // One table's row; shared by the app's tables and the imported ones below the divider.
+            void TableRow(PlayTable t)
+            {
             var isOwner = t.IsOwner(userId);
             var hasSeat = t.Participants.Any(p => p.UserId == userId);
             var canManage = isOwner || isAdmin;
@@ -255,6 +257,12 @@ else
                     }
                 </div>
             </div>
+            }
+        }
+
+        @foreach (var t in tables.Where(t => !t.IsImported))
+        {
+            TableRow(t);
         }
 
         @if (isLoggedIn)
@@ -356,6 +364,19 @@ else
                 <div class="draft-panel">
                     @LookupMessages
                 </div>
+            }
+        }
+
+        @* Temporary, while sign-ups move from the sheet to the app: imported tables sit below the app's own. *@
+        @if (tables.Any(t => t.IsImported))
+        {
+            <div class="import-divider" role="separator">
+                <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
+            </div>
+
+            @foreach (var t in tables.Where(t => t.IsImported))
+            {
+                TableRow(t);
             }
         }
     </div>

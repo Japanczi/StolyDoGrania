@@ -17,7 +17,7 @@ public class Game
     /// <summary>Rodzaj stołu potrzebnego do gry.</summary>
     public TableKind Kind { get; set; } = TableKind.Small;
 
-    /// <summary>BGG's average weight, set only from BGG data; 0 means no rating.</summary>
+    /// <summary>BGG's average weight, set only from BGG data (directly, or as copied by the sign-up sheet); 0 means no rating.</summary>
     public decimal Difficulty { get; set; }
 
     /// <summary>Maksymalna liczba graczy przewidziana przez grę (domyślna pojemność stołu).</summary>
@@ -44,6 +44,12 @@ public class Game
     /// <summary>Other titles of this game, as listed by BGG.</summary>
     public List<GameAlternateName> AlternateNames { get; set; } = new();
 
+    /// <summary>
+    /// True for a game the sign-up sheet import added to the catalog. The import deletes it again once no table uses it;
+    /// attaching BGG data in the app clears the flag, so the game then stays.
+    /// </summary>
+    public bool IsFromSheet { get; set; }
+
     /// <summary>A generated placeholder doesn't count as a cover.</summary>
     public bool IsMissingCover => Cover is null || CoverContentType == "image/svg+xml";
 
@@ -57,6 +63,7 @@ public class Game
     public void ApplyBggData(BggGameDetails details, BggCover? cover)
     {
         var wasHandAdded = BggId is null;
+        IsFromSheet = false;
 
         BggId = details.Id;
         BggUrl = new Uri($"https://boardgamegeek.com/boardgame/{details.Id}");

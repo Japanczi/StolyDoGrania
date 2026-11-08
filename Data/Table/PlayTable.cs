@@ -1,3 +1,5 @@
+using Planszowkarz.Data.Import;
+
 namespace Planszowkarz.Data.Table;
 
 /// <summary>Stół na konkretny termin – gra z katalogu + start + zapisani uczestnicy.</summary>
@@ -30,6 +32,14 @@ public class PlayTable
 
     /// <summary>Id of the user who created the table; null for tables created before this was tracked.</summary>
     public string? OwnerUserId { get; set; }
+
+    /// <summary>
+    /// Identifies the sign-up sheet row this table mirrors (see <see cref="SheetTableRow.KeysFor"/>);
+    /// null for tables created in the app, which the import never touches.
+    /// </summary>
+    public string? ImportKey { get; set; }
+
+    public bool IsImported => ImportKey is not null;
 
     /// <summary>False when the meeting hour is not set yet (<see cref="Start"/> holds the default value).</summary>
     public bool HasStartTime => Start != default;
@@ -298,6 +308,78 @@ public class PlayTable
         MaxPlayers = maxPlayers;
         _takenSlots = 0;
         return true;
+    }
+
+    /// <summary>
+    /// Makes this table match a row of the sign-up sheet: title, table kind, hour, seat count, imported players and
+    /// "Zajęte" marks. Seats taken in the app are kept; one whose seat the sheet now gives to someone else, or that is
+    /// past the new seat count, moves to the lowest free seat. Returns the names of app players who no longer fit.
+    /// The caller sets the game.
+    /// </summary>
+    public IReadOnlyList<string> ApplyImport(SheetTableRow row)
+    {
+        GameTitle = row.Title;
+        Kind = row.Kind;
+        MaxPlayers = row.MaxPlayers;
+
+        // The date isn't in the sheet, so an unchanged hour keeps the stored date.
+        var currentHour = HasStartTime ? TimeOnly.FromDateTime(Start) : (TimeOnly?)null;
+        if (currentHour != row.Start)
+        {
+            SetStartTime(row.Start);
+        }
+
+        // Desired seats: the sheet's players first, then app players where they sit, then displaced app players.
+        var desired = row.Players
+            .Where(p => p.Key >= 1 && p.Key <= MaxPlayers)
+            .ToDictionary(p => p.Key, p => new TableSlot { SlotNumber = p.Key, ParticipantName = p.Value, IsImported = true });
+
+        var appSeats = Participants.Where(p => !p.IsImported).OrderBy(p => p.SlotNumber).ToList();
+        var displaced = new List<TableSlot>();
+        foreach (var seat in appSeats)
+        {
+            if (seat.SlotNumber <= MaxPlayers && !desired.ContainsKey(seat.SlotNumber))
+            {
+                desired[seat.SlotNumber] = new TableSlot { SlotNumber = seat.SlotNumber, ParticipantName = seat.ParticipantName, UserId = seat.UserId };
+            }
+            else
+            {
+                displaced.Add(seat);
+            }
+        }
+
+        var dropped = new List<string>();
+        foreach (var seat in displaced)
+        {
+            var free = Enumerable.Range(1, MaxPlayers).FirstOrDefault(n => !desired.ContainsKey(n));
+            if (free == 0)
+            {
+                dropped.Add(seat.ParticipantName);
+                continue;
+            }
+
+            desired[free] = new TableSlot { SlotNumber = free, ParticipantName = seat.ParticipantName, UserId = seat.UserId };
+        }
+
+        // Existing rows are updated in place rather than replaced: EF can't track a removed and an added row with the same key.
+        foreach (var existing in Participants.ToList())
+        {
+            if (desired.Remove(existing.SlotNumber, out var wanted))
+            {
+                existing.ParticipantName = wanted.ParticipantName;
+                existing.UserId = wanted.UserId;
+                existing.IsImported = wanted.IsImported;
+            }
+            else
+            {
+                Participants.Remove(existing);
+            }
+        }
+
+        Participants.AddRange(desired.Values.OrderBy(s => s.SlotNumber));
+
+        _takenSlots = Math.Min(row.TakenSlots, MaxTakenSlots);
+        return dropped;
     }
 
     public int? Join(string participantName)
