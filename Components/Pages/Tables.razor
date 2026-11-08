@@ -664,9 +664,9 @@ else
         }
 
         // Only the person in the slot, the table's owner or an admin may free it.
-        var entry = await Db.TableSlots.FirstOrDefaultAsync(s =>
-            s.PlayTableId == tableId && s.SlotNumber == slot
-            && (isAdmin || s.UserId == userId || s.PlayTable.OwnerUserId == userId));
+        var entry = await Db.TableSlots
+            .Where(TableSlot.RemovableBy(userId, isAdmin))
+            .FirstOrDefaultAsync(s => s.PlayTableId == tableId && s.SlotNumber == slot);
 
         if (entry is null)
         {

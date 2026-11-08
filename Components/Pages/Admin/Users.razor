@@ -154,25 +154,12 @@ else
         currentIsOwner = list.Any(r => r.Id == currentUserId && r.Role == AppRoles.Owner);
     }
 
-    /// <summary>The highest of a user's roles: Owner, then Admin, otherwise User.</summary>
-    private static string MainRole(IList<string> roles) =>
-        roles.Contains(AppRoles.Owner) ? AppRoles.Owner
-        : roles.Contains(AppRoles.Admin) ? AppRoles.Admin
-        : AppRoles.User;
+    private static string MainRole(IList<string> roles) => AppRoles.MainRole(roles);
 
-    /// <summary>
-    /// Whether the current user may change the role of, or delete, a user with this role:
-    /// nobody touches the Owner, and only the Owner touches other admins.
-    /// </summary>
+    /// <summary>Whether the current user may change the role of, or delete, a user with this role.</summary>
     private bool CanManage(string targetRole) => CanManage(targetRole, currentIsOwner);
 
-    private static bool CanManage(string targetRole, bool actorIsOwner) =>
-        targetRole switch
-        {
-            AppRoles.Owner => false,
-            AppRoles.Admin => actorIsOwner,
-            _ => true
-        };
+    private static bool CanManage(string targetRole, bool actorIsOwner) => AppRoles.CanManage(targetRole, actorIsOwner);
 
     /// <summary>The current user, freshly from the database, and whether they are the Owner right now.</summary>
     private async Task<(ApplicationUser? Actor, bool IsOwner)> LoadActorAsync()

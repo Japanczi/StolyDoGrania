@@ -12,7 +12,8 @@ namespace Planszowkarz.Data;
 public sealed partial class ValidEmailAttribute() : ValidationAttribute(
     "Podaj poprawny adres e-mail, np. jan.nowak@example.com.")
 {
-    [GeneratedRegex(@"^(?!\.)(?!.*\.\.)[A-Za-z0-9._%+\-]+(?<!\.)@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$")]
+    // \z, not $: in .NET "$" also matches before a trailing "\n", which would let "a@b.pl\n" through.
+    [GeneratedRegex(@"^(?!\.)(?!.*\.\.)[A-Za-z0-9._%+\-]+(?<!\.)@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}\z")]
     private static partial Regex Pattern();
 
     public override bool IsValid(object? value) =>
