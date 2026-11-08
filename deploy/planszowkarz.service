@@ -1,0 +1,13 @@
+[Unit]
+Description=Planszowkarz
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/planszowkarz/app
+ExecStart=/opt/planszowkarz/app/Planszowkarz
+EnvironmentFile=/opt/planszowkarz/planszowkarz.env
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
