@@ -228,38 +228,6 @@
     gap: 2px;
 }
 
-/* "Ostatnio:" – the last names used to create tables, as small chips at the bottom of the game cell. */
-.recent-phrases {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 3px;
-    margin-top: 2px;
-    font-size: .6875rem;
-}
-
-.recent-label {
-    color: #a0a0a6;
-}
-
-.recent-phrase {
-    max-width: 100%;
-    padding: 0 .4rem;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, .25);
-    border-radius: 1rem;
-    background: rgba(255, 255, 255, .06);
-    color: #d7d7d7;
-    line-height: 1.5;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-    .recent-phrase:hover:not(:disabled) {
-        border-color: rgba(255, 255, 255, .5);
-        color: #fff;
-    }
-
 .draft-cover {
     position: relative;
     width: 100px;

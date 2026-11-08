@@ -285,18 +285,6 @@ else
                             <button type="button" class="btn btn-outline-light btn-sm" @onclick="ResetDraft">Anuluj</button>
                         }
                     </div>
-                    @if (recentPhrases.Count > 0)
-                    {
-                        @* The last names used to create tables (all users); a click fills the field and looks the game up. *@
-                        <div class="recent-phrases" role="group" aria-label="Ostatnio używane nazwy gier">
-                            <span class="recent-label">Ostatnio:</span>
-                            @foreach (var phrase in recentPhrases)
-                            {
-                                <button type="button" class="recent-phrase" title="Użyj nazwy: @phrase" disabled="@(busy || bggBusy)"
-                                        @onclick="() => UseRecentPhraseAsync(phrase)">@phrase</button>
-                            }
-                        </div>
-                    }
                 </div>
 
                 @if (DraftDetailsVisible)
@@ -438,11 +426,6 @@ else
     private List<PlayTable>? tables;
     private List<CatalogEntry> catalog = [];
     private List<string> catalogNames = [];
-
-    private const int RecentPhraseCount = 5;
-
-    /// <summary>The newest distinct names used to create tables (all users), newest first.</summary>
-    private List<string> recentPhrases = [];
 
     private bool isLoggedIn;
     private bool isAdmin;
@@ -587,17 +570,6 @@ else
             .SelectMany(g => g.AlternateNames.Prepend(g.Name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
-
-        // Only the draft row shows them. A margin of rows, so that repeats can be dropped (ignoring case) and 5 still remain.
-        recentPhrases = !isLoggedIn ? [] : (await Db.TablePhrases
-                .AsNoTracking()
-                .OrderByDescending(p => p.CreatedUtc)
-                .Select(p => p.Phrase)
-                .Take(50)
-                .ToListAsync())
-            .Distinct(StringComparer.CurrentCultureIgnoreCase)
-            .Take(RecentPhraseCount)
             .ToList();
 
         autoReset = isAdmin && await Db.BoardSettings.AsNoTracking().AnyAsync(s => s.AutoResetEnabled);
@@ -1153,13 +1125,6 @@ else
         candidatesTitle = null;
         selectedGame = null;
         selectedCoverSrc = null;
-    }
-
-    // Same as typing the name and leaving the field.
-    private async Task UseRecentPhraseAsync(string phrase)
-    {
-        newTable.GameName = phrase;
-        await OnGameNameChangedAsync();
     }
 
     private async Task OnGameNameChangedAsync()
