@@ -15,6 +15,8 @@
 @inject NormalUserMode Mode
 @inject NavigationManager Nav
 @inject BoardResetter Resetter
+@inject FeedbackArchive Feedback
+@inject IJSRuntime JS
 
 <PageTitle>Zapisy na gry</PageTitle>
 
@@ -412,7 +414,8 @@ else
     <div class="admin-dock">
         <AdminHelpBox />
         <AdminToolbox TableCount="@(tables?.Count ?? 0)" AutoReset="@autoReset" Busy="@busy"
-                      OnClearTables="ClearTablesAsync" OnAutoResetChanged="SetAutoResetAsync" />
+                      OnClearTables="ClearTablesAsync" OnAutoResetChanged="SetAutoResetAsync"
+                      FeedbackCount="@feedbackCount" OnDownloadFeedback="DownloadFeedbackAsync" />
     </div>
 }
 
@@ -448,6 +451,7 @@ else
 
     private bool busy;
     private bool autoReset;
+    private int feedbackCount;
     private string? statusMessage;
     private string? errorMessage;
     private string? formError;
@@ -594,6 +598,7 @@ else
             .ToList();
 
         autoReset = isAdmin && await Db.BoardSettings.AsNoTracking().AnyAsync(s => s.AutoResetEnabled);
+        feedbackCount = isAdmin ? Feedback.Count() : 0;
     }
 
     /// <summary>Runs a write, shows its error (if any) and reloads. Ignores clicks while another write is running.</summary>
@@ -982,6 +987,52 @@ else
         await Db.SaveChangesAsync();
         return null;
     }, "Nie udało się zapisać ustawienia automatycznego czyszczenia.");
+
+    /// <summary>Downloads every user comment as a zip, then deletes those files from the server.</summary>
+    private async Task DownloadFeedbackAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        statusMessage = null;
+        busy = true;
+        try
+        {
+            var packed = Feedback.Pack(DateTime.Now);
+            if (packed is null)
+            {
+                statusMessage = "Brak uwag do pobrania.";
+                return;
+            }
+
+            using var stream = new MemoryStream(packed.Zip);
+            using var streamRef = new DotNetStreamReference(stream);
+            // Returns once the browser has the whole zip, so a failed download deletes nothing.
+            await JS.InvokeVoidAsync("downloadFileFromStream", packed.FileName, streamRef);
+
+            try
+            {
+                Feedback.Delete(packed.Files);
+                statusMessage = $"Pobrano i usunięto uwagi ({packed.Files.Count}).";
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                errorMessage = "Uwagi pobrano, ale nie udało się usunąć ich z serwera.";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JSException)
+        {
+            errorMessage = "Nie udało się pobrać uwag.";
+        }
+        finally
+        {
+            feedbackCount = Feedback.Count();
+            busy = false;
+        }
+    }
 
     // ---------- new table form ----------
 

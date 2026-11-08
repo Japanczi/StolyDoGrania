@@ -1,5 +1,6 @@
 @using System.Security.Claims
-@inject IWebHostEnvironment Env
+@using Planszowkarz.Data
+@inject FeedbackArchive Archive
 @inject NavigationManager Nav
 
 @* Logged-in users only, in every environment; comments are saved server-side. *@
@@ -108,7 +109,7 @@
 
         try
         {
-            var folder = Path.Combine(Env.ContentRootPath, "Claude_Resources", "Feedback");
+            var folder = Archive.Folder;
             Directory.CreateDirectory(folder);
             await File.WriteAllTextAsync(Path.Combine(folder, fileName), content);
 

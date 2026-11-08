@@ -21,6 +21,17 @@
                     <span class="switch-label">Auto</span>
                 </button>
             </div>
+
+            <div class="toolbox-item">
+                @* Two clicks too: the comments are deleted from the server once the zip has been downloaded. *@
+                <ConfirmButton Class="toolbox-button" Disabled="@(Busy || FeedbackCount == 0)" OnConfirm="OnDownloadFeedback"
+                               Title="Pobierz wszystkie uwagi użytkowników jako .zip i usuń je z serwera"
+                               DisabledTitle="Brak uwag do pobrania"
+                               ArmedTitle="Kliknij ponownie, aby pobrać uwagi i usunąć je z serwera">
+                    <ChildContent>Pobierz i usuń uwagi (@FeedbackCount)</ChildContent>
+                    <ArmedContent>✓ Kliknij ponownie – pobierze i usunie @FeedbackCount @CommentsWord(FeedbackCount)</ArmedContent>
+                </ConfirmButton>
+            </div>
         </section>
     }
 
@@ -43,6 +54,11 @@
 
     [Parameter] public EventCallback OnClearTables { get; set; }
 
+    /// <summary>Number of user comments saved on the server; downloading is disabled when there are none.</summary>
+    [Parameter] public int FeedbackCount { get; set; }
+
+    [Parameter] public EventCallback OnDownloadFeedback { get; set; }
+
     /// <summary>Called with the requested new state of the automatic reset.</summary>
     [Parameter] public EventCallback<bool> OnAutoResetChanged { get; set; }
 
@@ -56,4 +72,10 @@
         n == 1 ? "stół"
         : n % 10 is >= 2 and <= 4 && n % 100 is not (>= 12 and <= 14) ? "stoły"
         : "stołów";
+
+    // 1 uwagę, 2–4 uwagi (except 12–14), otherwise uwag.
+    private static string CommentsWord(int n) =>
+        n == 1 ? "uwagę"
+        : n % 10 is >= 2 and <= 4 && n % 100 is not (>= 12 and <= 14) ? "uwagi"
+        : "uwag";
 }
