@@ -6,6 +6,7 @@ using StolyDoGrania.Components;
 using StolyDoGrania.Components.Account;
 using StolyDoGrania.Data;
 using StolyDoGrania.Data.Bgg;
+using StolyDoGrania.Data.Email;
 using StolyDoGrania.Data.Table;
 using StolyDoGrania.Tools;
 
@@ -52,7 +53,18 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+// Real e-mail only when an SMTP host is configured; otherwise the no-op sender keeps the
+// "click here to confirm" link on RegisterConfirmation, which local development relies on.
+var emailSection = builder.Configuration.GetSection(EmailSettings.SectionName);
+builder.Services.Configure<EmailSettings>(emailSection);
+if (!string.IsNullOrWhiteSpace(emailSection[nameof(EmailSettings.Host)]))
+{
+    builder.Services.AddSingleton<IEmailSender<ApplicationUser>, MailKitEmailSender>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+}
 
 builder.Services.AddSingleton<NormalUserMode>();
 builder.Services.AddSingleton<IClaimsTransformation, NormalUserModeClaimsTransformation>();
