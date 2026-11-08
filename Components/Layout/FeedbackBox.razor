@@ -1,40 +1,46 @@
+@using System.Security.Claims
 @inject IWebHostEnvironment Env
 @inject NavigationManager Nav
 
-@* Debug tool: renders and saves only in the Development environment. *@
-@if (Env.IsDevelopment())
+@* Open to every visitor (logged in or not) in every environment; comments are saved server-side. *@
+@if (open)
 {
-    @if (open)
-    {
-        <section class="feedback-box" aria-label="Uwagi do strony">
-            <div class="feedback-head">
-                <strong>Uwagi (debug)</strong>
-                <button type="button" class="btn-close" aria-label="Zwiń" @onclick="() => open = false"></button>
-            </div>
+    <section id="feedback-card" class="feedback-card" aria-label="Uwagi do strony" @onkeydown="OnKeyDown">
+        <div class="feedback-head">
+            <strong>Masz uwagę?</strong>
+            <button type="button" class="btn-close btn-close-sm" aria-label="Zamknij" @onclick="() => open = false"></button>
+        </div>
+        <p class="feedback-hint">Napisz, co poprawić na tej stronie.</p>
 
-            <textarea class="form-control" rows="4" maxlength="@MaxLength" aria-label="Treść uwagi"
-                      placeholder="Co poprawić na tej stronie?"
-                      @bind="comment" @bind:event="oninput"></textarea>
+        <textarea class="form-control form-control-sm" rows="4" maxlength="@MaxLength" aria-label="Treść uwagi"
+                  placeholder="Twoja uwaga…"
+                  @bind="comment" @bind:event="oninput"></textarea>
 
-            <div class="feedback-foot">
-                <span class="feedback-status @(failed ? "text-danger" : "text-success")" role="status">@status</span>
-                <button type="button" class="btn btn-primary btn-sm"
-                        disabled="@(string.IsNullOrWhiteSpace(comment) || saving)" @onclick="SaveAsync">
-                    Zapisz uwagę
-                </button>
-            </div>
-        </section>
-    }
-    else
-    {
-        <button type="button" class="btn btn-primary btn-sm feedback-toggle" @onclick="() => open = true">
-            💬 Uwagi
-        </button>
-    }
+        <div class="feedback-foot">
+            <span class="feedback-count">@comment.Length/@MaxLength</span>
+            <button type="button" class="btn btn-success btn-sm"
+                    disabled="@(string.IsNullOrWhiteSpace(comment) || saving)" @onclick="SaveAsync">
+                Wyślij
+            </button>
+        </div>
+
+        @if (status is not null)
+        {
+            <div class="feedback-status @(failed ? "text-danger" : "text-success")" role="status">@status</div>
+        }
+    </section>
 }
+
+<button type="button" class="feedback-bubble @(open ? "is-open" : null)"
+        aria-label="@(open ? "Zamknij uwagi" : "Zgłoś uwagę")" title="@(open ? "Zamknij" : "Zgłoś uwagę")"
+        aria-expanded="@(open ? "true" : "false")" aria-controls="feedback-card"
+        @onclick="() => open = !open">
+    @(open ? "✕" : "💬")
+</button>
 
 @code {
     private const int MaxLength = 4000;
+    private const string Anonymous = "(niezalogowany)";
 
     // Resolved here (not passed in) so the box works from any layout, including static Identity pages.
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
@@ -45,16 +51,28 @@
     private string comment = string.Empty;
     private string? status;
 
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            open = false;
+        }
+    }
+
     private async Task SaveAsync()
     {
-        if (!Env.IsDevelopment() || string.IsNullOrWhiteSpace(comment) || saving)
+        if (string.IsNullOrWhiteSpace(comment) || saving)
         {
             return;
         }
 
         saving = true;
         var now = DateTime.Now;
-        var userName = await GetShortUserNameAsync();
+        var user = AuthState is null ? null : (await AuthState).User;
+        // Full Identity UserName (often an e-mail) and id: written only to the server-side file, never shown.
+        var fullUserName = user?.Identity?.IsAuthenticated == true ? user.Identity.Name : null;
+        var userId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var shortName = UserNames.Short(fullUserName);
         // Read at save time, so it is the subpage the user is on now, not the one the box was first rendered on.
         var page = "/" + Nav.ToBaseRelativePath(Nav.Uri);
         // One file per comment, so saves never have to share or lock a file.
@@ -63,7 +81,9 @@
             ---
             date: {now:yyyy-MM-dd HH:mm:ss}
             page: {page}
-            user: {userName ?? "(niezalogowany)"}
+            user: {(shortName.Length > 0 ? shortName : Anonymous)}
+            userName: {(string.IsNullOrEmpty(fullUserName) ? Anonymous : fullUserName)}
+            userId: {(string.IsNullOrEmpty(userId) ? Anonymous : userId)}
             ---
 
             {comment.Trim()}
@@ -78,29 +98,17 @@
 
             comment = string.Empty;
             failed = false;
-            status = $"Zapisano o {now:HH:mm:ss} (strona {page}).";
+            status = $"Dziękujemy! Uwaga zapisana o {now:HH:mm}.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // The typed text stays in the box, so nothing is lost and it can be retried.
             failed = true;
-            status = "Nie udało się zapisać uwagi.";
+            status = "Nie udało się zapisać uwagi. Spróbuj ponownie.";
         }
         finally
         {
             saving = false;
         }
-    }
-
-    /// <summary>Part of the user name before '@' (a full e-mail is never stored or shown); null when anonymous.</summary>
-    private async Task<string?> GetShortUserNameAsync()
-    {
-        if (AuthState is null)
-        {
-            return null;
-        }
-
-        var name = UserNames.Short((await AuthState).User.Identity?.Name);
-        return name.Length > 0 ? name : null;
     }
 }

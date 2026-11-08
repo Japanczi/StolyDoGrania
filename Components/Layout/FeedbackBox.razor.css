@@ -1,29 +1,56 @@
-/* Bottom centre, where the opened box appears. Bottom-left holds the admin dock (tables page),
-   bottom-right the designer launcher. */
-.feedback-toggle {
+/* Corner chat bubble, bottom right. Bottom-left holds the admin dock (tables page); the dev-only
+   designer launcher sits just above the bubble (bottom: 60px). */
+.feedback-bubble {
     position: fixed;
-    left: 50%;
+    right: 1rem;
     bottom: 1rem;
-    transform: translateX(-50%);
     z-index: 900;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 50%;
+    background: #22a559;
+    color: #fff;
+    font-size: 1.25rem;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+    cursor: pointer;
+    transition: transform .15s ease-out, background-color .15s ease-out;
 }
 
-.feedback-box {
+.feedback-bubble:hover {
+    transform: scale(1.07);
+}
+
+.feedback-bubble:focus-visible {
+    outline: 2px solid #b6f5cf;
+    outline-offset: 2px;
+}
+
+.feedback-bubble.is-open {
+    background: #3a3a40;
+    font-size: 1rem;
+}
+
+.feedback-card {
     position: fixed;
-    left: 50%;
-    bottom: 0;
+    right: 1rem;
+    /* Clears the bubble and the dev-only designer launcher above it. */
+    bottom: 5.75rem;
     z-index: 900;
     display: flex;
     flex-direction: column;
     gap: .5rem;
-    width: min(640px, 100%);
-    padding: .75rem;
-    transform: translateX(-50%);
-    border: 1px solid #55555c;
-    border-bottom: 0;
-    border-radius: .5rem .5rem 0 0;
+    width: min(340px, calc(100vw - 2rem));
+    padding: .875rem;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: .875rem .875rem .25rem .875rem;
     background: #1f1f22;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, .5);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
+    animation: feedback-pop .18s ease-out;
 }
 
 .feedback-head,
@@ -34,6 +61,38 @@
     gap: .75rem;
 }
 
+.btn-close-sm {
+    font-size: .7rem;
+}
+
+.feedback-hint {
+    margin: -.25rem 0 0;
+    color: #a8a8b0;
+    font-size: .8125rem;
+}
+
+.feedback-card textarea {
+    resize: vertical;
+    min-height: 5.5rem;
+}
+
+.feedback-count {
+    color: #8a8a92;
+    font-size: .75rem;
+    font-variant-numeric: tabular-nums;
+}
+
 .feedback-status {
-    font-size: .875rem;
+    font-size: .8125rem;
+}
+
+@keyframes feedback-pop {
+    from { opacity: 0; transform: translateY(8px) scale(.97); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .feedback-bubble { transition: none; }
+    .feedback-bubble:hover { transform: none; }
+    .feedback-card { animation: none; }
 }
