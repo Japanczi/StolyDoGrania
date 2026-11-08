@@ -2,7 +2,9 @@
 @inject IWebHostEnvironment Env
 @inject NavigationManager Nav
 
-@* Open to every visitor (logged in or not) in every environment; comments are saved server-side. *@
+@* Logged-in users only, in every environment; comments are saved server-side. *@
+@if (signedIn)
+{
 @if (open)
 {
     <section id="feedback-card" class="feedback-card" aria-label="Uwagi do strony" @onkeydown="OnKeyDown">
@@ -37,6 +39,7 @@
         @onclick="() => open = !open">
     @(open ? "✕" : "💬")
 </button>
+}
 
 @code {
     private const int MaxLength = 4000;
@@ -45,11 +48,17 @@
     // Resolved here (not passed in) so the box works from any layout, including static Identity pages.
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    private bool signedIn;
     private bool open;
     private bool saving;
     private bool failed;
     private string comment = string.Empty;
     private string? status;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        signedIn = AuthState is not null && (await AuthState).User.Identity?.IsAuthenticated == true;
+    }
 
     private void OnKeyDown(KeyboardEventArgs e)
     {
@@ -66,11 +75,18 @@
             return;
         }
 
+        var user = AuthState is null ? null : (await AuthState).User;
+        // Server-side check too: anonymous visitors never get to write a file, even with a stale circuit.
+        if (user?.Identity?.IsAuthenticated != true)
+        {
+            signedIn = open = false;
+            return;
+        }
+
         saving = true;
         var now = DateTime.Now;
-        var user = AuthState is null ? null : (await AuthState).User;
         // Full Identity UserName (often an e-mail) and id: written only to the server-side file, never shown.
-        var fullUserName = user?.Identity?.IsAuthenticated == true ? user.Identity.Name : null;
+        var fullUserName = user.Identity.Name;
         var userId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
         var shortName = UserNames.Short(fullUserName);
         // Read at save time, so it is the subpage the user is on now, not the one the box was first rendered on.
