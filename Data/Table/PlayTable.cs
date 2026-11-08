@@ -41,6 +41,9 @@ public class PlayTable
 
     public bool IsImported => ImportKey is not null;
 
+    /// <summary>Position of the row in the sign-up sheet (0 = first), so imported tables list in the sheet's order; null for app tables.</summary>
+    public int? ImportOrder { get; set; }
+
     /// <summary>False when the meeting hour is not set yet (<see cref="Start"/> holds the default value).</summary>
     public bool HasStartTime => Start != default;
 

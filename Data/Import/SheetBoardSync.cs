@@ -75,6 +75,7 @@ public sealed class SheetBoardSync(ApplicationDbContext db)
                 table.Game = game;
             }
 
+            table.ImportOrder = i;
             dropped.AddRange(table.ApplyImport(row));
         }
 

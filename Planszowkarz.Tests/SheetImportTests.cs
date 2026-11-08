@@ -212,6 +212,8 @@ public sealed class SheetBoardSyncTests : IDisposable
         var tables = await _db.PlayTables.AsNoTracking().Include(t => t.Participants).ToListAsync();
         Assert.Equal(3, tables.Count); // app Catan + imported Catan + Recall
         Assert.Contains(tables, t => t.Id == appTable.Id && t.ImportKey == null && t.Participants.Single().UserId == "owner");
+        Assert.Equal(1, tables.Single(t => t.GameTitle == "Recall").ImportOrder); // was row 2, now row 1 of the sheet
+        Assert.Null(tables.Single(t => t.Id == appTable.Id).ImportOrder);
         var recallSeats = tables.Single(t => t.GameTitle == "Recall").Slots;
         Assert.Equal(new Dictionary<int, string> { [1] = "Ela", [2] = "Ula", [3] = "Janek" }, recallSeats);
 

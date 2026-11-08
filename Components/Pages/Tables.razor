@@ -374,7 +374,7 @@ else
                 <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
             </div>
 
-            @foreach (var t in tables.Where(t => t.IsImported))
+            @foreach (var t in tables.Where(t => t.IsImported).OrderBy(t => t.ImportOrder))
             {
                 TableRow(t);
             }

@@ -285,6 +285,9 @@ namespace Planszowkarz.Migrations
                         .HasMaxLength(220)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("ImportOrder")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
