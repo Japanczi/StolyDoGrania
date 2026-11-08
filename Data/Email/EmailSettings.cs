@@ -1,6 +1,6 @@
 using MailKit.Security;
 
-namespace StolyDoGrania.Data.Email;
+namespace Planszowkarz.Data.Email;
 
 /// <summary>
 /// SMTP settings for outgoing e-mail, read from the "Email" configuration section.

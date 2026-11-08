@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using MimeKit;
 
-namespace StolyDoGrania.Data.Email;
+namespace Planszowkarz.Data.Email;
 
 /// <summary>
 /// Sends Identity e-mails (account confirmation, password reset) over SMTP with MailKit.

@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
-using StolyDoGrania.Components.Account.Pages;
-using StolyDoGrania.Components.Account.Pages.Manage;
-using StolyDoGrania.Data;
+using Planszowkarz.Components.Account.Pages;
+using Planszowkarz.Components.Account.Pages.Manage;
+using Planszowkarz.Data;
 
 namespace Microsoft.AspNetCore.Routing;
 

@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data.Table;
+namespace Planszowkarz.Data.Table;
 
 /// <summary>Settings for the whole list of tables, stored as a single row with <see cref="SingletonId"/>.</summary>
 public class BoardSettings

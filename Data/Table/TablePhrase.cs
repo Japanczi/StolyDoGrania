@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data.Table;
+namespace Planszowkarz.Data.Table;
 
 /// <summary>
 /// The game name used when a table was created with "Utwórz stół" (board or Baza gier), kept for good:

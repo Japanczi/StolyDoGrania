@@ -2,13 +2,13 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using StolyDoGrania.Components;
-using StolyDoGrania.Components.Account;
-using StolyDoGrania.Data;
-using StolyDoGrania.Data.Bgg;
-using StolyDoGrania.Data.Email;
-using StolyDoGrania.Data.Table;
-using StolyDoGrania.Tools;
+using Planszowkarz.Components;
+using Planszowkarz.Components.Account;
+using Planszowkarz.Data;
+using Planszowkarz.Data.Bgg;
+using Planszowkarz.Data.Email;
+using Planszowkarz.Data.Table;
+using Planszowkarz.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,7 +74,7 @@ builder.Services.Configure<TableSettings>(builder.Configuration.GetSection(Table
 builder.Services.AddHttpClient(BggClient.HttpClientName, client =>
 {
     client.Timeout = TimeSpan.FromSeconds(20);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("StolyDoGrania/1.0");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Planszowkarz/1.0");
 });
 builder.Services.AddSingleton<BggClient>();
 

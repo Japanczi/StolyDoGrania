@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data.Table
+namespace Planszowkarz.Data.Table
 {
     /// <summary>Jeden zapisany uczestnik na konkretnym miejscu przy stole (tabela TableSlots).</summary>
     public class TableSlot

@@ -2,7 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace StolyDoGrania.Tools;
+namespace Planszowkarz.Tools;
 
 /// <summary>
 /// Backend of the page designer (wwwroot/tools/designer.js). Must only be mapped in Development,

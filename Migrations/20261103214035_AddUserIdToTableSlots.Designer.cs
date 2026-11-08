@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using StolyDoGrania.Data;
+using Planszowkarz.Data;
 
 #nullable disable
 
-namespace StolyDoGrania.Migrations
+namespace Planszowkarz.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20261103214035_AddUserIdToTableSlots")]
@@ -169,7 +169,7 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.ApplicationUser", b =>
+            modelBuilder.Entity("Planszowkarz.Data.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
@@ -234,7 +234,7 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
+            modelBuilder.Entity("Planszowkarz.Data.Table.PlayTable", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -259,7 +259,7 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("PlayTables", (string)null);
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.Table.TableSlot", b =>
+            modelBuilder.Entity("Planszowkarz.Data.Table.TableSlot", b =>
                 {
                     b.Property<int>("PlayTableId")
                         .HasColumnType("INTEGER");
@@ -281,7 +281,7 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("TableSlots", (string)null);
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Game", b =>
+            modelBuilder.Entity("Planszowkarz.Game", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -334,7 +334,7 @@ namespace StolyDoGrania.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.ApplicationUser", null)
+                    b.HasOne("Planszowkarz.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -343,7 +343,7 @@ namespace StolyDoGrania.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.ApplicationUser", null)
+                    b.HasOne("Planszowkarz.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -352,7 +352,7 @@ namespace StolyDoGrania.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserPasskey<string>", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.ApplicationUser", null)
+                    b.HasOne("Planszowkarz.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -409,7 +409,7 @@ namespace StolyDoGrania.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StolyDoGrania.Data.ApplicationUser", null)
+                    b.HasOne("Planszowkarz.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -418,16 +418,16 @@ namespace StolyDoGrania.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.ApplicationUser", null)
+                    b.HasOne("Planszowkarz.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
+            modelBuilder.Entity("Planszowkarz.Data.Table.PlayTable", b =>
                 {
-                    b.HasOne("StolyDoGrania.Game", "Game")
+                    b.HasOne("Planszowkarz.Game", "Game")
                         .WithMany("Tables")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -436,9 +436,9 @@ namespace StolyDoGrania.Migrations
                     b.Navigation("Game");
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.Table.TableSlot", b =>
+            modelBuilder.Entity("Planszowkarz.Data.Table.TableSlot", b =>
                 {
-                    b.HasOne("StolyDoGrania.Data.Table.PlayTable", "PlayTable")
+                    b.HasOne("Planszowkarz.Data.Table.PlayTable", "PlayTable")
                         .WithMany("Participants")
                         .HasForeignKey("PlayTableId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -447,12 +447,12 @@ namespace StolyDoGrania.Migrations
                     b.Navigation("PlayTable");
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Data.Table.PlayTable", b =>
+            modelBuilder.Entity("Planszowkarz.Data.Table.PlayTable", b =>
                 {
                     b.Navigation("Participants");
                 });
 
-            modelBuilder.Entity("StolyDoGrania.Game", b =>
+            modelBuilder.Entity("Planszowkarz.Game", b =>
                 {
                     b.Navigation("Tables");
                 });

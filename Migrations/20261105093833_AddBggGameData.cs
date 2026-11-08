@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace StolyDoGrania.Migrations
+namespace Planszowkarz.Migrations
 {
     /// <inheritdoc />
     public partial class AddBggGameData : Migration

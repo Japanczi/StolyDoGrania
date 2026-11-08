@@ -1,5 +1,5 @@
 TOOLS - INFORMATION
-Persistent information about the tools developed for designing the StolyDoGrania application.
+Persistent information about the tools developed for designing the Planszówkarz application.
 Created: 2026-11-05
 
 == Conventions ==
@@ -23,7 +23,7 @@ Files:
 - Tools/DesignerEndpoints.cs     POST /_designer/save, writes the design file
 - Components/App.razor           loads the script in Development only
 - Program.cs                     maps the endpoint in Development only
-- StolyDoGrania.csproj           excludes Claude_Resources/ from the build (saved .json would otherwise count as published content)
+- Planszowkarz.csproj           excludes Claude_Resources/ from the build (saved .json would otherwise count as published content)
 
 Use: run the app in Development, click "Projektant" (bottom right, above "Uwagi") on any page, edit, then "Zapisz".
 Shape and fill colors in a design are drafts unless a comment says otherwise (user, 2026-11-07); read comments as the spec.

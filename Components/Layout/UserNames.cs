@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Components.Layout;
+namespace Planszowkarz.Components.Layout;
 
 public static class UserNames
 {

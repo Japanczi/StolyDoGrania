@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace StolyDoGrania.Data;
+namespace Planszowkarz.Data;
 
 public static class IdentitySeeder
 {

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
-using StolyDoGrania.Data;
+using Planszowkarz.Data;
 
-namespace StolyDoGrania.Components.Account;
+namespace Planszowkarz.Components.Account;
 
 internal sealed class IdentityRedirectManager(NavigationManager navigationManager)
 {

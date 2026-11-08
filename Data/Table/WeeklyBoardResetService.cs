@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data.Table;
+namespace Planszowkarz.Data.Table;
 
 /// <summary>
 /// Clears the list of tables every Monday at midnight, server time, while the admin toolbox's "Auto" switch is on.

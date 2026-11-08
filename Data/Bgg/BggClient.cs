@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Xml;
 using System.Xml.Linq;
-using StolyDoGrania.Data.Table;
+using Planszowkarz.Data.Table;
 
-namespace StolyDoGrania.Data.Bgg;
+namespace Planszowkarz.Data.Bgg;
 
 public sealed record BggSearchResult(int Id, string Name, int? Year);
 

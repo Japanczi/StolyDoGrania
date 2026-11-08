@@ -1,4 +1,4 @@
-﻿namespace StolyDoGrania.Data;
+﻿namespace Planszowkarz.Data;
 
 public static class AppRoles
 {

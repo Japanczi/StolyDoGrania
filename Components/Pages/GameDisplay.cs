@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace StolyDoGrania.Components.Pages;
+namespace Planszowkarz.Components.Pages;
 
 /// <summary>Display helpers shared by the pages that show games (tables board, games catalog).</summary>
 public static class GameDisplay

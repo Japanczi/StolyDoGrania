@@ -1,7 +1,7 @@
-using StolyDoGrania.Data.Bgg;
-using StolyDoGrania.Data.Table;
+using Planszowkarz.Data.Bgg;
+using Planszowkarz.Data.Table;
 
-namespace StolyDoGrania;
+namespace Planszowkarz;
 
 /// <summary>Gra jako "produkt" w katalogu – użytkownicy dodają ją do swoich stołów.</summary>
 public class Game

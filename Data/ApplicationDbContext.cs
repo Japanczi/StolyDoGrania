@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using StolyDoGrania.Data.Table;
+using Planszowkarz.Data.Table;
 
-namespace StolyDoGrania.Data;
+namespace Planszowkarz.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
 {

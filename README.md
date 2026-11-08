@@ -1,1 +1,1 @@
-# StolyDoGrania
+# Planszówkarz

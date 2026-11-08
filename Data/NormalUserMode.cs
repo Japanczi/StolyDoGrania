@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 
-namespace StolyDoGrania.Data;
+namespace Planszowkarz.Data;
 
 /// <summary>
 /// Admins who chose to use the app as a regular user, for testing the UI.

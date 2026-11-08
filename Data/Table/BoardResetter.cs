@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace StolyDoGrania.Data.Table;
+namespace Planszowkarz.Data.Table;
 
 /// <summary>Clears the list of tables, for the admin toolbox and the weekly automatic reset. Callers check permissions.</summary>
 public sealed class BoardResetter(ApplicationDbContext db)

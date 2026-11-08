@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data.Table;
+namespace Planszowkarz.Data.Table;
 
 /// <summary>Stół na konkretny termin – gra z katalogu + start + zapisani uczestnicy.</summary>
 public class PlayTable

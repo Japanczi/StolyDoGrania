@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Components.Account;
+namespace Planszowkarz.Components.Account;
 
 public enum PasskeyOperation
 {

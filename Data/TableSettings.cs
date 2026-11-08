@@ -1,4 +1,4 @@
-namespace StolyDoGrania.Data;
+namespace Planszowkarz.Data;
 
 /// <summary>App-wide table rules, read from the "Tables" section of appsettings.json.</summary>
 public sealed class TableSettings
