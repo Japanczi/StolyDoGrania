@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Planszowkarz.Components;
@@ -81,7 +82,20 @@ builder.Services.AddSingleton<BggClient>();
 builder.Services.AddScoped<BoardResetter>();
 builder.Services.AddHostedService<WeeklyBoardResetService>();
 
+// In production HTTPS ends at the hosting proxy (Mikrus / Cloudflare), which forwards plain HTTP.
+// Trust its X-Forwarded-Proto/For headers so generated links (e.g. confirmation e-mails) use https://.
+// The proxy's address isn't known in advance, so the default loopback-only trust list is cleared.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+// Must run first, so everything below sees the visitor's real scheme and IP.
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
