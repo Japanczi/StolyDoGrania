@@ -75,9 +75,13 @@ public static class IdentitySeeder
                 }
             }
 
-            if (!await userManager.IsInRoleAsync(admin, AppRoles.Admin))
+            // The configured admin is the main admin (Owner), which always comes with Admin.
+            foreach (var role in new[] { AppRoles.Admin, AppRoles.Owner })
             {
-                await userManager.AddToRoleAsync(admin, AppRoles.Admin);
+                if (!await userManager.IsInRoleAsync(admin, role))
+                {
+                    await userManager.AddToRoleAsync(admin, role);
+                }
             }
         }
 

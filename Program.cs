@@ -82,6 +82,7 @@ builder.Services.AddSingleton<BggClient>();
 
 builder.Services.AddScoped<BoardResetter>();
 builder.Services.AddSingleton<FeedbackArchive>();
+builder.Services.AddSingleton<DiskUsage>();
 builder.Services.AddHostedService<WeeklyBoardResetService>();
 
 // In production HTTPS ends at the hosting proxy (Mikrus / Cloudflare), which forwards plain HTTP.

@@ -32,6 +32,29 @@
                     <ArmedContent>✓ Kliknij ponownie – pobierze i usunie @FeedbackCount @CommentsWord(FeedbackCount)</ArmedContent>
                 </ConfirmButton>
             </div>
+
+            <div class="toolbox-item">
+                @* Read-only, so one click; clicking again refreshes the reading. *@
+                <button type="button" class="toolbox-button" disabled="@Busy" title="Pokaż zajętość dysku serwera"
+                        @onclick="OnShowDiskUsage">
+                    💾 Miejsce na dysku@(DiskUsage is null ? null : " (odśwież)")
+                </button>
+            </div>
+
+            @if (DiskUsage is { } d)
+            {
+                <div class="disk-usage" role="status">
+                    <div class="disk-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                         aria-valuenow="@((int)d.UsedPercent)" aria-label="Zajętość dysku">
+                        <div class="disk-bar-fill @(d.UsedPercent >= 90 ? "critical" : d.UsedPercent >= 75 ? "warning" : null)"
+                             style="width: @(d.UsedPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                    </div>
+                    <div>Zajęte <strong>@Size(d.DriveUsed)</strong> z @Size(d.DriveTotal) (@d.UsedPercent.ToString("0")%)</div>
+                    <div>Wolne: <strong>@Size(d.DriveFree)</strong></div>
+                    <div class="disk-detail">Baza danych: @Size(d.Database) · Uwagi: @Size(d.Feedback)</div>
+                    <div class="disk-detail">Odczyt: @d.ReadAt.ToString("HH:mm:ss")</div>
+                </div>
+            }
         </section>
     }
 
@@ -61,6 +84,27 @@
 
     /// <summary>Called with the requested new state of the automatic reset.</summary>
     [Parameter] public EventCallback<bool> OnAutoResetChanged { get; set; }
+
+    /// <summary>The latest disk reading, shown under its button; null until requested.</summary>
+    [Parameter] public Planszowkarz.Data.DiskUsage.Report? DiskUsage { get; set; }
+
+    /// <summary>Asks the page for a fresh disk reading.</summary>
+    [Parameter] public EventCallback OnShowDiskUsage { get; set; }
+
+    /// <summary>Bytes as B / KB / MB / GB / TB, with a Polish decimal comma.</summary>
+    private static string Size(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return value.ToString(unit == 0 ? "0" : "0.#", System.Globalization.CultureInfo.GetCultureInfo("pl-PL")) + " " + units[unit];
+    }
 
     private bool open;
 

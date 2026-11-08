@@ -28,7 +28,7 @@ public sealed class NormalUserMode
 }
 
 /// <summary>
-/// Removes the Admin role while the mode is active, so every role check in the app respects it.
+/// Removes the Admin (and Owner) role while the mode is active, so every role check in the app respects it.
 /// It only ever removes the role, so being listed in the mode can't grant anything.
 /// </summary>
 public sealed class NormalUserModeClaimsTransformation(NormalUserMode mode) : IClaimsTransformation
@@ -44,7 +44,9 @@ public sealed class NormalUserModeClaimsTransformation(NormalUserMode mode) : IC
         var clone = principal.Clone();
         foreach (var identity in clone.Identities)
         {
-            var adminClaims = identity.FindAll(identity.RoleClaimType).Where(c => c.Value == AppRoles.Admin).ToList();
+            var adminClaims = identity.FindAll(identity.RoleClaimType)
+                .Where(c => c.Value is AppRoles.Admin or AppRoles.Owner)
+                .ToList();
             foreach (var claim in adminClaims)
             {
                 identity.RemoveClaim(claim);

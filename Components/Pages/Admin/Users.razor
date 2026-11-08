@@ -12,6 +12,7 @@
 
 <PageTitle>Użytkownicy</PageTitle>
 <h1>Zarządzanie użytkownikami</h1>
+<p><a href="admin/logs">Dziennik działań</a> – dołączenia do stołów, zmiany ról i usunięcia kont.</p>
 
 @if (status is not null)
 {
@@ -46,7 +47,7 @@
                 <div class="col-md-2">
                     <label class="form-label" for="nu-role">Rola</label>
                     <InputSelect id="nu-role" class="form-select" @bind-Value="newUser.Role">
-                        @foreach (var r in AppRoles.All)
+                        @foreach (var r in AppRoles.Assignable)
                         {
                             <option value="@r">@r</option>
                         }
@@ -72,6 +73,8 @@ else
             @foreach (var u in rows)
             {
                 var isSelf = u.Id == currentUserId;
+                // Mirrors the checks in ChangeRoleAsync / DeleteUserAsync, which are what actually enforce them.
+                var protectedRow = !isSelf && !CanManage(u.Role);
                 <tr>
                     <td>@u.UserName @if (isSelf) {
                         <span class="badge text-bg-secondary">to Ty</span>
@@ -79,16 +82,24 @@ else
                 </td>
                 <td>@u.Email</td>
                 <td>
-                    <select class="form-select form-select-sm" disabled="@isSelf"
-                            value="@u.Role" @onchange="e => ChangeRoleAsync(u.Id, e.Value?.ToString())">
-                        @foreach (var r in AppRoles.All)
-                        {
-                            <option value="@r">@r</option>
-                        }
-                    </select>
+                    @if (u.Role == AppRoles.Owner)
+                    {
+                        <span class="badge text-bg-warning" title="Główny administrator">@AppRoles.Owner</span>
+                    }
+                    else
+                    {
+                        <select class="form-select form-select-sm" disabled="@(isSelf || protectedRow)"
+                                title="@(protectedRow ? ProtectedAdminHint : null)"
+                                value="@u.Role" @onchange="e => ChangeRoleAsync(u.Id, e.Value?.ToString())">
+                            @foreach (var r in AppRoles.Assignable)
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </select>
+                    }
                 </td>
                 <td class="text-end">
-                    @if (!isSelf)
+                    @if (!isSelf && !protectedRow)
                     {
                         @if (confirmDeleteId == u.Id)
                         {
@@ -112,8 +123,12 @@ else
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    private const string ProtectedAdminHint = "Tylko główny administrator (Owner) może odebrać rolę administratora lub usunąć jego konto.";
+
     private List<UserRow>? rows;
     private string? currentUserId, status, error, confirmDeleteId;
+    // For the UI only; every action re-checks it against the database.
+    private bool currentIsOwner;
     private NewUserModel newUser = new();
 
     protected override async Task OnInitializedAsync()
@@ -129,16 +144,58 @@ else
         var list = new List<UserRow>();
         foreach (var u in users)
         {
-            var roles = await UserManager.GetRolesAsync(u);
-            list.Add(new UserRow(u.Id, u.UserName ?? "—", u.Email ?? "—",
-                roles.Contains(AppRoles.Admin) ? AppRoles.Admin : AppRoles.User));
+            list.Add(new UserRow(u.Id, u.UserName ?? "—", u.Email ?? "—", MainRole(await UserManager.GetRolesAsync(u))));
         }
         rows = list;
+        currentIsOwner = list.Any(r => r.Id == currentUserId && r.Role == AppRoles.Owner);
+    }
+
+    /// <summary>The highest of a user's roles: Owner, then Admin, otherwise User.</summary>
+    private static string MainRole(IList<string> roles) =>
+        roles.Contains(AppRoles.Owner) ? AppRoles.Owner
+        : roles.Contains(AppRoles.Admin) ? AppRoles.Admin
+        : AppRoles.User;
+
+    /// <summary>
+    /// Whether the current user may change the role of, or delete, a user with this role:
+    /// nobody touches the Owner, and only the Owner touches other admins.
+    /// </summary>
+    private bool CanManage(string targetRole) => CanManage(targetRole, currentIsOwner);
+
+    private static bool CanManage(string targetRole, bool actorIsOwner) =>
+        targetRole switch
+        {
+            AppRoles.Owner => false,
+            AppRoles.Admin => actorIsOwner,
+            _ => true
+        };
+
+    /// <summary>The current user, freshly from the database, and whether they are the Owner right now.</summary>
+    private async Task<(ApplicationUser? Actor, bool IsOwner)> LoadActorAsync()
+    {
+        var actor = currentUserId is null ? null : await UserManager.FindByIdAsync(currentUserId);
+        return (actor, actor is not null && await UserManager.IsInRoleAsync(actor, AppRoles.Owner));
+    }
+
+    /// <summary>Saves a log entry; a failure is shown but doesn't undo the action that was logged.</summary>
+    private async Task WriteLogAsync(UserActionLog entry)
+    {
+        try
+        {
+            Db.UserActionLogs.Add(entry);
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            Db.ChangeTracker.Clear();
+            error = "Zmiana została zapisana, ale nie udało się zapisać wpisu w dzienniku.";
+        }
     }
 
     private async Task AddUserAsync()
     {
         status = error = null;
+        if (!AppRoles.Assignable.Contains(newUser.Role)) { error = "Nieprawidłowa rola."; return; }
         var user = new ApplicationUser { UserName = newUser.Email, Email = newUser.Email, EmailConfirmed = true };
         var result = await UserManager.CreateAsync(user, newUser.Password);
         if (!result.Succeeded)
@@ -155,20 +212,33 @@ else
     private async Task ChangeRoleAsync(string id, string? newRole)
     {
         status = error = null;
-        if (newRole is null || !AppRoles.All.Contains(newRole) || id == currentUserId) return;
+        if (newRole is null || !AppRoles.Assignable.Contains(newRole) || id == currentUserId) return;
 
         var user = await UserManager.FindByIdAsync(id);
-        if (user is null) { error = "Nie znaleziono użytkownika."; return; }
+        if (user is null) { error = "Nie znaleziono użytkownika."; await LoadAsync(); return; }
 
         var current = await UserManager.GetRolesAsync(user);
+        var oldRole = MainRole(current);
+        var (actor, actorIsOwner) = await LoadActorAsync();
+        if (actor is null || !CanManage(oldRole, actorIsOwner))
+        {
+            error = oldRole == AppRoles.Owner
+                ? "Nie można zmienić roli głównego administratora."
+                : ProtectedAdminHint;
+            await LoadAsync();
+            return;
+        }
+        if (oldRole == newRole) return;
+
         if (current.Count > 0) await UserManager.RemoveFromRolesAsync(user, current);
         var result = await UserManager.AddToRoleAsync(user, newRole);
         if (!result.Succeeded)
             error = string.Join(" ", result.Errors.Select(e => e.Description));
         else
         {
-            await UserManager.UpdateSecurityStampAsync(user); // wymusza ponowne zalogowanie z nową rolą
-            status = $"Zmieniono rolę użytkownika {user.Email} na {newRole}.";
+            await UserManager.UpdateSecurityStampAsync(user); // forces a fresh sign-in with the new role
+            status = $"Zmieniono rolę użytkownika {user.UserName} na {newRole}.";
+            await WriteLogAsync(UserActionLog.RoleChanged(actor.Id, actor.UserName, user, oldRole, newRole));
         }
         await LoadAsync();
     }
@@ -182,12 +252,28 @@ else
         var user = await UserManager.FindByIdAsync(id);
         if (user is null) { error = "Nie znaleziono użytkownika."; return; }
 
+        var role = MainRole(await UserManager.GetRolesAsync(user));
+        var (actor, actorIsOwner) = await LoadActorAsync();
+        if (actor is null || !CanManage(role, actorIsOwner))
+        {
+            error = role == AppRoles.Owner ? "Nie można usunąć konta głównego administratora." : ProtectedAdminHint;
+            await LoadAsync();
+            return;
+        }
+
         // TableSlots.UserId nie jest kluczem obcym – zwalniamy miejsca usuwanego użytkownika
         await Db.TableSlots.Where(s => s.UserId == id).ExecuteDeleteAsync();
 
         var result = await UserManager.DeleteAsync(user);
-        status = result.Succeeded ? $"Usunięto użytkownika {user.Email}." : null;
-        if (!result.Succeeded) error = string.Join(" ", result.Errors.Select(e => e.Description));
+        if (result.Succeeded)
+        {
+            status = $"Usunięto użytkownika {user.UserName}.";
+            await WriteLogAsync(UserActionLog.UserRemoved(actor.Id, actor.UserName, user, role));
+        }
+        else
+        {
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
+        }
         await LoadAsync();
     }
 

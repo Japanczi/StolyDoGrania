@@ -12,6 +12,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<TableSlot> TableSlots => Set<TableSlot>();
     public DbSet<BoardSettings> BoardSettings => Set<BoardSettings>();
     public DbSet<TablePhrase> TablePhrases => Set<TablePhrase>();
+    public DbSet<UserActionLog> UserActionLogs => Set<UserActionLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -80,6 +81,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .WithMany()
                 .HasForeignKey(p => p.GameId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<UserActionLog>(e =>
+        {
+            e.ToTable("UserActionLogs");
+            e.Property(l => l.Action).HasConversion<string>().HasMaxLength(40);
+            e.Property(l => l.ActorUserId).HasMaxLength(450);
+            e.Property(l => l.ActorName).HasMaxLength(UserActionLog.NameMaxLength);
+            e.Property(l => l.TargetUserId).HasMaxLength(450);
+            e.Property(l => l.TargetName).HasMaxLength(UserActionLog.NameMaxLength);
+            e.Property(l => l.Details).HasMaxLength(UserActionLog.DetailsMaxLength);
+            e.HasIndex(l => l.CreatedUtc);
         });
 
         builder.Entity<BoardSettings>(e =>

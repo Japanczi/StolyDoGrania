@@ -1,0 +1,162 @@
+@page "/admin/logs"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = AppRoles.Admin)]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Planszowkarz.Data
+@inject ApplicationDbContext Db
+
+<PageTitle>Dziennik</PageTitle>
+<h1>Dziennik działań</h1>
+
+<form class="row g-2 align-items-end mb-3" @onsubmit="SearchAsync">
+    <div class="col-sm-4 col-md-3">
+        <label class="form-label" for="log-action">Akcja</label>
+        <select id="log-action" class="form-select form-select-sm" @bind="actionFilter" @bind:after="SearchAsync">
+            <option value="">Wszystkie</option>
+            @foreach (var a in Enum.GetValues<UserAction>())
+            {
+                <option value="@a">@ActionLabel(a)</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-5 col-md-4">
+        <label class="form-label" for="log-search">Szukaj</label>
+        <input id="log-search" class="form-control form-control-sm" maxlength="100"
+               placeholder="Użytkownik, gra, szczegóły" @bind="search" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">Szukaj</button>
+    </div>
+</form>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (rows is null)
+{
+    <p><em>Ładowanie...</em></p>
+}
+else if (rows.Count == 0)
+{
+    <p>Brak wpisów.</p>
+}
+else
+{
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr><th style="width:170px">Czas</th><th style="width:170px">Akcja</th><th>Kto</th><th>Kogo dotyczy</th><th>Szczegóły</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var r in rows)
+            {
+                <tr>
+                    <td class="text-nowrap">@ToPolishTime(r.CreatedUtc).ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td><span class="badge @ActionBadge(r.Action)">@ActionLabel(r.Action)</span></td>
+                    <td>@(r.ActorName ?? "—")</td>
+                    <td>@(r.TargetName ?? "—")</td>
+                    <td>@r.Details</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(page == 0)" @onclick="() => GoToAsync(page - 1)">← Nowsze</button>
+        <span>Strona @(page + 1) z @PageCount (wpisów: @total)</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(page + 1 >= PageCount)" @onclick="() => GoToAsync(page + 1)">Starsze →</button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 50;
+
+    // Log times are stored in UTC and shown in Polish time, whatever the server's own zone is.
+    private static readonly TimeZoneInfo PolishTime = FindPolishTimeZone();
+
+    private List<UserActionLog>? rows;
+    private int total, page;
+    private string actionFilter = "";
+    private string? search, error;
+
+    private int PageCount => Math.Max(1, (total + PageSize - 1) / PageSize);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SearchAsync() => GoToAsync(0);
+
+    private Task GoToAsync(int newPage)
+    {
+        page = Math.Max(0, newPage);
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            var query = Db.UserActionLogs.AsNoTracking();
+
+            if (Enum.TryParse<UserAction>(actionFilter, out var action))
+            {
+                query = query.Where(l => l.Action == action);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(l =>
+                    (l.ActorName != null && l.ActorName.Contains(s))
+                    || (l.TargetName != null && l.TargetName.Contains(s))
+                    || (l.Details != null && l.Details.Contains(s)));
+            }
+
+            total = await query.CountAsync();
+            page = Math.Min(page, PageCount - 1);
+            rows = await query
+                .OrderByDescending(l => l.CreatedUtc).ThenByDescending(l => l.Id)
+                .Skip(page * PageSize).Take(PageSize)
+                .ToListAsync();
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            rows = [];
+            error = "Nie udało się wczytać dziennika.";
+        }
+    }
+
+    private static string ActionLabel(UserAction action) => action switch
+    {
+        UserAction.JoinedTable => "Dołączenie do stołu",
+        UserAction.RoleChanged => "Zmiana roli",
+        UserAction.UserRemoved => "Usunięcie konta",
+        _ => action.ToString()
+    };
+
+    private static string ActionBadge(UserAction action) => action switch
+    {
+        UserAction.JoinedTable => "text-bg-success",
+        UserAction.RoleChanged => "text-bg-warning",
+        UserAction.UserRemoved => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+
+    private static DateTime ToPolishTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), PolishTime);
+
+    private static TimeZoneInfo FindPolishTimeZone()
+    {
+        try
+        {
+            // IANA id; .NET maps it on Windows too.
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Local;
+        }
+    }
+}

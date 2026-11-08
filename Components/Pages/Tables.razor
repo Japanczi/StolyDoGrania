@@ -16,6 +16,7 @@
 @inject NavigationManager Nav
 @inject BoardResetter Resetter
 @inject FeedbackArchive Feedback
+@inject DiskUsage Disk
 @inject IJSRuntime JS
 
 <PageTitle>Zapisy na gry</PageTitle>
@@ -415,7 +416,8 @@ else
         <AdminHelpBox />
         <AdminToolbox TableCount="@(tables?.Count ?? 0)" AutoReset="@autoReset" Busy="@busy"
                       OnClearTables="ClearTablesAsync" OnAutoResetChanged="SetAutoResetAsync"
-                      FeedbackCount="@feedbackCount" OnDownloadFeedback="DownloadFeedbackAsync" />
+                      FeedbackCount="@feedbackCount" OnDownloadFeedback="DownloadFeedbackAsync"
+                      DiskUsage="@diskUsage" OnShowDiskUsage="ShowDiskUsageAsync" />
     </div>
 }
 
@@ -452,6 +454,7 @@ else
     private bool busy;
     private bool autoReset;
     private int feedbackCount;
+    private DiskUsage.Report? diskUsage;
     private string? statusMessage;
     private string? errorMessage;
     private string? formError;
@@ -647,6 +650,8 @@ else
             return error;
         }
 
+        // Saved together with the seat, so the log never records a join that didn't happen.
+        Db.UserActionLogs.Add(UserActionLog.JoinedTable(table, slot, userId, displayName));
         await Db.SaveChangesAsync();
         return null;
     }, "Nie udało się zająć miejsca (być może ktoś był szybszy). Spróbuj ponownie.");
@@ -1030,6 +1035,37 @@ else
         finally
         {
             feedbackCount = Feedback.Count();
+            busy = false;
+        }
+    }
+
+    /// <summary>Reads the server's disk usage for the admin toolbox.</summary>
+    private async Task ShowDiskUsageAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        errorMessage = null;
+        if (!isAdmin)
+        {
+            errorMessage = "Tylko administrator może sprawdzić miejsce na dysku.";
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            // Walks the feedback folder, so it runs off the circuit's thread.
+            diskUsage = await Task.Run(Disk.Read);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            errorMessage = "Nie udało się odczytać zajętości dysku.";
+        }
+        finally
+        {
             busy = false;
         }
     }

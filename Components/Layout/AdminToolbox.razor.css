@@ -78,3 +78,40 @@
 .switch-label {
     font-weight: 600;
 }
+
+/* Disk reading under its button. */
+.disk-usage {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    padding: .4rem .5rem;
+    border-radius: .35rem;
+    background: #1f1f22;
+    color: #fff;
+}
+
+.disk-bar {
+    height: .5rem;
+    margin-bottom: .2rem;
+    border-radius: .25rem;
+    background: #45454b;
+    overflow: hidden;
+}
+
+.disk-bar-fill {
+    height: 100%;
+    background: #3fa34d;
+}
+
+.disk-bar-fill.warning {
+    background: #d9a400;
+}
+
+.disk-bar-fill.critical {
+    background: #d9363e;
+}
+
+.disk-detail {
+    color: #b8b8bf;
+    font-size: .75rem;
+}
