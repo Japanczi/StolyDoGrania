@@ -67,16 +67,17 @@
 else
 {
     <table class="table align-middle">
-        <thead><tr><th>E-mail</th><th style="width:180px">Rola</th><th style="width:220px"></th></tr></thead>
+        <thead><tr><th>Nazwa użytkownika</th><th>E-mail</th><th style="width:180px">Rola</th><th style="width:220px"></th></tr></thead>
         <tbody>
             @foreach (var u in rows)
             {
                 var isSelf = u.Id == currentUserId;
                 <tr>
-                    <td>@u.Email @if (isSelf) {
+                    <td>@u.UserName @if (isSelf) {
                         <span class="badge text-bg-secondary">to Ty</span>
                     }
                 </td>
+                <td>@u.Email</td>
                 <td>
                     <select class="form-select form-select-sm" disabled="@isSelf"
                             value="@u.Role" @onchange="e => ChangeRoleAsync(u.Id, e.Value?.ToString())">
@@ -107,7 +108,7 @@ else
 }
 
 @code {
-    private record UserRow(string Id, string Email, string Role);
+    private record UserRow(string Id, string UserName, string Email, string Role);
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
@@ -129,7 +130,7 @@ else
         foreach (var u in users)
         {
             var roles = await UserManager.GetRolesAsync(u);
-            list.Add(new UserRow(u.Id, u.Email ?? u.UserName ?? u.Id,
+            list.Add(new UserRow(u.Id, u.UserName ?? "—", u.Email ?? "—",
                 roles.Contains(AppRoles.Admin) ? AppRoles.Admin : AppRoles.User));
         }
         rows = list;
