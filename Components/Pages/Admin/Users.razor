@@ -36,11 +36,15 @@
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" />
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label" for="nu-name">Nazwa użytkownika</label>
+                    <InputText id="nu-name" class="form-control" @bind-Value="newUser.UserName" />
+                </div>
+                <div class="col-md-3">
                     <label class="form-label" for="nu-email">E-mail</label>
                     <InputText id="nu-email" class="form-control" @bind-Value="newUser.Email" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-2">
                     <label class="form-label" for="nu-pass">Hasło</label>
                     <InputText id="nu-pass" type="password" class="form-control" @bind-Value="newUser.Password" />
                 </div>
@@ -196,15 +200,16 @@ else
     {
         status = error = null;
         if (!AppRoles.Assignable.Contains(newUser.Role)) { error = "Nieprawidłowa rola."; return; }
-        var user = new ApplicationUser { UserName = newUser.Email, Email = newUser.Email, EmailConfirmed = true };
+        var userName = ValidUserNameAttribute.Normalize(newUser.UserName);
+        var user = new ApplicationUser { UserName = userName, Email = newUser.Email.Trim(), EmailConfirmed = true };
         var result = await UserManager.CreateAsync(user, newUser.Password);
         if (!result.Succeeded)
         {
-            error = string.Join(" ", result.Errors.Select(e => e.Description));
+            error = string.Join(" ", result.Errors.Select(IdentityErrorText.Describe));
             return;
         }
         await UserManager.AddToRoleAsync(user, newUser.Role);
-        status = $"Dodano użytkownika {newUser.Email}.";
+        status = $"Dodano użytkownika {userName}.";
         newUser = new();
         await LoadAsync();
     }
@@ -279,6 +284,7 @@ else
 
     private sealed class NewUserModel
     {
+        [Required(ErrorMessage = "Podaj nazwę użytkownika."), ValidUserName] public string UserName { get; set; } = "";
         [Required, EmailAddress] public string Email { get; set; } = "";
         [Required, StringLength(100, MinimumLength = 6)] public string Password { get; set; } = "";
         public string Role { get; set; } = AppRoles.User;
