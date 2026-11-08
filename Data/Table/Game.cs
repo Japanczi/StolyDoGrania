@@ -17,7 +17,7 @@ public class Game
     /// <summary>Rodzaj stołu potrzebnego do gry.</summary>
     public TableKind Kind { get; set; } = TableKind.Small;
 
-    /// <summary>Poziom trudności (np. "weight" z BGG, skala 1–5).</summary>
+    /// <summary>BGG's average weight, set only from BGG data; 0 means no rating.</summary>
     public decimal Difficulty { get; set; }
 
     /// <summary>Maksymalna liczba graczy przewidziana przez grę (domyślna pojemność stołu).</summary>

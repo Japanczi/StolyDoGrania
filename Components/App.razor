@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@inject IWebHostEnvironment Env
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -19,6 +21,10 @@
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
+    @if (Env.IsDevelopment())
+    {
+        <script src="@Assets["tools/designer.js"]"></script>
+    }
 </body>
 
 </html>

@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-StolyDoGrania-92e05698-2c3c-47e5-9ca7-182696238af8</UserSecretsId>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- Local reference material and saved designs: not part of the app, and must not trigger dotnet watch restarts. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Claude_Resources\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

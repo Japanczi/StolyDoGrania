@@ -10,6 +10,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<GameAlternateName> GameAlternateNames => Set<GameAlternateName>();
     public DbSet<PlayTable> PlayTables => Set<PlayTable>();
     public DbSet<TableSlot> TableSlots => Set<TableSlot>();
+    public DbSet<BoardSettings> BoardSettings => Set<BoardSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -64,6 +65,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasKey(s => new { s.PlayTableId, s.SlotNumber });
             e.Property(s => s.ParticipantName).IsRequired().HasMaxLength(100);
             e.Property(s => s.UserId).HasMaxLength(450);
+        });
+
+        builder.Entity<BoardSettings>(e =>
+        {
+            e.ToTable("BoardSettings");
+            e.Property(s => s.Id).ValueGeneratedNever();
+            // The single row exists from the start, so nothing has to create it on first use.
+            e.HasData(new { Id = Table.BoardSettings.SingletonId, AutoResetEnabled = false });
         });
     }
 }

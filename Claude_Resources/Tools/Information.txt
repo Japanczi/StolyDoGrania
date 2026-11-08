@@ -10,9 +10,63 @@ Created: 2026-11-05
 - Prompt "review features": list the features already implemented and those still to be done, based on Features.txt.
 - Work is experimental: when suitable, Claude asks whether to branch from the conversation.
 - Claude_Resources/ is git-ignored except for Claude_Resources/Tools/, so this folder is versioned (to allow rolling back experiments).
+  Claude_Resources/Tools/Designs/ (saved designs) is ignored again: designs are not committed (user decision, 2026-11-07).
 
 == Tools ==
-(none yet)
+
+--- Page designer ("Projektant") ---
+Branch: GraphicDesigner
+Purpose: mock up changes to any subpage on a frozen snapshot of it, and save them to a file Claude can implement from.
+
+Files:
+- wwwroot/tools/designer.js      the whole UI; plain JavaScript, no dependencies, isolated in a shadow DOM
+- Tools/DesignerEndpoints.cs     POST /_designer/save, writes the design file
+- Components/App.razor           loads the script in Development only
+- Program.cs                     maps the endpoint in Development only
+- StolyDoGrania.csproj           excludes Claude_Resources/ from the build (saved .json would otherwise count as published content)
+
+Use: run the app in Development, click "Projektant" (bottom right, above "Uwagi") on any page, edit, then "Zapisz".
+Shape and fill colors in a design are drafts unless a comment says otherwise (user, 2026-11-07); read comments as the spec.
+Output: Claude_Resources/Tools/Designs/<yyyyMMdd-HHmmss>-<page>.json (every save creates a new file).
+
+How it works:
+- Snapshot: a copy of the current DOM with scripts removed, in a full-screen iframe. It keeps form values
+  (never passwords) and scroll positions. It does not update, and the live page is not affected.
+- Input: a transparent layer above the iframe receives the mouse and hit-tests into it, so links and forms are inert.
+- No pushing: the first move, resize or rotate lifts the element to position:absolute, and a hidden copy
+  (data-designer-placeholder) keeps its original space, so neighbours never shift.
+- Shapes: real absolutely positioned elements appended to the snapshot's body (data-designer-shape), so the move,
+  resize, rotate, fill, color pick and comment tools work on them with no special cases. They scroll with the page.
+
+Design file format (version 1); coordinates are page pixels at the saved viewport size:
+- page, title, savedAt, viewport {w,h}, scroll {x,y}
+- elements[]: selector, tag, text (first 80 characters), before {x,y,w,h},
+  after {x,y,w,h} + rotation (only if moved, resized or rotated), fill {before,after} (only if filled)
+- shapes[]: id, type (rectangle | ellipse), x, y, w, h, rotation, fill. Ids aren't renumbered, so gaps mean deleted shapes.
+- comments[]: id, text, at {x,y}, element (absent if placed on empty space): either {selector,tag,text}
+  for a page element, or {shape: id} for a drawn shape
+- after {x,y,w,h} and shape x,y,w,h describe the unrotated box; rotation is in degrees, clockwise, around the center.
+- Selectors are CSS paths on the rendered page. Table rows and seats come from data, so a selector points at
+  one specific instance: treat a change to one row as an example of the pattern unless a comment says otherwise.
+
+Known limitations:
+- Moves are free placement on a mockup, not a real layout; Claude translates the intent into CSS/markup.
+- The pixel-accurate eyedropper uses the browser's EyeDropper API (Chrome/Edge). Elsewhere, the fallback reads the
+  element's background-color, so it can't read images or gradients. The API path could not be tested automatically.
+- Filling sets the background only; there is no text or border color yet.
+- Hover, focus and open-menu states aren't captured unless they are present in the DOM at snapshot time.
+- wwwroot/tools/designer.js is still published and appears in the page's import map, but outside Development it
+  is never loaded and the save endpoint doesn't exist (verified: no script tag, POST returns the same 400 as an
+  unknown route, nothing is written).
 
 == Decisions ==
-(none yet)
+- 2026-11-05: Work on a snapshot rather than the live page: Blazor would otherwise undo or break DOM edits.
+- 2026-11-05: Elements do not push each other aside (user request).
+- 2026-11-05: UI text is in Polish, per the project convention.
+- 2026-11-05: Drawing shapes was in the first idea but not in the requested controls, so it is on the to-do list.
+- 2026-11-05: Added the shape tool (user request): rectangle and ellipse, filled with the chosen color. Drawing switches
+  back to the select tool. Deleting a shape (Usuń button or Delete key) keeps its comments, as free pins.
+- 2026-11-07: Launcher moved from bottom left to bottom right (above "Uwagi"): the bottom left corner is the admin dock.
+- 2026-11-07: First design implemented: 20261107-210323-stoly.json (admin toolbox on /stoly).
+- 2026-11-05: Added "Nadrzędny" (select parent) and "Przywróć" (reset element) beyond the requested controls: nested
+  elements can't be reached otherwise, and without undo a mistake would mean losing the whole session.

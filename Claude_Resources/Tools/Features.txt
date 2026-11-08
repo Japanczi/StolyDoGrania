@@ -3,7 +3,29 @@ Feature tracker for the design tools. Listed on the prompt "review features".
 Created: 2026-11-05
 
 == Implemented ==
-(none yet)
+Page designer (branch GraphicDesigner):
+- Launcher button on every page, Development only
+- Frozen snapshot of the current page, works on Identity pages too
+- Select elements by clicking, select parent ("Nadrzędny")
+- Move by dragging; neighbours don't shift
+- Resize with 8 handles, also on rotated elements
+- Rotate by dragging or by handle; Shift snaps to 15 degrees
+- Extract color (browser eyedropper, with an element fallback)
+- Fill color
+- Comments on elements or empty space: numbered pins, edit, delete
+- Draw shapes ("Kształt"): rectangle or ellipse, Shift for equal sides; move, resize, rotate, fill, comment and delete them
+- Reset one element ("Przywróć")
+- Scrolling inside the snapshot
+- Floating, draggable toolbar with a status line
+- Save to JSON in Claude_Resources/Tools/Designs/
+- Prompt about unsaved changes on close
 
 == To do ==
-(none yet)
+Page designer:
+- More shape kinds: arrows, lines, text labels (not requested yet)
+- Outline-only shapes (not requested yet)
+- Undo/redo
+- Numeric entry for position, size and angle
+- Text and border color
+- Optional screenshot saved next to the JSON
+- Load a saved design back into the snapshot

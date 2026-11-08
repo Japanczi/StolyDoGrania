@@ -1,5 +1,5 @@
+@page "/"
 @page "/stoly"
-@layout TablesLayout
 @rendermode InteractiveServer
 @using System.Globalization
 @using System.Security.Claims
@@ -13,11 +13,12 @@
 @inject IOptions<TableSettings> Settings
 @inject NormalUserMode Mode
 @inject NavigationManager Nav
+@inject BoardResetter Resetter
 
-<PageTitle>Stoły</PageTitle>
+<PageTitle>Zapisy na gry</PageTitle>
 
 <div class="toolbar">
-    <h1>Stoły</h1>
+    <h1>Zapisy na gry</h1>
     @if (!isLoggedIn)
     {
         <a class="btn btn-outline-light btn-sm" href="Account/Login?ReturnUrl=stoly">Zaloguj się, aby tworzyć stoły i zajmować miejsca</a>
@@ -100,8 +101,45 @@ else
                                 }
                             </div>
 
+                            <div class="action-anchor">
+                                <button type="button" class="action-button action-rename" title="Zmień grę" aria-label="Zmień grę: @t.DisplayTitle"
+                                        @onclick="() => OpenRename(t)">🏷️</button>
+                                @if (renameTableId == t.Id)
+                                {
+                                    <div class="popup-backdrop" @onclick="CloseRename"></div>
+
+                                    <div class="action-popup action-popup-wide" role="dialog" aria-label="Zmień grę" @onkeydown="OnRenameKeyDown">
+                                        <label for="rename-name">Nazwa gry</label>
+                                        <input @ref="renameInput" id="rename-name" class="form-control form-control-sm" list="catalog-names" maxlength="200" autocomplete="off"
+                                               @bind="renameName" @bind:after="OnGameNameChangedAsync" />
+
+                                        @LookupMessages
+
+                                        @if (RenameReady && RenamedMaxPlayers != t.MaxPlayers)
+                                        {
+                                            <span class="form-text mt-0">Liczba miejsc: @t.MaxPlayers → @RenamedMaxPlayers</span>
+                                        }
+
+                                        @if (t.TakenSlots > 0 || t.Participants.Any(p => !(p.SlotNumber == PlayTable.OwnerSlot && t.IsOwner(p.UserId))))
+                                        {
+                                            <span class="rename-warning">Zapisanie zwolni wszystkie miejsca (zostaje tylko właściciel).</span>
+                                        }
+
+                                        <div class="action-popup-buttons">
+                                            <button type="button" class="btn btn-success btn-sm" disabled="@(busy || bggBusy)" @onclick="RenameTableAsync">Zapisz</button>
+                                            @if (Bgg.IsConfigured)
+                                            {
+                                                <button type="button" class="btn btn-outline-light btn-sm" title="Szukaj tej gry na BoardGameGeek, np. innego wydania"
+                                                        disabled="@bggBusy" @onclick="SearchBggManuallyAsync">BGG</button>
+                                            }
+                                            <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseRename">Anuluj</button>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
                             @* Placeholders for owner options coming later in development. *@
-                            @for (var i = 0; i < 4; i++)
+                            @for (var i = 0; i < 3; i++)
                             {
                                 <button type="button" class="action-button action-placeholder" disabled title="Opcja dostępna wkrótce" aria-label="Opcja dostępna wkrótce">🛠️</button>
                             }
@@ -289,19 +327,8 @@ else
                         }
                     </div>
 
-                    @* Difficulty belongs to the game, so a catalog game keeps its stored value. *@
-                    @if (selectedGame is not null)
-                    {
-                        <div id="new-difficulty" class="cell cell-difficulty" style="@DifficultyStyle(selectedGame.Difficulty)">@DifficultyLabel(selectedGame.Difficulty)</div>
-                    }
-                    else
-                    {
-                        <div class="cell">
-                            @* lang: shows a dot rather than a comma, whatever the browser's language. *@
-                            <input id="new-difficulty" type="number" lang="en" class="cell-input" min="0" max="5" step="0.01"
-                                   aria-label="Trudność" @bind="newTable.Difficulty" />
-                        </div>
-                    }
+                    @* Difficulty comes only from BGG; users can't enter it. *@
+                    <div id="new-difficulty" class="cell cell-difficulty" style="@DifficultyStyle(selectedGame?.Difficulty ?? 0)">@DifficultyLabel(selectedGame?.Difficulty ?? 0)</div>
 
                     <div class="cell cell-cover">
                         <div class="draft-cover">
@@ -329,59 +356,16 @@ else
                 }
             </div>
 
-            @if (bggBusy || bggNote is not null || candidates is not null || formError is not null || (DraftDetailsVisible && selectedGame?.BggId is not null))
+            @* While a table is being renamed, its popup shows the lookup instead. *@
+            @if (!Renaming && (bggBusy || bggNote is not null || candidates is not null || formError is not null || (DraftDetailsVisible && selectedGame?.BggId is not null)))
             {
                 <div class="draft-panel">
-                    @if (formError is not null)
-                    {
-                        <div class="alert alert-danger py-2 mb-2" role="alert">@formError</div>
-                    }
-
-                    @if (bggBusy)
-                    {
-                        <div role="status">
-                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                            Wczytuję dane z BoardGameGeek...
-                        </div>
-                    }
-
-                    @if (bggNote is not null)
-                    {
-                        <div class="form-text mt-0" role="status">@bggNote</div>
-                    }
-
-                    @if (candidates is not null)
-                    {
-                        <div class="form-text mt-0 mb-1">@candidatesTitle</div>
-                        <div class="candidate-list">
-                            @foreach (var candidate in candidates)
-                            {
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-outline-light candidate-name" disabled="@(bggBusy || busy)" @onclick="() => PickCandidateAsync(candidate)">
-                                        @candidate.Name@(candidate.Year is { } year ? $" ({year})" : "")
-                                    </button>
-                                    <a class="btn btn-outline-light candidate-link" href="https://boardgamegeek.com/boardgame/@candidate.BggId" target="_blank" rel="noopener noreferrer"
-                                       title="Zobacz na BoardGameGeek" aria-label="Zobacz na BoardGameGeek: @candidate.Name">↗</a>
-                                </div>
-                            }
-                            <button type="button" class="btn btn-outline-light btn-sm" @onclick="RejectCandidatesAsync">Żadna z tych</button>
-                        </div>
-                    }
-
-                    @if (DraftDetailsVisible && selectedGame is { BggId: not null } found)
-                    {
-                        <div class="form-text mt-0" role="status">Znaleziono na BoardGameGeek: @CatalogLabel(found)</div>
-                    }
+                    @LookupMessages
                 </div>
             }
         }
     </div>
 }
-
-@* Required by BGG's XML API terms for public-facing uses. *@
-<a class="bgg-credit" href="https://boardgamegeek.com/" target="_blank" rel="noopener noreferrer" title="Dane gier: BoardGameGeek">
-    <img src="images/powered-by-bgg.png" alt="Powered by BoardGameGeek" />
-</a>
 
 @if (addTarget is not null)
 {
@@ -421,10 +405,13 @@ else
 
 @if (isAdmin)
 {
-    <AdminHelpBox />
+    @* Side by side in one dock, so an opened panel pushes its neighbour aside instead of covering it. *@
+    <div class="admin-dock">
+        <AdminHelpBox />
+        <AdminToolbox TableCount="@(tables?.Count ?? 0)" AutoReset="@autoReset" Busy="@busy"
+                      OnClearTables="ClearTablesAsync" OnAutoResetChanged="SetAutoResetAsync" />
+    </div>
 }
-
-<FeedbackBox UserName="@displayName" />
 
 @code {
     private const string AddPlayerHint = "Prawy przycisk: dodaj gracza";
@@ -446,6 +433,7 @@ else
     private string? displayName;
 
     private bool busy;
+    private bool autoReset;
     private int? confirmDeleteId;
     private ElementReference deleteCancelButton;
     private bool focusDeleteCancel;
@@ -467,6 +455,12 @@ else
     private string? selectedCoverSrc;
     // Bumped by each lookup, so that a reply to an outdated one (BGG can take seconds) is ignored.
     private int lookupVersion;
+
+    // Renaming a table: the game lookup above serves this popup instead of the new table form.
+    private int? renameTableId;
+    private string renameName = string.Empty;
+    private ElementReference renameInput;
+    private bool focusRenameInput;
 
     // Add-player popup (owner's right-click on a slot).
     private AddPlayerTarget? addTarget;
@@ -516,6 +510,12 @@ else
             focusDeleteCancel = false;
             await deleteCancelButton.FocusAsync();
         }
+
+        if (focusRenameInput)
+        {
+            focusRenameInput = false;
+            await renameInput.FocusAsync();
+        }
     }
 
     private void SetNormalUserMode(ChangeEventArgs e)
@@ -561,6 +561,8 @@ else
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+
+        autoReset = isAdmin && await Db.BoardSettings.AsNoTracking().AnyAsync(s => s.AutoResetEnabled);
     }
 
     /// <summary>Runs a write, shows its error (if any) and reloads. Ignores clicks while another write is running.</summary>
@@ -709,17 +711,22 @@ else
 
     // ---------- owner's edits ----------
 
-    private async Task<string?> EditAsOwnerAsync(int tableId, Func<PlayTable, string?> edit)
-    {
+    private const string NotOwnerError = "Tylko właściciel stołu lub administrator może go edytować.";
+
+    /// <summary>The table, tracked, if the current user owns it or is an admin; otherwise null.</summary>
+    private async Task<PlayTable?> LoadManagedTableAsync(int tableId) =>
         // The owner check is part of the query, so hidden controls are not the only protection.
-        var table = userId is null
+        userId is null
             ? null
             : await Db.PlayTables.Include(t => t.Participants)
                 .FirstOrDefaultAsync(t => t.Id == tableId && (isAdmin || t.OwnerUserId == userId));
 
+    private async Task<string?> EditAsOwnerAsync(int tableId, Func<PlayTable, string?> edit)
+    {
+        var table = await LoadManagedTableAsync(tableId);
         if (table is null)
         {
-            return "Tylko właściciel stołu lub administrator może go edytować.";
+            return NotOwnerError;
         }
 
         var error = edit(table);
@@ -728,6 +735,121 @@ else
             await Db.SaveChangesAsync();
         }
         return error;
+    }
+
+    // ---------- renaming a table ----------
+
+    private bool Renaming => renameTableId is not null;
+
+    private PlayTable? RenamedTable => tables?.FirstOrDefault(t => t.Id == renameTableId);
+
+    private bool RenameReady => !bggBusy && candidates is null && !string.IsNullOrWhiteSpace(renameName);
+
+    // A BGG game brings its own seat count; otherwise the table keeps its own.
+    private int RenamedMaxPlayers =>
+        selectedGame is { BggId: not null, MaxPlayers: > 0 } game ? game.MaxPlayers : RenamedTable?.MaxPlayers ?? 0;
+
+    private void OpenRename(PlayTable table)
+    {
+        // The lookup is shared, so an unfinished new table is dropped.
+        ResetDraft();
+        renameTableId = table.Id;
+        renameName = table.DisplayTitle;
+        focusRenameInput = true;
+    }
+
+    private void CloseRename()
+    {
+        renameTableId = null;
+        renameName = string.Empty;
+        formError = null;
+        ResetLookup();
+    }
+
+    private void OnRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseRename();
+        }
+    }
+
+    private async Task RenameTableAsync()
+    {
+        formError = null;
+
+        if (renameTableId is not { } tableId || RenamedTable is not { } current)
+        {
+            CloseRename();
+            return;
+        }
+
+        if (bggBusy)
+        {
+            formError = "Poczekaj na wynik wyszukiwania na BoardGameGeek.";
+            return;
+        }
+
+        if (candidates is not null)
+        {
+            formError = "Wybierz grę z listy albo kliknij „Żadna z tych”.";
+            return;
+        }
+
+        var name = renameName.Trim();
+        if (name.Length == 0)
+        {
+            formError = "Podaj nazwę gry.";
+            return;
+        }
+
+        var maxPlayers = RenamedMaxPlayers;
+        if (TooManySpotsError(maxPlayers) is { } tooManySpots)
+        {
+            formError = tooManySpots;
+            return;
+        }
+
+        var oldTitle = current.DisplayTitle;
+        var renamed = false;
+
+        await WriteAsync(async () =>
+        {
+            var table = await LoadManagedTableAsync(tableId);
+            if (table is null)
+            {
+                return NotOwnerError;
+            }
+
+            var known = selectedGame ?? FindInCatalog(name);
+            var game = known is null ? null : await Db.Games.FirstOrDefaultAsync(g => g.Id == known.Id);
+            if (game is null)
+            {
+                game = new Game { Name = name, Kind = table.Kind, MaxPlayers = maxPlayers, BggUrl = DefaultBggUrl };
+                Db.Games.Add(game);
+            }
+
+            if (!table.TryChangeGame(game, name, maxPlayers, out var error))
+            {
+                return error;
+            }
+
+            await Db.SaveChangesAsync();
+            renamed = true;
+            return null;
+        }, "Nie udało się zmienić gry stołu.");
+
+        if (renamed)
+        {
+            statusMessage = $"Zmieniono grę stołu: {oldTitle} → {name}.";
+            CloseRename();
+        }
+        else if (errorMessage is not null)
+        {
+            // Shown in the popup, next to the name it's about.
+            formError = errorMessage;
+            errorMessage = null;
+        }
     }
 
     private void OpenDeleteConfirm(int tableId)
@@ -805,6 +927,49 @@ else
             return null;
         }), "Nie udało się zapisać godziny.");
 
+    // ---------- admin toolbox ----------
+
+    private async Task ClearTablesAsync()
+    {
+        int? removed = null;
+        await WriteAsync(async () =>
+        {
+            if (!isAdmin)
+            {
+                return "Tylko administrator może wyczyścić listę stołów.";
+            }
+
+            try
+            {
+                removed = await Resetter.ClearTablesAsync();
+            }
+            // Bulk deletes bypass SaveChanges, so their failures aren't DbUpdateExceptions.
+            catch (System.Data.Common.DbException)
+            {
+                return "Nie udało się wyczyścić listy stołów.";
+            }
+            return null;
+        }, "Nie udało się wyczyścić listy stołów.");
+
+        if (removed is { } count)
+        {
+            statusMessage = $"Usunięto wszystkie stoły ({count}).";
+        }
+    }
+
+    private Task SetAutoResetAsync(bool enabled) => WriteAsync(async () =>
+    {
+        if (!isAdmin)
+        {
+            return "Tylko administrator może zmienić to ustawienie.";
+        }
+
+        var settings = await Resetter.GetSettingsAsync();
+        settings.SetAutoReset(enabled, DateTime.UtcNow);
+        await Db.SaveChangesAsync();
+        return null;
+    }, "Nie udało się zapisać ustawienia automatycznego czyszczenia.");
+
     // ---------- new table form ----------
 
     // The name is only bound once the field loses focus, so the lookup has started by the time this is checked.
@@ -830,6 +995,55 @@ else
 
     // ---------- game lookup: the catalog's titles first, then BGG ----------
 
+    // The lookup serves either the new table form or the rename popup.
+    private string LookupName => Renaming ? renameName : newTable.GameName;
+
+    private TableKind LookupKind => Renaming ? RenamedTable?.Kind ?? TableKind.Small : newTable.Kind;
+
+    // The lookup's progress, choices and errors; shown under the new table form or in the rename popup.
+    private RenderFragment LookupMessages => @<text>
+        @if (formError is not null)
+        {
+            <div class="alert alert-danger py-2 mb-2" role="alert">@formError</div>
+        }
+
+        @if (bggBusy)
+        {
+            <div role="status">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Wczytuję dane z BoardGameGeek...
+            </div>
+        }
+
+        @if (bggNote is not null)
+        {
+            <div class="form-text mt-0" role="status">@bggNote</div>
+        }
+
+        @if (candidates is not null)
+        {
+            <div class="form-text mt-0 mb-1">@candidatesTitle</div>
+            <div class="candidate-list">
+                @foreach (var candidate in candidates)
+                {
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-light candidate-name" disabled="@(bggBusy || busy)" @onclick="() => PickCandidateAsync(candidate)">
+                            @candidate.Name@(candidate.Year is { } year ? $" ({year})" : "")
+                        </button>
+                        <a class="btn btn-outline-light candidate-link" href="https://boardgamegeek.com/boardgame/@candidate.BggId" target="_blank" rel="noopener noreferrer"
+                           title="Zobacz na BoardGameGeek" aria-label="Zobacz na BoardGameGeek: @candidate.Name">↗</a>
+                    </div>
+                }
+                <button type="button" class="btn btn-outline-light btn-sm" @onclick="RejectCandidatesAsync">Żadna z tych</button>
+            </div>
+        }
+
+        @if (!bggBusy && candidates is null && selectedGame is { BggId: not null } found)
+        {
+            <div class="form-text mt-0" role="status">Znaleziono na BoardGameGeek: @CatalogLabel(found)</div>
+        }
+    </text>;
+
     private void ResetLookup()
     {
         lookupVersion++;
@@ -843,18 +1057,16 @@ else
 
     private async Task OnGameNameChangedAsync()
     {
-        var hadSelection = selectedGame is not null;
         ResetLookup();
         formError = null;
-        newCover = null;
-        newCoverType = null;
-        newTable.MaxPlayers = drawnMaxPlayers;
-        if (hadSelection)
+        if (!Renaming)
         {
-            newTable.Difficulty = 0;
+            newCover = null;
+            newCoverType = null;
+            newTable.MaxPlayers = drawnMaxPlayers;
         }
 
-        var name = newTable.GameName.Trim();
+        var name = LookupName.Trim();
         if (name.Length == 0)
         {
             return;
@@ -889,7 +1101,7 @@ else
     /// <summary>The fallback for when BGG has nothing: an existing hand-added game of this name, if there is one.</summary>
     private async Task UseHandAddedGameAsync()
     {
-        if (FindInCatalog(newTable.GameName) is { BggId: null } handAdded)
+        if (FindInCatalog(LookupName) is { BggId: null } handAdded)
         {
             await SelectCatalogGameAsync(handAdded);
         }
@@ -898,7 +1110,7 @@ else
     /// <summary>Lets the user reach BGG even when the catalog already has a match, e.g. to choose another edition.</summary>
     private async Task SearchBggManuallyAsync()
     {
-        var name = newTable.GameName.Trim();
+        var name = LookupName.Trim();
 
         // Ignored while busy: leaving the name field to click this button has already started a lookup.
         if (bggBusy || name.Length == 0)
@@ -1030,7 +1242,7 @@ else
             return;
         }
 
-        var kind = newTable.Kind;
+        var kind = LookupKind;
         await WriteAsync(async () =>
         {
             await SaveBggGameAsync(details, cover, kind);
@@ -1098,18 +1310,21 @@ else
     private async Task SelectCatalogGameAsync(CatalogEntry game)
     {
         // The name field keeps what the user typed: that's the title the table will show.
-        newTable.Kind = game.Kind;
-        newTable.Difficulty = game.Difficulty;
-        newTable.MaxPlayers = game is { BggId: not null, MaxPlayers: > 0 } ? game.MaxPlayers : drawnMaxPlayers;
+        // A renamed table keeps its own type.
+        if (!Renaming)
+        {
+            newTable.Kind = game.Kind;
+            newTable.MaxPlayers = game is { BggId: not null, MaxPlayers: > 0 } ? game.MaxPlayers : drawnMaxPlayers;
+        }
 
         selectedGame = game;
         selectedCoverSrc = null;
         candidates = null;
         candidatesTitle = null;
-        formError = TooManySpotsError();
+        formError = TooManySpotsError(Renaming ? RenamedMaxPlayers : newTable.MaxPlayers);
 
-        // Only a preview, so it's skipped rather than risking two queries on one DbContext.
-        if (game.HasCover && !busy)
+        // Only a preview for the new table form, so it's skipped rather than risking two queries on one DbContext.
+        if (!Renaming && game.HasCover && !busy)
         {
             busy = true;
             try
@@ -1127,8 +1342,8 @@ else
         }
     }
 
-    private string? TooManySpotsError() =>
-        newTable.MaxPlayers > Settings.Value.MaximumSpotsAllowed
+    private string? TooManySpotsError(int maxPlayers) =>
+        maxPlayers > Settings.Value.MaximumSpotsAllowed
             ? $"Nie można tworzyć stołów dla gier z więcej niż {Settings.Value.MaximumSpotsAllowed} miejscami."
             : null;
 
@@ -1198,7 +1413,7 @@ else
             return;
         }
 
-        if (TooManySpotsError() is { } tooManySpots)
+        if (TooManySpotsError(newTable.MaxPlayers) is { } tooManySpots)
         {
             formError = tooManySpots;
             return;
@@ -1207,12 +1422,6 @@ else
         if (newTable.TakenSlots < 0)
         {
             formError = "Liczba zajętych miejsc nie może być ujemna.";
-            return;
-        }
-
-        if (newTable.Difficulty is < 0 or > 5)
-        {
-            formError = "Trudność musi mieścić się w zakresie 0–5.";
             return;
         }
 
@@ -1236,7 +1445,6 @@ else
                 {
                     Name = name,
                     Kind = newTable.Kind,
-                    Difficulty = Math.Round(newTable.Difficulty, 2),
                     MaxPlayers = newTable.MaxPlayers,
                     BggUrl = DefaultBggUrl
                 };
@@ -1338,7 +1546,5 @@ else
         public int MaxPlayers { get; set; }
 
         public int TakenSlots { get; set; }
-
-        public decimal Difficulty { get; set; }
     }
 }

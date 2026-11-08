@@ -1,0 +1,103 @@
+/* The panel opens upwards, above its toggle, which stays in place. */
+.admin-toolbox {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .5rem;
+}
+
+.toolbox-panel {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    min-width: 280px;
+    padding: .6rem;
+    border: 1px solid #fff;
+    border-radius: .5rem;
+    background: #2b2b2f;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+    font-size: .8125rem;
+}
+
+.toolbox-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.toolbox-button {
+    flex: 1;
+    padding: .35rem .6rem;
+    border: 0;
+    border-radius: .35rem;
+    background: #45454b;
+    color: #fff;
+    text-align: left;
+}
+
+.toolbox-button:hover:not(:disabled) {
+    background: #56565d;
+}
+
+.toolbox-button:disabled {
+    color: #a0a0a6;
+}
+
+.toolbox-switch {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .2rem;
+    border: 0;
+    background: none;
+    color: #fff;
+}
+
+.toolbox-switch:disabled {
+    opacity: .6;
+}
+
+/* Light gray in both states, so it stands out from the dark panel; the knob's side shows the state. */
+.switch-track {
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    border: 1px solid #fff;
+    border-radius: 1rem;
+    background: #d4d4d8;
+}
+
+.switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.25rem - 6px);
+    height: calc(1.25rem - 6px);
+    border-radius: 50%;
+    background: #6b6b72;
+    transition: transform .15s;
+}
+
+.toolbox-switch[aria-checked="true"] .switch-knob {
+    transform: translateX(1rem);
+    background: #1f1f22;
+}
+
+.switch-label {
+    font-weight: 600;
+}
+
+.toolbox-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    padding: .5rem;
+    border-radius: .35rem;
+    background: #45454b;
+    color: #fff;
+}
+
+.toolbox-confirm-buttons {
+    display: flex;
+    gap: .4rem;
+}

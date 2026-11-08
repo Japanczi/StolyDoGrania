@@ -6,6 +6,8 @@ using StolyDoGrania.Components;
 using StolyDoGrania.Components.Account;
 using StolyDoGrania.Data;
 using StolyDoGrania.Data.Bgg;
+using StolyDoGrania.Data.Table;
+using StolyDoGrania.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,12 +66,16 @@ builder.Services.AddHttpClient(BggClient.HttpClientName, client =>
 });
 builder.Services.AddSingleton<BggClient>();
 
+builder.Services.AddScoped<BoardResetter>();
+builder.Services.AddHostedService<WeeklyBoardResetService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
+    app.MapDesignerEndpoints();
 }
 else
 {

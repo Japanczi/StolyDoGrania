@@ -227,6 +227,36 @@ public class PlayTable
         return true;
     }
 
+    /// <summary>
+    /// Owner's action: switches the table to another game (or just retitles it), with that game's seat count.
+    /// Starts the sign-up over: every player leaves and the marks are cleared; a seated owner keeps the first seat.
+    /// </summary>
+    public bool TryChangeGame(Game game, string title, int maxPlayers, out string? error)
+    {
+        error = null;
+        var name = title.Trim();
+
+        if (name.Length is 0 or > 200)
+        {
+            error = "Nazwa gry musi mieć od 1 do 200 znaków.";
+            return false;
+        }
+
+        if (maxPlayers < 1)
+        {
+            error = "Gra musi mieć co najmniej jedno miejsce.";
+            return false;
+        }
+
+        Participants.RemoveAll(p => !(p.SlotNumber == OwnerSlot && IsOwner(p.UserId)));
+
+        Game = game;
+        GameTitle = name;
+        MaxPlayers = maxPlayers;
+        _takenSlots = 0;
+        return true;
+    }
+
     public int? Join(string participantName)
     {
         if (string.IsNullOrWhiteSpace(participantName))

@@ -19,8 +19,8 @@
 
 .table-row {
     display: grid;
-    grid-template-columns: 62px minmax(150px, 1.2fr) 64px 84px 96px 60px 52px 76px 76px minmax(280px, 3fr);
-    min-width: 1022px;
+    grid-template-columns: 62px minmax(150px, 1fr) 64px 84px 96px 60px 52px 76px 108px minmax(280px, 4fr);
+    min-width: 1054px;
     overflow: hidden;
     border-radius: 6px;
     background: #3b3b40;
@@ -96,6 +96,14 @@
     background: #14532d;
 }
 
+.action-rename {
+    background: #14532d;
+}
+
+    .action-rename:hover {
+        background: #1e7a42;
+    }
+
 .action-anchor {
     display: flex;
 }
@@ -119,6 +127,17 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
     font-size: .8125rem;
     text-align: left;
+}
+
+/* Room for the game lookup's list of BGG titles; scrolls rather than running off the screen. */
+.action-popup-wide {
+    width: 360px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.rename-warning {
+    color: #ffc107;
 }
 
 .action-popup-buttons {
@@ -152,8 +171,8 @@
 
 .thumb {
     flex: none;
-    width: 68px;
-    height: 68px;
+    width: 100px;
+    height: 100px;
     object-fit: cover;
 }
 
@@ -177,7 +196,7 @@
 }
 
 .draft-panel {
-    min-width: 1022px;
+    min-width: 1054px;
     padding: .5rem .75rem;
     border-radius: 6px;
     background: #2c2c30;
@@ -209,8 +228,8 @@
 
 .draft-cover {
     position: relative;
-    width: 68px;
-    height: 68px;
+    width: 100px;
+    height: 100px;
 }
 
 /* A quarter of the cover's area. */
@@ -237,20 +256,6 @@
 
     .cover-upload:focus-within {
         outline: 2px solid #8ab4f8;
-    }
-
-/* White backing: the logo's dark lettering wouldn't be legible on the page background. */
-.bgg-credit {
-    display: inline-block;
-    margin-top: .5rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #fff;
-}
-
-    .bgg-credit img {
-        display: block;
-        height: 40px;
     }
 
 .kind-small {
@@ -296,16 +301,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Grows with the player's name, up to 300% of the base width. */
+    /* As tall as a row with a cover (100px, less the cell's padding); grows with the player's name, up to 300% of the base width. */
     flex: none;
-    min-width: 60px;
-    max-width: 180px;
-    height: 60px;
-    padding: 2px 4px;
+    min-width: 92px;
+    max-width: 276px;
+    height: 92px;
+    padding: 2px 6px;
     overflow: hidden;
     border: 2px solid transparent;
-    border-radius: 10px;
-    font-size: .6875rem;
+    border-radius: 14px;
+    font-size: .8125rem;
     font-weight: 600;
     line-height: 1.15;
     text-align: center;
@@ -416,4 +421,16 @@ button.slot:focus-visible {
 .add-player-free {
     display: flex;
     gap: .35rem;
+}
+
+/* Admin controls in the bottom left corner: the help note and the toolbox, bottoms aligned. */
+.admin-dock {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 900;
+    display: flex;
+    align-items: flex-end;
+    gap: .75rem;
+    max-height: calc(100vh - 2rem);
 }

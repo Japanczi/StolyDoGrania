@@ -231,6 +231,29 @@ namespace StolyDoGrania.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("StolyDoGrania.Data.Table.BoardSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("AutoResetCheckedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AutoResetEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BoardSettings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AutoResetEnabled = false
+                        });
+                });
+
             modelBuilder.Entity("StolyDoGrania.Data.Table.GameAlternateName", b =>
                 {
                     b.Property<int>("GameId")
