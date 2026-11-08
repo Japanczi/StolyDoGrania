@@ -29,5 +29,5 @@ public sealed class EmailSettings
     public string FromAddress { get; set; } = "";
 
     /// <summary>Sender name shown to recipients.</summary>
-    public string FromName { get; set; } = "StolyDoGrania";
+    public string FromName { get; set; } = "Planszówkarz";
 }

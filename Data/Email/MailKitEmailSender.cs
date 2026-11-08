@@ -16,36 +16,53 @@ public sealed class MailKitEmailSender(IOptions<EmailSettings> options, ILogger<
 {
     private readonly EmailSettings settings = options.Value;
 
-    // Links arrive already HTML-encoded by the Identity pages, so they go into the HTML body as-is
-    // and are decoded for the plain-text body.
+    private const string Closing = "Miłej zabawy!";
+
+    /// <summary>
+    /// Identity uses this both for new accounts and for changing the address in the profile;
+    /// the latter links to Account/ConfirmEmailChange, which is how the two texts are told apart
+    /// without editing the scaffolded Identity pages.
+    /// </summary>
     public Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink) =>
-        SendAsync(email,
-            "Potwierdź adres e-mail",
-            $"<p>Cześć!</p><p>Aby potwierdzić adres e-mail w StolyDoGrania, <a href=\"{confirmationLink}\">kliknij tutaj</a>.</p>" +
-            "<p>Jeśli nie spodziewasz się tej wiadomości, po prostu ją zignoruj.</p>",
-            $"Cześć!\n\nAby potwierdzić adres e-mail w StolyDoGrania, otwórz ten link:\n{WebUtility.HtmlDecode(confirmationLink)}\n\n" +
-            "Jeśli nie spodziewasz się tej wiadomości, po prostu ją zignoruj.");
+        IsEmailChangeLink(confirmationLink)
+            ? SendLinkAsync(email, "Potwierdź nowy adres e-mail",
+                "Hej, potwierdź nowy adres e-mail dla swojego konta na Planszówkarzu.", confirmationLink)
+            : SendLinkAsync(email, "Potwierdź adres e-mail",
+                "Hej, dzięki za założenie konta na Planszówkarzu :)", confirmationLink);
+
+    private static bool IsEmailChangeLink(string encodedLink) =>
+        Uri.TryCreate(WebUtility.HtmlDecode(encodedLink), UriKind.Absolute, out var uri)
+        && uri.AbsolutePath.EndsWith("/Account/ConfirmEmailChange", StringComparison.OrdinalIgnoreCase);
 
     public Task SendPasswordResetLinkAsync(ApplicationUser user, string email, string resetLink) =>
-        SendAsync(email,
-            "Resetowanie hasła",
-            $"<p>Cześć!</p><p>Aby ustawić nowe hasło w StolyDoGrania, <a href=\"{resetLink}\">kliknij tutaj</a>.</p>" +
-            "<p>Jeśli nie prosisz o zmianę hasła, po prostu zignoruj tę wiadomość.</p>",
-            $"Cześć!\n\nAby ustawić nowe hasło w StolyDoGrania, otwórz ten link:\n{WebUtility.HtmlDecode(resetLink)}\n\n" +
-            "Jeśli nie prosisz o zmianę hasła, po prostu zignoruj tę wiadomość.");
+        SendLinkAsync(email, "Resetowanie hasła",
+            "Hej, dostaliśmy prośbę o zresetowanie hasła do Twojego konta na Planszówkarzu.", resetLink);
 
     public Task SendPasswordResetCodeAsync(ApplicationUser user, string email, string resetCode) =>
-        SendAsync(email,
-            "Resetowanie hasła",
-            $"<p>Cześć!</p><p>Kod do zresetowania hasła w StolyDoGrania: <strong>{WebUtility.HtmlEncode(resetCode)}</strong></p>",
-            $"Cześć!\n\nKod do zresetowania hasła w StolyDoGrania: {resetCode}");
+        SendAsync(email, "Resetowanie hasła",
+            $"<p>Hej, dostaliśmy prośbę o zresetowanie hasła do Twojego konta na Planszówkarzu.<br>" +
+            $"Twój kod: <strong>{WebUtility.HtmlEncode(resetCode)}</strong></p><p>{Closing}</p>",
+            $"Hej, dostaliśmy prośbę o zresetowanie hasła do Twojego konta na Planszówkarzu.\n" +
+            $"Twój kod: {resetCode}\n\n{Closing}");
+
+    /// <summary>
+    /// Greeting, a clickable "Tutaj" plus the full link written out, then the closing line.
+    /// The link arrives already HTML-encoded by the Identity pages, so it goes into the HTML body
+    /// as-is and is decoded for the plain-text body.
+    /// </summary>
+    private Task SendLinkAsync(string to, string subject, string greeting, string encodedLink) =>
+        SendAsync(to, subject,
+            $"<p>{greeting}<br>" +
+            $"Kliknij <a href=\"{encodedLink}\">Tutaj</a> albo wejdź pod ten link: <a href=\"{encodedLink}\">{encodedLink}</a></p>" +
+            $"<p>{Closing}</p>",
+            $"{greeting}\nWejdź pod ten link: {WebUtility.HtmlDecode(encodedLink)}\n\n{Closing}");
 
     private async Task SendAsync(string to, string subject, string htmlBody, string textBody)
     {
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(settings.FromName, settings.FromAddress));
         message.To.Add(MailboxAddress.Parse(to));
-        message.Subject = $"{subject} – StolyDoGrania";
+        message.Subject = $"{subject} – Planszówkarz";
         message.Body = new BodyBuilder { HtmlBody = htmlBody, TextBody = textBody }.ToMessageBody();
 
         try
