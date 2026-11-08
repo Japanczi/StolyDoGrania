@@ -381,3 +381,6 @@ Data/app.db-wal
 /Data/app.db
 /Data/app.db-shm
 /Data/app.db-wal
+/Properties/serviceDependencies.json
+/Properties/serviceDependencies.local.json
+/.claude/launch.json
