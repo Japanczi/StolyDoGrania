@@ -145,10 +145,10 @@
         [Display(Name = "Nazwa użytkownika")]
         public string UserName { get; set; } = "";
 
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Podaj adres e-mail.")]
+        [ValidEmail]
         [Display(Name = "Email")]
-        public string Email { get; set; } = "";
+        public string Email { get; set => field = value.Trim(); } = "";
 
         [Required]
         [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]

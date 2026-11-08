@@ -135,9 +135,9 @@
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Podaj adres e-mail.")]
+        [ValidEmail]
         [Display(Name = "New email")]
-        public string? NewEmail { get; set; }
+        public string? NewEmail { get; set => field = value?.Trim(); }
     }
 }
