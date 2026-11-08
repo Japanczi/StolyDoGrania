@@ -2,8 +2,34 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-a, .btn-link {
-    color: #006bb7;
+/* Shared app theme (tables board, main menu, account pages): dark background with a subtle diagonal weave.
+   Use together with data-bs-theme="dark" on the same element. */
+.board-theme {
+    min-height: 100vh;
+    color: #ececec;
+    color-scheme: dark;
+    background-color: #2b2b2e;
+    background-image:
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, .018) 0 2px, transparent 2px 9px),
+        repeating-linear-gradient(-45deg, rgba(0, 0, 0, .10) 0 2px, transparent 2px 9px);
+    /* Bootstrap reads these for links and .btn-link. */
+    --bs-link-color: #8ab4f8;
+    --bs-link-color-rgb: 138, 180, 248;
+    --bs-link-hover-color: #aecbfa;
+    --bs-link-hover-color-rgb: 174, 203, 250;
+    /* Translucent surfaces, same as the tables ribbon. */
+    --board-bar-bg: rgba(0, 0, 0, .35);
+    --board-border: rgba(255, 255, 255, .08);
+}
+
+/* Slightly smaller, tighter headings than Bootstrap's defaults. */
+.board-theme h1 { font-size: 1.5rem; }
+.board-theme h2 { font-size: 1.25rem; }
+.board-theme h3 { font-size: 1.1rem; }
+.board-theme h4 { font-size: 1rem; }
+
+.board-theme h1, .board-theme h2, .board-theme h3, .board-theme h4 {
+    margin-bottom: .5rem;
 }
 
 .btn-primary {
@@ -16,8 +42,9 @@ a, .btn-link {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
 
-.content {
-    padding-top: 1.1rem;
+/* No page scrolling behind the open menu drawer (see MainLayout). */
+body:has(#app-menu-toggle:checked) {
+    overflow: hidden;
 }
 
 h1:focus {

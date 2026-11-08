@@ -1,23 +1,68 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@* The only app layout: top ribbon + slide-in menu drawer over the page.
+   The layout renders statically, so the drawer is driven by a CSS-only checkbox (works on Identity pages too). *@
+<div class="app board-theme" data-bs-theme="dark">
+    @* Must stay before the ribbon, backdrop and drawer: the CSS uses ":checked ~" sibling selectors.
+       Visually hidden but focusable, so Tab + Space opens the menu. *@
+    <input type="checkbox" id="app-menu-toggle" class="app-menu-toggle" aria-label="Pokaż menu" aria-controls="app-drawer" />
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+    <header class="app-bar">
+        <a class="app-brand" href="">StolyDoGrania</a>
+
+        @* Left group, per design 20261107-214747-root: Menu, then Profile or Registration. *@
+        <nav class="app-bar-nav" aria-label="Nawigacja">
+            <label for="app-menu-toggle" class="btn btn-outline-light btn-sm app-menu-button">Menu</label>
+
+            <AuthorizeView>
+                <Authorized>
+                    <a class="btn btn-outline-light btn-sm app-user" href="Account/Manage" title="Profil">@UserNames.Short(context.User.Identity?.Name)</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-outline-light btn-sm" href="Account/Register">Zarejestruj się</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+
+        @* Right side: login / logout. *@
+        <div class="app-bar-auth">
+            <AuthorizeView>
+                <Authorized>
+                    <form action="Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        @* Must be non-empty (the logout endpoint binds a required string); "stoly" is an alias of "/". *@
+                        <input type="hidden" name="ReturnUrl" value="stoly" />
+                        <button type="submit" class="btn btn-link btn-sm">Wyloguj</button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-link btn-sm" href="Account/Login?ReturnUrl=%2F">Zaloguj się</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
+    </header>
 
-        <article class="content px-4">
-            @Body
-        </article>
+    @* Clicking outside the drawer closes it. *@
+    <label for="app-menu-toggle" class="app-drawer-backdrop" aria-hidden="true"></label>
+
+    @* Overlays the page (fixed position), so the page layout never shifts.
+       Following a link or pressing Escape closes it. *@
+    <aside id="app-drawer" class="app-drawer" aria-label="Menu"
+           onclick="if (event.target.closest('a, button')) document.getElementById('app-menu-toggle').checked = false;"
+           onkeydown="if (event.key === 'Escape') { const t = document.getElementById('app-menu-toggle'); t.checked = false; t.focus(); }">
+        <NavMenu />
+    </aside>
+
+    <main class="app-main">
+        @Body
     </main>
+
+    @* Interactive island: works on this static layout regardless of the page's own render mode. *@
+    <FeedbackBox @rendermode="InteractiveServer" />
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
+    Wystąpił nieoczekiwany błąd.
+    <a href="." class="reload">Odśwież</a>
     <span class="dismiss">🗙</span>
 </div>

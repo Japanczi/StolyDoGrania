@@ -1,104 +1,64 @@
-﻿@implements IDisposable
+﻿@inject NavigationManager NavigationManager
 
-@inject NavigationManager NavigationManager
-
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">StolyDoGrania</a>
-    </div>
+@* Contents of the slide-in drawer (opened by the Menu button in MainLayout's ribbon). *@
+<div class="drawer-head">
+    <span class="drawer-title">Menu</span>
+    <label for="app-menu-toggle" class="drawer-close" title="Zamknij menu" aria-label="Zamknij menu">✕</label>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="drawer-nav flex-column">
+    <NavLink class="drawer-link" href="" Match="NavLinkMatch.All">
+        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Zapisy na gry
+    </NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+    <AuthorizeView Roles="Admin">
+        <NavLink class="drawer-link" href="admin/users">
+            <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Użytkownicy
+        </NavLink>
+    </AuthorizeView>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="stoly">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Stoły
-            </NavLink>
-        </div>
+    <hr class="drawer-sep" />
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+    <AuthorizeView>
+        <Authorized>
+            <NavLink class="drawer-link" href="Account/Manage">
+                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Profil (@UserNames.Short(context.User.Identity?.Name))
             </NavLink>
-        </div>
+            <form action="Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+                <button type="submit" class="drawer-link">
+                    <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj
+                </button>
+            </form>
+        </Authorized>
+        <NotAuthorized>
+            <NavLink class="drawer-link" href="Account/Register">
+                <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Zarejestruj się
+            </NavLink>
+            <NavLink class="drawer-link" href="Account/Login">
+                <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Zaloguj się
+            </NavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</nav>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div>
-        <AuthorizeView Roles="Admin">
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="admin/users">
-                    <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Użytkownicy
-                </NavLink>
-            </div>
-        </AuthorizeView>
-        <AuthorizeView>
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
+@* Bottom-right corner of the menu. Required by BGG's XML API terms for public-facing uses. *@
+<div class="drawer-foot">
+    <a class="bgg-credit" href="https://boardgamegeek.com/" target="_blank" rel="noopener noreferrer" title="Dane gier: BoardGameGeek">
+        <img src="images/powered-by-bgg.png" alt="Powered by BoardGameGeek" />
+    </a>
 </div>
 
 @code {
-    private string? currentUrl;
-
-    protected override void OnInitialized()
+    // Static layout: rendered once per request, so the current URL is known here.
+    // The logout endpoint needs a non-empty value; "stoly" is an alias of "/".
+    private string ReturnUrl
     {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-        NavigationManager.LocationChanged += OnLocationChanged;
-    }
-
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= OnLocationChanged;
+        get
+        {
+            var url = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            return string.IsNullOrEmpty(url) ? "stoly" : url;
+        }
     }
 }
-

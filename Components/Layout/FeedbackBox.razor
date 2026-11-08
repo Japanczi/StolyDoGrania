@@ -36,8 +36,8 @@
 @code {
     private const int MaxLength = 4000;
 
-    /// <summary>Display name stored with the comment; null for anonymous users.</summary>
-    [Parameter] public string? UserName { get; set; }
+    // Resolved here (not passed in) so the box works from any layout, including static Identity pages.
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private bool open;
     private bool saving;
@@ -54,13 +54,16 @@
 
         saving = true;
         var now = DateTime.Now;
+        var userName = await GetShortUserNameAsync();
+        // Read at save time, so it is the subpage the user is on now, not the one the box was first rendered on.
+        var page = "/" + Nav.ToBaseRelativePath(Nav.Uri);
         // One file per comment, so saves never have to share or lock a file.
         var fileName = $"{now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}.md";
         var content = $"""
             ---
             date: {now:yyyy-MM-dd HH:mm:ss}
-            page: /{Nav.ToBaseRelativePath(Nav.Uri)}
-            user: {UserName ?? "(niezalogowany)"}
+            page: {page}
+            user: {userName ?? "(niezalogowany)"}
             ---
 
             {comment.Trim()}
@@ -75,7 +78,7 @@
 
             comment = string.Empty;
             failed = false;
-            status = $"Zapisano o {now:HH:mm:ss}.";
+            status = $"Zapisano o {now:HH:mm:ss} (strona {page}).";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -87,5 +90,17 @@
         {
             saving = false;
         }
+    }
+
+    /// <summary>Part of the user name before '@' (a full e-mail is never stored or shown); null when anonymous.</summary>
+    private async Task<string?> GetShortUserNameAsync()
+    {
+        if (AuthState is null)
+        {
+            return null;
+        }
+
+        var name = UserNames.Short((await AuthState).User.Identity?.Name);
+        return name.Length > 0 ? name : null;
     }
 }

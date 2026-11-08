@@ -1,7 +1,10 @@
+/* Bottom centre, where the opened box appears. Bottom-left holds the admin dock (tables page),
+   bottom-right the designer launcher. */
 .feedback-toggle {
     position: fixed;
-    right: 1rem;
+    left: 50%;
     bottom: 1rem;
+    transform: translateX(-50%);
     z-index: 900;
 }
 
