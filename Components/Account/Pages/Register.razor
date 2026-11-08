@@ -30,7 +30,7 @@
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.UserName" id="Input.UserName" class="form-control" autocomplete="username" aria-required="true" placeholder="nazwa" />
                 <label for="Input.UserName">Nazwa użytkownika</label>
-                <div class="form-text">Widoczna dla innych graczy. 3–20 znaków: litery, cyfry, „.”, „_”, „-”.</div>
+                <div class="form-text">Widoczna dla innych graczy. 3–20 znaków: litery, cyfry, spacje, „.”, „_”, „-”.</div>
                 <ValidationMessage For="() => Input.UserName" class="text-danger" />
             </div>
             <div class="form-floating mb-3">
@@ -89,7 +89,7 @@
     {
         var user = CreateUser();
 
-        await UserStore.SetUserNameAsync(user, Input.UserName.Trim(), CancellationToken.None);
+        await UserStore.SetUserNameAsync(user, ValidUserNameAttribute.Normalize(Input.UserName), CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
         var result = await UserManager.CreateAsync(user, Input.Password);
@@ -147,12 +147,31 @@
         return (IUserEmailStore<ApplicationUser>)UserStore;
     }
 
+    /// <summary>
+    /// Checks the user name as it will be stored: trimmed, with runs of spaces collapsed to one,
+    /// 3–20 characters of letters (incl. Polish), digits, spaces, '.', '_' or '-'.
+    /// </summary>
+    private sealed class ValidUserNameAttribute : ValidationAttribute
+    {
+        private static readonly System.Text.RegularExpressions.Regex Allowed =
+            new(@"^[a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ_.\- ]{3,20}$");
+
+        public ValidUserNameAttribute()
+            : base("Nazwa użytkownika: 3–20 znaków – litery, cyfry, spacje, „.”, „_” lub „-”.") { }
+
+        // Collapses runs of spaces so "Jan  Nowak" and "Jan Nowak" can't both exist.
+        public static string Normalize(string value) =>
+            string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+        public override bool IsValid(object? value) =>
+            value is not string s || Allowed.IsMatch(Normalize(s));
+    }
+
     private sealed class InputModel
     {
         // No '@' allowed, so a user name can never be mistaken for an e-mail address at login.
         [Required(ErrorMessage = "Podaj nazwę użytkownika.")]
-        [RegularExpression(@"^\s*[a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ_.\-]{3,20}\s*$",
-            ErrorMessage = "Nazwa użytkownika: 3–20 znaków – litery, cyfry, „.”, „_” lub „-”.")]
+        [ValidUserName]
         [Display(Name = "Nazwa użytkownika")]
         public string UserName { get; set; } = "";
 
