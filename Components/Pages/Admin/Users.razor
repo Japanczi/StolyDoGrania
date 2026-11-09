@@ -192,7 +192,7 @@ else
         var result = await UserManager.CreateAsync(user, newUser.Password);
         if (!result.Succeeded)
         {
-            error = string.Join(" ", result.Errors.Select(IdentityErrorText.Describe));
+            error = string.Join(" ", result.Errors.Select(e => e.Description));
             return;
         }
         await UserManager.AddToRoleAsync(user, newUser.Role);

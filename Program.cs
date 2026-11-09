@@ -53,6 +53,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
         }
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddErrorDescriber<PolishIdentityErrorDescriber>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 

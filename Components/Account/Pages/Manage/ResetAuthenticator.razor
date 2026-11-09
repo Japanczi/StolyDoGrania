@@ -8,24 +8,24 @@
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<ResetAuthenticator> Logger
 
-<PageTitle>Reset authenticator key</PageTitle>
+<PageTitle>Zresetuj aplikację uwierzytelniającą</PageTitle>
 
 <StatusMessage />
-<h3>Reset authenticator key</h3>
+<h3>Zresetuj aplikację uwierzytelniającą</h3>
 <div class="alert alert-warning" role="alert">
     <p>
         <span class="glyphicon glyphicon-warning-sign"></span>
-        <strong>If you reset your authenticator key your authenticator app will not work until you reconfigure it.</strong>
+        <strong>Po zresetowaniu klucza aplikacja uwierzytelniająca przestanie działać, dopóki jej ponownie nie skonfigurujesz.</strong>
     </p>
     <p>
-        This process disables 2FA until you verify your authenticator app.
-        If you do not complete your authenticator app configuration you may lose access to your account.
+        Ta operacja wyłącza 2FA do czasu zweryfikowania aplikacji uwierzytelniającej.
+        Jeśli nie dokończysz konfiguracji aplikacji uwierzytelniającej, możesz stracić dostęp do konta.
     </p>
 </div>
 <div>
     <form @formname="reset-authenticator" @onsubmit="OnSubmitAsync" method="post">
         <AntiforgeryToken />
-        <button class="btn btn-danger" type="submit">Reset authenticator key</button>
+        <button class="btn btn-danger" type="submit">Zresetuj klucz</button>
     </form>
 </div>
 
@@ -51,7 +51,7 @@
 
         RedirectManager.RedirectToWithStatus(
             "Account/Manage/EnableAuthenticator",
-            "Your authenticator app key has been reset, you will need to configure your authenticator app using the new key.",
+            "Klucz aplikacji uwierzytelniającej został zresetowany. Skonfiguruj aplikację uwierzytelniającą, używając nowego klucza.",
             HttpContext);
     }
 }
