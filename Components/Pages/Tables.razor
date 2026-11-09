@@ -25,7 +25,7 @@
     <h1>Zapisy na gry</h1>
     @if (!isLoggedIn)
     {
-        <a class="btn login-prompt" href="Account/Login?ReturnUrl=stoly">Zaloguj się, aby tworzyć stoły i zajmować miejsca</a>
+        <a class="btn login-prompt" href="Account/Register?ReturnUrl=stoly" title="Załóż konto, aby tworzyć stoły i zajmować miejsca">Dołącz do Planszówkarza teraz!</a>
     }
     @if (canSwitchMode)
     {
@@ -368,20 +368,13 @@ else
         }
 
         @* Temporary, while sign-ups move from the sheet to the app: imported tables sit below the app's own. *@
-        @* The first few imported rows sit above the divider line, the rest below it. *@
-        @{ var imported = tables.Where(t => t.IsImported).OrderBy(t => t.ImportOrder).ToList(); }
-        @if (imported.Count > 0)
+        @if (tables.Any(t => t.IsImported))
         {
-            @foreach (var t in imported.Take(ImportedRowsAboveDivider))
-            {
-                TableRow(t);
-            }
-
             <div class="import-divider" role="separator">
-                <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
+                <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
             </div>
 
-            @foreach (var t in imported.Skip(ImportedRowsAboveDivider))
+            @foreach (var t in tables.Where(t => t.IsImported).OrderBy(t => t.ImportOrder))
             {
                 TableRow(t);
             }
@@ -441,9 +434,6 @@ else
     private const string AddPlayerHint = "Prawy przycisk: dodaj gracza";
     private const string AssignOwnerHint = "Prawy przycisk: wybierz właściciela";
     private const int MaxListedCandidates = 20;
-
-    /// <summary>How many imported tables are listed above the import divider line.</summary>
-    private const int ImportedRowsAboveDivider = 5;
     private static readonly Uri DefaultBggUrl = new("https://boardgamegeek.com/");
 
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }

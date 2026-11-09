@@ -29,7 +29,7 @@
         }
 }
 
-/* Raised dark-red "3D" button inviting guests to log in. */
+/* Raised dark-red "3D" button inviting guests to register ("Dołącz do Planszówkarza teraz!"). */
 .login-prompt {
     grid-column: 2;
     padding: .45rem 1.1rem;
@@ -77,8 +77,8 @@
     align-items: center;
     gap: .75rem;
     min-width: 1054px;
-    /* Two empty text lines of breathing room above the divider. */
-    margin-block: 3rem .25rem;
+    /* About five empty text lines (~106px, per design 20261109-162610) between the app's tables and the divider. */
+    margin-block: 6.5rem .25rem;
     color: #f0b429;
     font-size: .8rem;
     font-weight: 700;

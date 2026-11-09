@@ -10,7 +10,8 @@
     <header class="app-bar">
         <a class="app-brand" href="">Planszówkarz</a>
 
-        @* Left group, per design 20261107-214747-root: Menu, then Profile or Registration. *@
+        @* Left group: Menu, then Profile when logged in. Registration is reached from the board's
+           "Dołącz" button, the drawer and the login page (design 20261109-163104-root). *@
         <nav class="app-bar-nav" aria-label="Nawigacja">
             <label for="app-menu-toggle" class="btn btn-outline-light btn-sm app-menu-button">Menu</label>
 
@@ -18,13 +19,10 @@
                 <Authorized>
                     <a class="btn btn-outline-light btn-sm app-user" href="Account/Manage" title="Profil">@UserNames.Short(context.User.Identity?.Name)</a>
                 </Authorized>
-                <NotAuthorized>
-                    <a class="btn btn-outline-light btn-sm" href="Account/Register">Zarejestruj się</a>
-                </NotAuthorized>
             </AuthorizeView>
         </nav>
 
-        @* Right side: login / logout. *@
+        @* Right side: login / logout, styled like the Menu button. *@
         <div class="app-bar-auth">
             <AuthorizeView>
                 <Authorized>
@@ -32,11 +30,11 @@
                         <AntiforgeryToken />
                         @* Must be non-empty (the logout endpoint binds a required string); "stoly" is an alias of "/". *@
                         <input type="hidden" name="ReturnUrl" value="stoly" />
-                        <button type="submit" class="btn btn-link btn-sm">Wyloguj</button>
+                        <button type="submit" class="btn btn-outline-light btn-sm">Wyloguj</button>
                     </form>
                 </Authorized>
                 <NotAuthorized>
-                    <a class="btn btn-link btn-sm" href="Account/Login?ReturnUrl=%2F">Zaloguj się</a>
+                    <a class="btn btn-outline-light btn-sm" href="Account/Login?ReturnUrl=%2F">Zaloguj się</a>
                 </NotAuthorized>
             </AuthorizeView>
         </div>
