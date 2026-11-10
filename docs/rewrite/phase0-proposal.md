@@ -1,6 +1,7 @@
 # Node rewrite – phase 0 proposal
 
-Status: **waiting for your approval** (2026-11-10). No app code is written until you approve or change the choices below.
+Status: **approved** (2026-11-10): the user accepted every recommendation as written. The draft CLAUDE.md is now
+the branch's root `CLAUDE.md`.
 Brief: `Claude_Resources/Rewrite/NodeRewrite.md` (draft 3, in the main checkout). Issue: https://github.com/Japanczi/StolyDoGrania/issues/2
 
 How to read this: each section is one open item from brief section 4. It explains the problem in plain words,
@@ -356,5 +357,5 @@ Not proposed: a linter/formatter (ESLint, Prettier) – useful but optional; ask
 
 ## 13. Next step
 
-After your approval: update the branch's `CLAUDE.md` from `docs/rewrite/CLAUDE.node.draft.md`, close issue #2,
-and open the phase 1 issue (skeleton: server, layout, SQLite access, test setup, local run script).
+Done after approval: the branch's `CLAUDE.md` was replaced by the draft, issue #2 closed, and the phase 1 issue
+opened (skeleton: server, layout, SQLite access, test setup, local run script).
