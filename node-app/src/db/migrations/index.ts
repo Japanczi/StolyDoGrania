@@ -6,9 +6,11 @@ import type { Migration } from 'kysely/migration';
 import * as m0001 from './0001-board-settings.ts';
 import * as m0002 from './0002-accounts.ts';
 import * as m0003 from './0003-board.ts';
+import * as m0004 from './0004-sheet-import.ts';
 
 export const migrations: Record<string, Migration> = {
   '0001-board-settings': m0001,
   '0002-accounts': m0002,
   '0003-board': m0003,
+  '0004-sheet-import': m0004,
 };

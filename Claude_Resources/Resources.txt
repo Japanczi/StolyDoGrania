@@ -124,6 +124,27 @@ Phase 3 – board (decided 2026-11-10):
 - Packages added: fast-xml-parser, @fastify/websocket, @fastify/multipart; dev @types/ws, @playwright/test
   (+ Chromium for Playwright, downloaded to the PC only). npm run test:e2e runs the browser test.
 
+Phase 4 – the rest (decided 2026-11-10):
+- Baza gier, the admin users page, Dziennik, the admin dock (note + toolbox), normal user mode, the weekly reset, the
+  feedback box, the sheet import and the page designer work as in the main spec, with these differences:
+  - Deleting an account (admin page or own profile) keeps the user's seats and tables (the .NET users page freed the
+    seats). Logged as UserRemoved as before.
+  - A role change applies at the user's next request (no new login needed).
+  - Baza gier search/sort, Dziennik filter/search/page are in the URL (?q=…&sort=…, ?action=…&q=…&page=…).
+  - The weekly reset uses Europe/Warsaw explicitly (Temporal), not the server's zone.
+  - Feedback download: the zip, then the page asks the server to delete exactly the files that were in it.
+  - Feedback messages are limited to 4000 characters on the server too; header values in the .md files are
+    flattened to one line (file name pattern and front matter otherwise unchanged).
+  - Normal user mode is still in memory (everyone back to their real role after a restart).
+- Sheet import (TEMPORARY, src/import/): off unless SHEET_IMPORT_ENABLED=true (the live .NET app has it on, so
+  production must set it). SHEET_IMPORT_URL, SHEET_IMPORT_INTERVAL_MINUTES (30). Imported hours are stored as given
+  (not snapped to quarter-hours). Pages are notified only when the sheet actually changed something.
+- New settings: FEEDBACK_DIR, DESIGNS_DIR (default: the repo's Claude_Resources folders), SHEET_IMPORT_*.
+- Migration script: npm run import-dotnet-db -- <app.db copy> <new db>. Keeps ids; passwords stay Identity v3
+  hashes until the next login; SVG placeholder covers are dropped; seat/owner ids of accounts that no longer exist
+  are cleared; lists accounts that had 2FA. Tried on a copy of the local dev app.db (10 users, 14 games, 6 tables);
+  a run on a copy of the LIVE database still needs that copy downloaded from the server (not touched in phase 4).
+
 Data (decided 2026-11-10):
 - New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
   .NET app.db, run on a local copy in phase 4 and at cutover in phase 5.
@@ -135,7 +156,8 @@ Phases and status:
 - 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – approved
   2026-11-10 (issue #3, closed).
 - 2 Accounts – approved 2026-11-10 (issue #4, closed).
-- 3 Board (incl. live updates, BGG, covers) – done 2026-11-10, waiting for the user's review (issue #5).
+- 3 Board (incl. live updates, BGG, covers) – approved 2026-11-10 (issue #5, closed).
 - 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,
-  migration script on a local copy of app.db). Ends with the user testing and approving the whole app locally.
+  migration script on a local copy of app.db) – done 2026-11-10 (issue #6). Next: the user tests and approves the
+  whole app locally.
 - 5 Only after approval: merge to master, deploy beside the .NET app on a second port, side-by-side check, switch.

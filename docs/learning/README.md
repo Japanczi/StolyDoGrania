@@ -28,6 +28,7 @@ by links to the real files when they exist.
 | 9 | [Sessions, cookies, password hashing, CSRF vs ASP.NET Identity](sessions-and-passwords.md) | 2 | What the session cookie holds, Identity v3 hashes vs scrypt, lockout, e-mail tokens, why forms carry a hidden token |
 | 10 | [Live updates: WebSocket vs Blazor's SignalR connection](live-updates.md) | 3 | "Notify, then fetch", catching up after a disconnect, why messages carry no user data, the Origin check |
 | 11 | [Calling BGG: fetch, XML and throttling vs HttpClient](calling-bgg.md) | 3 | `fetch` + `AbortSignal`, a promise queue instead of `SemaphoreSlim`, stateless lookups, checking uploads by content |
+| 12 | [Background jobs: timers vs BackgroundService](background-jobs.md) | 4 | `setInterval` jobs, no overlapping runs, catching up a missed Monday, time zones with Temporal |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)
@@ -41,10 +42,10 @@ by links to the real files when they exist.
 | `npm test` | Run all tests | `dotnet test Planszowkarz.Tests` |
 | `npm run test:e2e` | Browser tests with Playwright (two browsers, live updates) | – (Microsoft.Playwright exists for .NET too) |
 | `npm run migrate` | Apply pending migrations | `dotnet ef database update` |
+| `npm run import-dotnet-db -- <app.db copy> <new.db>` | One-time conversion of the .NET database (cutover) | – |
 
 ## Planned notes (added in the phase that introduces them)
 
-- Background jobs vs `BackgroundService` (phase 4)
 - Building and deploying to Mikrus vs `dotnet publish` (phase 5)
 
 ## Related documents

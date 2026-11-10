@@ -6,6 +6,9 @@ import { seedAccounts } from './auth/seed.ts';
 import { ConfigError, loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { pendingMigrations } from './db/migrator.ts';
+import { startSheetImport } from './import/sheet-import-job.ts';
+import { startWeeklyReset } from './jobs/weekly-reset.ts';
+import { createLiveHub } from './live/hub.ts';
 
 let config;
 try {
@@ -29,13 +32,22 @@ if (pending.length > 0) {
   process.exit(1);
 }
 
-const app = await buildApp({ config, db });
+// The live-update hub is shared by the routes and the background jobs (they tell open pages about changes too).
+const hub = createLiveHub();
+const app = await buildApp({ config, db, hub });
 
 // The Owner account and, in development, the 4 test users (IdentitySeeder.SeedAsync in Program.cs).
 await seedAccounts(db, config, app.log);
 
+// Background jobs (AddHostedService in Program.cs): plain timers in this process. See docs/learning/background-jobs.md.
+const weeklyReset = startWeeklyReset({ db, hub, log: app.log });
+// TEMPORARY: the Google sign-up sheet import (off unless SHEET_IMPORT_ENABLED=true).
+const sheetImport = startSheetImport({ db, hub, log: app.log, settings: config.sheetImport });
+
 async function shutdown(signal: string): Promise<void> {
   app.log.info(`${signal} received, shutting down`);
+  weeklyReset.stop();
+  sheetImport.stop();
   await app.close();   // stops accepting requests, lets running ones finish
   await db.destroy();  // closes the SQLite connection
   process.exit(0);

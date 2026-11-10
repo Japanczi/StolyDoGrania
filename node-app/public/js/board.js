@@ -642,6 +642,16 @@
     input.select();
   }
 
+  // ---------- "Tryb zwykłego użytkownika" (admins, and admins already in the mode) ----------
+
+  const modeSwitch = /** @type {HTMLInputElement | null} */ (document.getElementById('normal-user-mode'));
+  modeSwitch?.addEventListener('change', async () => {
+    const result = await post('/api/admin/normal-user-mode', { active: modeSwitch.checked });
+    if (!result.ok) { showAlert(result.error, 'warning'); modeSwitch.checked = !modeSwitch.checked; return; }
+    // Roles apply per request: reload so the whole page (menu, rows, dock) shows the new view.
+    location.reload();
+  });
+
   // ---------- arrived from "Baza gier" with ?nowy= ----------
 
   const highlighted = board.dataset.highlight ? document.getElementById(`table-${board.dataset.highlight}`) : null;

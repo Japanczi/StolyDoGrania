@@ -19,8 +19,12 @@ export type Viewer = {
 
 export type GameInfo = Pick<Selectable<GamesTable>, 'id' | 'name' | 'weight' | 'bgg_url' | 'bgg_id' | 'kind' | 'max_players' | 'year_published' | 'cover_type'>;
 
-/** A table with what the board shows about its game. */
-export type BoardTable = PlayTable & { game: GameInfo };
+/**
+ * A table with what the board shows about its game.
+ * importKey/importOrder – TEMPORARY (sheet import, src/import/): non-null importKey = mirrored from the sign-up
+ * sheet; such tables list below the app's own, in importOrder (the sheet's row order).
+ */
+export type BoardTable = PlayTable & { game: GameInfo; importKey: string | null; importOrder: number | null };
 
 type Executor = Kysely<Database>;
 
@@ -43,7 +47,8 @@ async function loadTables(db: Executor, onlyId: number | null): Promise<BoardTab
     .innerJoin('games', 'games.id', 'play_tables.game_id')
     .select([
       'play_tables.id as table_id', 'play_tables.game_title', 'play_tables.start_hour', 'play_tables.max_players as table_max_players',
-      'play_tables.kind as table_kind', 'play_tables.owner_user_id', 'play_tables.taken_slots', ...gameColumns,
+      'play_tables.kind as table_kind', 'play_tables.owner_user_id', 'play_tables.taken_slots',
+      'play_tables.import_key', 'play_tables.import_order', ...gameColumns,
     ])
     .orderBy('play_tables.id');
   let slotsQuery = db.selectFrom('table_slots').selectAll().orderBy('slot_number');
@@ -64,11 +69,17 @@ async function loadTables(db: Executor, onlyId: number | null): Promise<BoardTab
     takenSlots: r.taken_slots,
     participants: slots
       .filter(s => s.play_table_id === r.table_id)
-      .map(s => ({ slotNumber: s.slot_number, participantName: s.participant_name, userId: s.user_id })),
+      .map(s => ({
+        slotNumber: s.slot_number, participantName: s.participant_name, userId: s.user_id,
+        // Sheet import seats keep their flag through edits (saveTable writes it back).
+        ...(s.is_imported === 1 ? { isImported: true } : {}),
+      })),
     game: {
       id: r.id, name: r.name, weight: r.weight, bgg_url: r.bgg_url, bgg_id: r.bgg_id, kind: r.kind,
       max_players: r.max_players, year_published: r.year_published, cover_type: r.cover_type,
     },
+    importKey: r.import_key,
+    importOrder: r.import_order,
   }));
 }
 
@@ -87,6 +98,7 @@ async function saveTable(trx: Executor, table: PlayTable): Promise<void> {
   if (table.participants.length > 0) {
     await trx.insertInto('table_slots').values(table.participants.map(p => ({
       play_table_id: table.id, slot_number: p.slotNumber, participant_name: p.participantName, user_id: p.userId,
+      is_imported: p.isImported === true ? 1 : 0,
     }))).execute();
   }
 }

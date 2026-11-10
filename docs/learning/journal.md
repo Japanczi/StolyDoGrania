@@ -173,3 +173,48 @@ ported by a helper agent (Sonnet) and checked; it needed no fixes. Effort: one l
 **Surprises.**
 - Playwright's first run passed: two browsers, create → take a seat → free it → delete, each seen live by the other.
 - The `display: contents` CSS trick let live updates swap all rows at once without changing the grid layout.
+
+---
+
+## Phase 4 – the rest (2026-11-10)
+
+**What happened.** Everything left from the .NET app: Baza gier (`/gry`), the admin users page with the Owner rules,
+Dziennik (`/admin/logs`), the admin dock on the board (permissions note; toolbox with "Wyczyść listę stołów", the
+"Auto" weekly reset, disk usage and the feedback zip download), the admin "normal user mode", the weekly reset job,
+the feedback box on every page, the temporary Google sheet import, the Development-only page designer, and the
+one-time `app.db` → new schema conversion script, tried on a copy of the local .NET database (a migrated user logged
+in with their old password). 275 server tests + the Playwright test. Effort: one long session, interrupted once by the
+usage limit.
+
+**Working with helper agents.** Four pieces ran in parallel as helper agents, each in its own files, while I did the
+security-sensitive parts (users page, normal user mode) and the wiring: Baza gier, Dziennik, feedback/designer
+(Sonnet) and the sheet import (Opus – it changes the data model). Splitting by *files* worked: no agent touched
+another's code. What needed fixing afterwards: their tests registered routes themselves, which clashed once the routes
+were wired into the app (15 failures, all "route already declared"), and one type error in `feedback.js`. The sheet
+import agent was cut off by the usage limit halfway and resumed from where it stopped.
+
+**Easier than .NET.**
+- **Normal user mode** became one line where the session is loaded (the role reads as 'user'); every check in the
+  app – menu, board, admin pages, toolbox – respects it automatically. .NET needed an `IClaimsTransformation`.
+- **Temporal** made the time-zone rule as readable as the C# `TimeZoneInfo` version.
+- **Role changes apply at the user's next click**, because the session reads the user from the database every time
+  (.NET had to update the security stamp and wait for revalidation).
+
+**Harder.**
+- **No ZIP writer in Node.** The feedback download needed a small hand-written ZIP encoder (zlib does the
+  compression); .NET has `System.IO.Compression.ZipArchive` built in.
+- **Downloading in two steps.** Blazor streamed the zip through its circuit and knew when the browser had it. Over
+  HTTP the page downloads the zip, then asks the server to delete exactly the files listed in a response header.
+- **Migrating data by hand.** EF's text formats (decimal weights, `DateTime` without a zone, `DateTimeOffset` with one,
+  `0001-01-01` meaning "no hour") each needed an explicit conversion, and .NET's missing foreign key on seat user ids
+  meant cleaning dangling ids.
+
+**Different.**
+- Deleting an account keeps its seats and tables (your decision); the .NET users page freed the seats.
+- Baza gier, Dziennik and the users page are plain forms and links with query parameters (search, sort, page) – the
+  URL can be bookmarked or shared; Blazor kept that state in the circuit.
+
+**Bugs .NET would have prevented (or caused).** None reached the app. The duplicate-route test failures were a
+coordination slip between helpers and wiring, not an app bug.
+
+**Surprises.** Node 26 has Temporal built in, and TypeScript 7 already knows its types.

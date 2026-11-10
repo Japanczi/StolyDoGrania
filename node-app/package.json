@@ -11,6 +11,7 @@
     "dev": "node --env-file-if-exists=.env src/db/migrate.ts && node --env-file-if-exists=.env --watch src/server.ts",
     "start": "node src/server.ts",
     "migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
+    "import-dotnet-db": "node scripts/import-dotnet-db.ts",
     "check": "tsc -p . && tsc -p public/js",
     "test": "node --test --test-timeout=30000 \"test/**/*.test.ts\"",
     "test:e2e": "playwright test"

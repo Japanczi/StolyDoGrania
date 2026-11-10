@@ -22,6 +22,9 @@ export const testConfig: Config = {
   email: null,
   adminSeed: null,
   bggToken: null,
+  feedbackDir: 'test-feedback-unused',
+  designsDir: 'test-designs-unused',
+  sheetImport: { enabled: false, sourceUrl: '', intervalMinutes: 30 },
 };
 
 export async function createTestDb(): Promise<Db> {

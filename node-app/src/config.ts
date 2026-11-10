@@ -41,6 +41,12 @@ export type Config = {
   secret: string;
   email: EmailConfig | null;
   adminSeed: AdminSeedConfig | null;
+  /** Folder for feedback comments (one .md each; "review latest feedback" reads them). */
+  feedbackDir: string;
+  /** Folder for page designs saved by the Development-only designer. */
+  designsDir: string;
+  /** TEMPORARY sheet import (src/import/): on/off, the public gviz feed URL, minutes between imports. */
+  sheetImport: { enabled: boolean; sourceUrl: string; intervalMinutes: number };
   /** Bearer token for the BGG XML API ("Bgg:Token" in .NET); null = BGG lookups off (hand-added games only). */
   bggToken: string | null;
 };
@@ -89,6 +95,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const email = readEmailConfig(env, problems);
   const adminSeed = readAdminSeed(env, problems);
 
+  // TEMPORARY Google sign-up sheet import (src/import/), "SheetImport" section in .NET. Off unless switched on.
+  const intervalText = env.SHEET_IMPORT_INTERVAL_MINUTES ?? '30';
+  const intervalMinutes = Number(intervalText);
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1) {
+    problems.push(`SHEET_IMPORT_INTERVAL_MINUTES must be a whole number of at least 1 (got "${intervalText}").`);
+  }
+  const sheetImport = {
+    enabled: env.SHEET_IMPORT_ENABLED === 'true',
+    sourceUrl: env.SHEET_IMPORT_URL
+      ?? 'https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg/gviz/tq?tqx=out:json&headers=1&sheet=Zapisy',
+    intervalMinutes,
+  };
+
   if (problems.length > 0) {
     throw new ConfigError(`Invalid configuration:\n- ${problems.join('\n- ')}`);
   }
@@ -105,6 +124,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     email,
     adminSeed,
     bggToken: env.BGG_TOKEN?.trim() || null,
+    // Relative paths start at node-app/, so the defaults are the repo's Claude_Resources folders (as in .NET).
+    feedbackDir: env.FEEDBACK_DIR ?? '../Claude_Resources/Feedback',
+    designsDir: env.DESIGNS_DIR ?? '../Claude_Resources/Tools/Designs',
+    sheetImport,
   };
 }
 

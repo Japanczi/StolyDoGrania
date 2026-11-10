@@ -25,10 +25,14 @@ export type PageOptions = {
   head?: SafeHtml;
   /** Extra <script> tags, loaded after the layout script. */
   scripts?: SafeHtml;
+  /** Rendered at the end of the page on every page: the feedback box (logged-in users only). */
+  feedback?: SafeHtml;
+  /** Development only: load the page designer (checked on the server by the caller). */
+  designer?: boolean;
 };
 
 /** Renders a complete HTML document around a page's body. */
-export function layout({ title, currentPath, user, csrfToken, body, head, scripts }: PageOptions): SafeHtml {
+export function layout({ title, currentPath, user, csrfToken, body, head, scripts, feedback, designer }: PageOptions): SafeHtml {
   /** Logout is a POST (a link could be triggered by other sites), protected by the CSRF token like every form. */
   const logoutForm = (returnUrl: string, button: SafeHtml) => html`<form action="/Account/Logout" method="post">
                 <input type="hidden" name="_csrf" value="${csrfToken}" />
@@ -47,6 +51,7 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     <link rel="stylesheet" href="/lib/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/app.css" />
     <link rel="stylesheet" href="/css/layout.css" />
+    <link rel="stylesheet" href="/css/feedback.css" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     ${head}
 </head>
@@ -77,8 +82,11 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     <main class="app-main">
         ${body}
     </main>
+    ${feedback}
 </div>
 <script src="/js/layout.js"></script>
+<script src="/js/feedback.js"></script>
+${designer && html`<script src="/tools/designer.js"></script>`}
 ${scripts}
 </body>
 </html>`;

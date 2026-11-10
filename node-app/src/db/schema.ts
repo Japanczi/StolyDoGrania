@@ -83,6 +83,8 @@ export type GamesTable = {
   year_published: number | null;
   cover: Buffer | null;
   cover_type: string | null;
+  /** 0/1 – TEMPORARY (sheet import, src/import/): added by the import, deleted again once no table uses it. */
+  is_from_sheet: Generated<number>;
 };
 
 export type GameAlternateNamesTable = {
@@ -101,6 +103,10 @@ export type PlayTablesTable = {
   kind: TableKind;
   owner_user_id: string | null;
   taken_slots: number;
+  /** TEMPORARY (sheet import): the sheet row this table mirrors ("title#1"), unique; null for tables created in the app. */
+  import_key: string | null;
+  /** TEMPORARY (sheet import): the row's position in the sheet (0 = first); null for app tables. */
+  import_order: number | null;
 };
 
 export type TableSlotsTable = {
@@ -108,6 +114,8 @@ export type TableSlotsTable = {
   slot_number: number;
   participant_name: string;
   user_id: string | null;
+  /** 0/1 – TEMPORARY (sheet import): a seat copied from the sheet, which the import may change or remove. */
+  is_imported: Generated<number>;
 };
 
 export type TablePhrasesTable = {

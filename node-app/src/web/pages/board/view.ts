@@ -10,6 +10,7 @@ import {
 } from '../../../domain/game.ts';
 import { isOwner, isSlotTaken, maxTakenSlots, ownerSlot, tableKinds, type TableKind } from '../../../domain/play-table.ts';
 import { html, type SafeHtml } from '../../html.ts';
+import { adminDock, type AdminDockModel } from './admin-dock.ts';
 
 const addPlayerHint = 'Prawy przycisk: dodaj gracza';
 const assignOwnerHint = 'Prawy przycisk: wybierz właściciela';
@@ -24,6 +25,10 @@ export type BoardPageModel = {
   /** Arrived from "Baza gier" after creating this table (?nowy=). */
   highlightId: number | null;
   statusMessage: string | null;
+  /** Admins only: the dock's data (null for everyone else). */
+  admin: AdminDockModel | null;
+  /** The "Tryb zwykłego użytkownika" switch: shown to admins and to anyone currently in the mode. */
+  normalUserMode: { active: boolean } | null;
 };
 
 export function boardPage(m: BoardPageModel): SafeHtml {
@@ -31,6 +36,10 @@ export function boardPage(m: BoardPageModel): SafeHtml {
   return html`<div class="toolbar">
     <h1>Zapisy na gry</h1>
     ${!loggedIn && html`<a class="btn login-prompt" href="/Account/Register?ReturnUrl=stoly" title="Załóż konto, aby tworzyć stoły i zajmować miejsca">Dołącz do Planszówkarza teraz!</a>`}
+    ${m.normalUserMode && html`<div class="form-check form-switch ms-auto mb-0">
+        <input id="normal-user-mode" type="checkbox" class="form-check-input"${m.normalUserMode.active ? html` checked` : ''} />
+        <label class="form-check-label" for="normal-user-mode">Tryb zwykłego użytkownika</label>
+    </div>`}
 </div>
 <div class="board-alerts" id="board-alerts" aria-live="polite">${m.statusMessage && html`<div class="alert alert-success alert-dismissible py-2" role="alert">${m.statusMessage}<button type="button" class="btn-close py-2" aria-label="Zamknij" data-dismiss-alert></button></div>`}</div>
 <div class="live-status" id="live-status" role="status" hidden>Łączenie… zmiany innych osób pojawią się po odświeżeniu połączenia.</div>
@@ -55,7 +64,8 @@ export function boardPage(m: BoardPageModel): SafeHtml {
         ${loggedIn && draftRow(m.catalogNames, m.bggConfigured)}
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
     </div>
-</div>`;
+</div>
+${m.admin && adminDock(m.admin)}`;
 }
 
 /**
@@ -63,7 +73,14 @@ export function boardPage(m: BoardPageModel): SafeHtml {
  * row below them (which may be half filled in) is left alone.
  */
 export function tableRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null = null): SafeHtml {
-  return html`${tables.map(t => tableRow(viewer, t, t.id === highlightId))}`;
+  // TEMPORARY (sheet import): tables mirrored from the sign-up sheet sit below the app's own, in the sheet's order.
+  const own = tables.filter(t => t.importKey === null);
+  const imported = tables.filter(t => t.importKey !== null).toSorted((a, b) => (a.importOrder ?? 0) - (b.importOrder ?? 0));
+  return html`${own.map(t => tableRow(viewer, t, t.id === highlightId))}
+${imported.length > 0 && html`<div class="import-divider" role="separator">
+    <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
+</div>`}
+${imported.map(t => tableRow(viewer, t, t.id === highlightId))}`;
 }
 
 /** One table's row (GET /fragments/table/:id). */

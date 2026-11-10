@@ -8,6 +8,9 @@ import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { NormalUserMode } from './auth/normal-user-mode.ts';
+import { designerRoutes } from './dev/designer.ts';
+import { feedbackRoutes } from './features/feedback.ts';
 import { registerRequestAuth } from './auth/request-auth.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/database.ts';
@@ -18,7 +21,10 @@ import { createNoOpMailer, createSmtpMailer, type Mailer } from './integrations/
 import { healthRoutes } from './web/health.ts';
 import { manageRoutes } from './web/pages/account/manage-routes.ts';
 import { accountRoutes } from './web/pages/account/routes.ts';
+import { logsRoutes } from './web/pages/admin/logs-routes.ts';
+import { usersRoutes } from './web/pages/admin/users-routes.ts';
 import { boardRoutes } from './web/pages/board/routes.ts';
+import { gamesRoutes } from './web/pages/games/routes.ts';
 import { errorPage, notFoundPage } from './web/pages/errors/view.ts';
 import { sendPage } from './web/respond.ts';
 
@@ -31,9 +37,11 @@ export type AppDeps = {
   bgg?: BggClient;
   /** The live-update hub; tests pass their own to watch notifications. */
   hub?: ReturnType<typeof createLiveHub>;
+  /** Admins using the app as regular users (in memory, shared by all requests). */
+  normalUserMode?: NormalUserMode;
 };
 
-export async function buildApp({ config, db, mailer, bgg, hub }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, mailer, bgg, hub, normalUserMode }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: config.environment === 'test' ? 'silent' : config.logLevel },
     // ASP.NET Core matches URLs case-insensitively (/account/login = /Account/Login); keep old links working.
@@ -48,7 +56,9 @@ export async function buildApp({ config, db, mailer, bgg, hub }: AppDeps): Promi
   // File uploads (new-table cover): the limit is applied while receiving, so a huge file is cut off early.
   await app.register(fastifyMultipart, { limits: { fileSize: maxCoverBytes, files: 1, fields: 10 } });
   // Who is logged in + CSRF checks, for every request (UseAuthentication + UseAntiforgery).
-  registerRequestAuth(app, config, db);
+  app.decorate('isDevelopment', config.environment === 'development');
+  const mode = normalUserMode ?? new NormalUserMode();
+  registerRequestAuth(app, config, db, mode);
 
   // A few protective response headers on every response (ASP.NET Core sets some of these via UseHsts etc.).
   app.addHook('onSend', async (_request, reply) => {
@@ -66,7 +76,13 @@ export async function buildApp({ config, db, mailer, bgg, hub }: AppDeps): Promi
   healthRoutes(app, db);
   const liveHub = hub ?? createLiveHub();
   await registerLive(app, liveHub, config.publicUrl);
-  boardRoutes(app, { config, db, bgg: bgg ?? createBggClient({ token: config.bggToken }), hub: liveHub });
+  boardRoutes(app, { config, db, bgg: bgg ?? createBggClient({ token: config.bggToken }), hub: liveHub, mode });
+  gamesRoutes(app, { db, hub: liveHub });
+  feedbackRoutes(app, { dir: config.feedbackDir });
+  // Development only: the route isn't registered at all otherwise.
+  designerRoutes(app, { dir: config.designsDir, enabled: config.environment === 'development' });
+  usersRoutes(app, { config, db });
+  logsRoutes(app, { db });
   accountRoutes(app, { config, db, mailer: emailSender });
   manageRoutes(app, { config, db, mailer: emailSender });
 

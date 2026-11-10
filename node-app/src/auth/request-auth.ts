@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/database.ts';
 import { createCsrfToken, csrfTokensMatch, isSameOrigin, isValidCsrfToken } from './csrf.ts';
+import type { NormalUserMode } from './normal-user-mode.ts';
 import { loadSession, sessionLifetimeMs, type SessionUser } from './sessions.ts';
 
 // TypeScript "declaration merging": tells the compiler that every FastifyRequest has these fields.
@@ -35,7 +36,7 @@ export function cookieNames(config: Config): CookieNames {
 
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-export function registerRequestAuth(app: FastifyInstance, config: Config, db: Db): void {
+export function registerRequestAuth(app: FastifyInstance, config: Config, db: Db, mode: NormalUserMode): void {
   const names = cookieNames(config);
   const secure = config.environment === 'production';
   const publicHost = new URL(config.publicUrl).host;
@@ -54,7 +55,10 @@ export function registerRequestAuth(app: FastifyInstance, config: Config, db: Db
     if (sessionId) {
       const session = await loadSession(db, sessionId);
       if (session) {
-        request.user = session.user;
+        // Normal user mode: an admin's role reads as 'user' for this whole request (every check respects it).
+        request.user = mode.isActive(session.user.id) && session.user.role !== 'user'
+          ? { ...session.user, role: 'user', normalUserMode: true }
+          : session.user;
         request.sessionIdHash = session.idHash;
         if (session.renewedExpires && session.persistent) {
           setSessionCookie(reply, config, sessionId, true);

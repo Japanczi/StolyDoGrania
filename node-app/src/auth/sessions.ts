@@ -22,6 +22,8 @@ export type SessionUser = {
   role: Role;
   /** 0/1 from the database turned into a boolean. */
   emailConfirmed: boolean;
+  /** True while an admin uses the app as a regular user (role then reads "user"); see normal-user-mode.ts. */
+  normalUserMode: boolean;
 };
 
 export type LoadedSession = {
@@ -83,7 +85,7 @@ export async function loadSession(db: Db, sessionId: string, now: Date = new Dat
   }
 
   return {
-    user: { id: row.id, userName: row.user_name, email: row.email, role: row.role, emailConfirmed: row.email_confirmed === 1 },
+    user: { id: row.id, userName: row.user_name, email: row.email, role: row.role, emailConfirmed: row.email_confirmed === 1, normalUserMode: false },
     idHash,
     persistent: row.persistent === 1,
     renewedExpires,

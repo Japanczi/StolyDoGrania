@@ -4,7 +4,7 @@
 // and each rule is a function that checks it and, if allowed, changes it in memory. The caller then saves
 // the whole table in one transaction. C#'s `bool TryX(..., out string? error)` becomes a returned Result.
 // Polish error texts are unchanged from the C# code.
-// Not ported here yet: ApplyImport (comes with the sheet import in phase 4).
+// ApplyImport lives with the (temporary) sheet import in src/import/apply-import.ts, so it can be removed in one go.
 
 export type TableKind = 'small' | 'big' | 'other';
 
@@ -20,6 +20,11 @@ export type TableSlot = {
   participantName: string;
   /** The registered user in this seat; null for a name typed by the owner, or a deleted account. */
   userId: string | null;
+  /**
+   * TEMPORARY (sheet import, src/import/): true for a seat copied from the sign-up sheet, which the import owns and
+   * may change or remove. Absent/false for seats taken in the app.
+   */
+  isImported?: boolean;
 };
 
 export type PlayTable = {

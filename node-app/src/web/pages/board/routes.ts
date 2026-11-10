@@ -5,7 +5,13 @@
 // rows it shows. Every POST re-checks who may do it, inside the database query where it matters (CLAUDE.md).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { NormalUserMode } from '../../../auth/normal-user-mode.ts';
 import type { Config } from '../../../config.ts';
+import { clearTables, countTables, getAutoReset, saveAutoReset } from '../../../db/queries/board-settings.ts';
+import { setAutoReset } from '../../../domain/board-settings.ts';
+import { readDiskUsage } from '../../../features/disk-usage.ts';
+import { countFeedback, deleteFeedback, packFeedback } from '../../../features/feedback.ts';
+import { basename, join } from 'node:path';
 import type { Db } from '../../../db/database.ts';
 import {
   deleteManagedTable, editManagedTable, editTable, freeSlot, insertTable, listUsers, loadBoard, loadBoardTable,
@@ -29,7 +35,7 @@ import { sendPage } from '../../respond.ts';
 import { lookupGame, pickBggGame } from './lookup.ts';
 import { addPlayerPopup, boardPage, tableRow, tableRows } from './view.ts';
 
-export type BoardDeps = { config: Config; db: Db; bgg: BggClient; hub: LiveHub };
+export type BoardDeps = { config: Config; db: Db; bgg: BggClient; hub: LiveHub; mode: NormalUserMode };
 
 type Json = { ok: true; message?: string; tableId?: number } | { ok: false; error: string };
 
@@ -42,7 +48,7 @@ export function viewerOf(request: FastifyRequest): Viewer {
 }
 
 export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
-  const { db, bgg, hub } = deps;
+  const { config, db, bgg, hub, mode } = deps;
 
   // ---------- pages and fragments ----------
 
@@ -53,11 +59,16 @@ export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
       // Arrived from "Baza gier" right after creating a table there.
       const nowy = Number((request.query as Record<string, string | undefined>).nowy);
       const highlighted = Number.isInteger(nowy) ? tables.find(t => t.id === nowy) ?? null : null;
+      const user = request.user;
       return sendPage(request, reply, {
         title: 'Zapisy na gry',
-        head: html`<link rel="stylesheet" href="/css/board.css" />`,
-        scripts: html`<script src="/js/board.js"></script>`,
+        head: html`<link rel="stylesheet" href="/css/board.css" />${viewer.isAdmin && html`<link rel="stylesheet" href="/css/admin-dock.css" />`}`,
+        scripts: html`<script src="/js/board.js"></script>${viewer.isAdmin && html`<script src="/js/admin-dock.js"></script>`}`,
         body: boardPage({
+          admin: viewer.isAdmin
+            ? { tableCount: tables.length, autoReset: (await getAutoReset(db)).enabled, feedbackCount: countFeedback(config.feedbackDir) }
+            : null,
+          normalUserMode: user && (user.normalUserMode || isAdminRole(user.role)) ? { active: user.normalUserMode } : null,
           viewer,
           tables,
           catalogNames: viewer.userId !== null ? await catalogNames(db) : [],
@@ -332,6 +343,101 @@ export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
     }
     hub.notify({ tableId: null });
     return send(reply, { ok: true, message: `Usunięto stół: ${table.gameTitle ?? table.game.name}.` });
+  });
+
+  // ---------- admin: normal user mode and the toolbox ----------
+
+  /** "Tryb zwykłego użytkownika": admins (and anyone already in the mode, to get back) switch it. */
+  app.post('/api/admin/normal-user-mode', async (request, reply) => {
+    const user = request.user;
+    if (!user || !(user.normalUserMode || isAdminRole(user.role))) {
+      return send(reply, { ok: false, error: 'Tylko administrator może zmienić ten tryb.' });
+    }
+    mode.set(user.id, jsonBody(request).active === true);
+    // Roles are applied per request, so the page reloads to show the new view.
+    return send(reply, { ok: true });
+  });
+
+  /** "Wyczyść listę stołów" – every table goes, games stay in the catalog. */
+  app.post('/api/admin/clear-tables', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) {
+      return send(reply, { ok: false, error: 'Tylko administrator może wyczyścić listę stołów.' });
+    }
+    try {
+      const removed = await clearTables(db);
+      hub.notify({ tableId: null });
+      return send(reply, { ok: true, message: `Usunięto wszystkie stoły (${removed}).` });
+    } catch (err) {
+      request.log.error({ err }, 'Clearing the board failed');
+      return send(reply, { ok: false, error: 'Nie udało się wyczyścić listy stołów.' });
+    }
+  });
+
+  /** The "Auto" switch: clear the board every Monday 00:00 (Europe/Warsaw). */
+  app.post('/api/admin/auto-reset', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) {
+      return send(reply, { ok: false, error: 'Tylko administrator może zmienić to ustawienie.' });
+    }
+    try {
+      const settings = await getAutoReset(db);
+      await saveAutoReset(db, setAutoReset(settings, jsonBody(request).enabled === true, new Date()));
+      return send(reply, { ok: true });
+    } catch (err) {
+      request.log.error({ err }, 'Saving the auto reset failed');
+      return send(reply, { ok: false, error: 'Nie udało się zapisać ustawienia automatycznego czyszczenia.' });
+    }
+  });
+
+  /** State for the admin dock (table count, Auto switch, comments), re-read after each toolbox action. */
+  app.get('/api/admin/toolbox', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) return reply.code(403).send({});
+    return reply.header('Cache-Control', 'no-store').send({
+      tables: await countTables(db), autoReset: (await getAutoReset(db)).enabled, feedback: countFeedback(config.feedbackDir),
+    });
+  });
+
+  /** "💾 Miejsce na dysku": read-only numbers (DiskUsage.cs). */
+  app.get('/api/admin/disk-usage', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) return reply.code(403).send({ ok: false, error: 'Brak dostępu.' });
+    try {
+      return reply.header('Cache-Control', 'no-store').send({ ok: true, usage: readDiskUsage(config.databasePath, config.feedbackDir) });
+    } catch (err) {
+      request.log.error({ err }, 'Reading disk usage failed');
+      return send(reply, { ok: false, error: 'Nie udało się odczytać zajętości dysku.' });
+    }
+  });
+
+  /**
+   * "Pobierz i usuń uwagi", step 1: the zip of every comment, with the names of the files it contains.
+   * Step 2 (below) deletes exactly those files once the browser has the zip – so a failed download deletes
+   * nothing, and comments saved meanwhile aren't deleted unseen (as in the .NET page).
+   */
+  app.post('/api/admin/feedback/download', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) return reply.code(403).send({ ok: false, error: 'Brak dostępu.' });
+    const packed = packFeedback(config.feedbackDir, new Date());
+    if (!packed) return send(reply, { ok: false, error: 'Brak uwag do pobrania.' });
+    return reply
+      .type('application/zip')
+      .header('Content-Disposition', `attachment; filename=${packed.fileName}`)
+      .header('X-Feedback-Files', JSON.stringify(packed.files.map(f => basename(f))))
+      .header('Cache-Control', 'no-store')
+      .send(packed.bytes);
+  });
+
+  app.post('/api/admin/feedback/delete', async (request, reply) => {
+    if (!viewerOf(request).isAdmin) return send(reply, { ok: false, error: 'Brak dostępu.' });
+    const names = jsonBody(request).files;
+    // Only plain file names of comments in our folder: nothing from the browser becomes a path elsewhere.
+    const files = (Array.isArray(names) ? names : [])
+      .filter((n): n is string => typeof n === 'string' && /^\d{8}-\d{6}-[0-9a-f]{6}\.md$/.test(n))
+      .map(n => join(config.feedbackDir, n));
+    try {
+      deleteFeedback(files);
+      return send(reply, { ok: true, message: `Pobrano i usunięto uwagi (${files.length}).` });
+    } catch (err) {
+      request.log.error({ err }, 'Deleting feedback failed');
+      return send(reply, { ok: false, error: 'Uwagi pobrano, ale nie udało się usunąć ich z serwera.' });
+    }
   });
 
   // ---------- helpers ----------
