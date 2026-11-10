@@ -10,6 +10,9 @@
 - The .NET app stays in the repo root as the reference implementation. Don't edit it on this branch.
 - `Claude_Resources/` is git-ignored and not in worktrees: read the spec, design log and feedback from the main
   checkout by absolute path (`C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\`).
+- The branch's own spec is `docs/rewrite/Resources.txt`: Node-specific decisions, differences from the main spec,
+  and phase status. When a decision about the Node app is made in conversation, write it back there in the same
+  work. Features and wording still come from the main spec unless the branch spec says otherwise.
 
 ## Goal: learning
 - The rewrite exists so the user can learn Node and compare it with .NET. Explaining is part of every task.

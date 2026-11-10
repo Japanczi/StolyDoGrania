@@ -1,0 +1,70 @@
+Planszówkarz – Node rewrite: branch spec (rewrite/node)
+
+This is the spec for the Node version of the app on branch rewrite/node. It is versioned with the branch
+(Claude_Resources/ is git-ignored, so the main spec can't live here).
+
+How the two specs fit together:
+- Features, wording, layout and rules: the MAIN spec, C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\Resources.txt,
+  and the design log Claude_Resources/Design/ApplicationDesign.md (main checkout). They apply unchanged to the Node app
+  unless this file says otherwise. Don't copy them here; point to them.
+- This file: what is different in the Node app, technical decisions, and the rewrite's status. Decisions made in
+  conversation about the Node app are written back here, in the same work.
+- Brief: Claude_Resources/Rewrite/NodeRewrite.md (main checkout). Detailed reasoning for each technical choice:
+  docs/rewrite/phase0-proposal.md. Learning notes: docs/learning/.
+
+Goal (decided 2026-11-10):
+- Learning: the user is new to web apps and rewrites the app in Node to learn and compare with .NET.
+  Explaining is part of every task; every phase writes learning notes (docs/learning/) and a journal entry
+  (docs/learning/journal.md). Between otherwise equal options, prefer the one that shows how things work.
+
+Ground rules (decided 2026-11-10):
+- Nothing is merged to master or deployed, and the live server isn't touched, until the whole Node app works
+  locally and the user has approved it (phase 5). The .NET app stays live until then.
+- The .NET code stays in the repo root on this branch as the reference; the Node app lives in node-app/.
+- One GitHub issue per phase, label area:rewrite-node, on project "Planszówkarz".
+
+Differences from the main spec (decided 2026-11-10):
+- NEW: board changes appear live for every open page (WebSocket), not only after a reload.
+  The server only announces "table N changed" (plus a version number); each page fetches the updated row over HTTP
+  with its own login, so pushes never carry user-specific or admin-only data. After a reconnect the page catches up
+  by comparing the version (whole board refetched if anything was missed). Own actions update the row without a
+  full reload; without JS, forms still work as normal posts.
+- OUT of v1: passkeys, two-factor authentication, external logins (and their pages). 2FA comes later: the login
+  is a step-by-step flow and sessions carry an auth level, so a second step can be inserted.
+- Accounts and passwords are kept: old ASP.NET Identity v3 hashes are verified, and re-hashed (scrypt) on the next
+  successful login. Users are logged out once at cutover (new cookies).
+- Existing 2FA/passkey settings and external logins are not migrated; the migration script lists any account that
+  had 2FA switched on.
+- Roles are stored as one value per user (owner / admin / user) instead of Identity's role tables; the rules are
+  unchanged (Owner is always also Admin, only the Owner manages admins, nobody changes the Owner).
+- Ported too (unchanged rules from the main spec): dev-only tools (page designer with the same JSON format, 4 test
+  users), the temporary Google sheet import (kept isolated in src/import/), the feedback box file format.
+
+Stack (decided 2026-11-10, phase 0 approved with all recommendations):
+- Node.js current LTS; TypeScript run directly by Node (type stripping), tsc only type-checks.
+- Fastify; HTML from our own escaping `html` tagged templates; Bootstrap 5; plain browser JS with // @ts-check.
+- SQLite (stay on Mikrus 2.1): better-sqlite3 + Kysely; hand-written, numbered migrations.
+- Hand-written database sessions (only the id's hash stored; HttpOnly, SameSite=Lax, Secure cookies);
+  CSRF token + same-origin check on every non-GET request; Origin check on the WebSocket upgrade.
+- WebSocket via @fastify/websocket with a hand-written reconnect (growing delays, max 30 s).
+- Tests: node:test + Fastify inject() + in-memory SQLite; a few Playwright browser tests from phase 3.
+- Background jobs (weekly reset, sheet import): in-process timers; Europe/Warsaw time computed explicitly.
+- Config: .env locally (git-ignored, .env.example committed), environment variables on the server; validated at startup.
+- npm packages approved for adding when their phase needs them: fastify, @fastify/cookie, @fastify/formbody,
+  @fastify/static, @fastify/multipart, @fastify/websocket, kysely, better-sqlite3, nodemailer, fast-xml-parser;
+  dev: typescript, @types/node, @types/better-sqlite3, @playwright/test. Others: ask first.
+
+Data (decided 2026-11-10):
+- New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
+  .NET app.db, run on a local copy in phase 4 and at cutover in phase 5.
+- Existing ids are kept (user ids, table and game ids), so action-log entries and feedback files still match.
+- Covers stay as BLOBs in the database. The BGG weight is kept as text, shown exactly as BGG gives it.
+
+Phases and status:
+- 0 Proposal – approved 2026-11-10 (issue #2, closed).
+- 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – to do (issue #3).
+- 2 Accounts – to do.
+- 3 Board (incl. live updates, BGG, covers) – to do.
+- 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,
+  migration script on a local copy of app.db). Ends with the user testing and approving the whole app locally.
+- 5 Only after approval: merge to master, deploy beside the .NET app on a second port, side-by-side check, switch.
