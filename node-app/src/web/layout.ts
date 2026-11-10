@@ -5,7 +5,7 @@
 
 import { html, type SafeHtml } from './html.ts';
 
-/** The signed-in user as the layout needs it. Accounts arrive in phase 2; until then always null. */
+/** The signed-in user as the layout needs it, or null when logged out. */
 export type LayoutUser = {
   /** Never a full e-mail address (CLAUDE.md): the user name, or the part before '@'. */
   shortName: string;
@@ -18,11 +18,20 @@ export type PageOptions = {
   /** The request path, used to highlight the current menu entry. */
   currentPath: string;
   user: LayoutUser | null;
+  /** For the hidden field of the logout forms (see auth/csrf.ts). */
+  csrfToken: string;
   body: SafeHtml;
 };
 
 /** Renders a complete HTML document around a page's body. */
-export function layout({ title, currentPath, user, body }: PageOptions): SafeHtml {
+export function layout({ title, currentPath, user, csrfToken, body }: PageOptions): SafeHtml {
+  /** Logout is a POST (a link could be triggered by other sites), protected by the CSRF token like every form. */
+  const logoutForm = (returnUrl: string, button: SafeHtml) => html`<form action="/Account/Logout" method="post">
+                <input type="hidden" name="_csrf" value="${csrfToken}" />
+                <input type="hidden" name="ReturnUrl" value="${returnUrl}" />
+                ${button}
+            </form>`;
+
   return html`<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -47,7 +56,7 @@ export function layout({ title, currentPath, user, body }: PageOptions): SafeHtm
             ${user && html`<a class="btn btn-outline-light btn-sm app-user" href="/Account/Manage" title="Profil">${user.shortName}</a>`}
         </nav>
         <div class="app-bar-auth">
-            ${user ? logoutForm(html`<button type="submit" class="btn btn-outline-light btn-sm">Wyloguj</button>`)
+            ${user ? logoutForm('/', html`<button type="submit" class="btn btn-outline-light btn-sm">Wyloguj</button>`)
                    : html`<a class="btn btn-outline-light btn-sm" href="/Account/Login?ReturnUrl=%2F">Zaloguj się</a>`}
         </div>
     </header>
@@ -55,7 +64,7 @@ export function layout({ title, currentPath, user, body }: PageOptions): SafeHtm
     <label for="app-menu-toggle" class="app-drawer-backdrop" aria-hidden="true"></label>
 
     <aside id="app-drawer" class="app-drawer" aria-label="Menu">
-        ${drawer(currentPath, user)}
+        ${drawer(currentPath, user, logoutForm(currentPath, html`<button type="submit" class="drawer-link"><span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj</button>`))}
     </aside>
 
     <main class="app-main">
@@ -67,7 +76,7 @@ export function layout({ title, currentPath, user, body }: PageOptions): SafeHtm
 </html>`;
 }
 
-function drawer(currentPath: string, user: LayoutUser | null): SafeHtml {
+function drawer(currentPath: string, user: LayoutUser | null, logout: SafeHtml): SafeHtml {
   return html`<div class="drawer-head">
             <span class="drawer-title">Menu</span>
             <label for="app-menu-toggle" class="drawer-close" title="Zamknij menu" aria-label="Zamknij menu">✕</label>
@@ -83,7 +92,7 @@ function drawer(currentPath: string, user: LayoutUser | null): SafeHtml {
             ${user
               ? [
                   navLink('/Account/Manage', 'person-fill', `Profil (${user.shortName})`, currentPath),
-                  logoutForm(html`<button type="submit" class="drawer-link"><span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj</button>`),
+                  logout,
                 ]
               : [
                   navLink('/Account/Register', 'person', 'Zarejestruj się', currentPath),
@@ -105,9 +114,4 @@ function navLink(href: string, icon: string, label: string, currentPath: string)
   return html`<a class="drawer-link${active ? ' active' : ''}" href="${href}"${active ? html` aria-current="page"` : ''}>
                 <span class="bi bi-${icon}-nav-menu" aria-hidden="true"></span> ${label}
             </a>`;
-}
-
-/** Logout is a POST (a link could be triggered by other sites). Phase 2 adds the endpoint and its CSRF token field. */
-function logoutForm(button: SafeHtml): SafeHtml {
-  return html`<form action="/Account/Logout" method="post">${button}</form>`;
 }

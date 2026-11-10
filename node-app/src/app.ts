@@ -3,11 +3,17 @@
 // build the app and send fake requests with app.inject(), without opening a port.
 
 import { join } from 'node:path';
+import fastifyCookie from '@fastify/cookie';
+import fastifyFormbody from '@fastify/formbody';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { registerRequestAuth } from './auth/request-auth.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/database.ts';
+import { createNoOpMailer, createSmtpMailer, type Mailer } from './integrations/email/mailer.ts';
 import { healthRoutes } from './web/health.ts';
+import { manageRoutes } from './web/pages/account/manage-routes.ts';
+import { accountRoutes } from './web/pages/account/routes.ts';
 import { boardRoutes } from './web/pages/board/routes.ts';
 import { errorPage, notFoundPage } from './web/pages/errors/view.ts';
 import { sendPage } from './web/respond.ts';
@@ -15,12 +21,24 @@ import { sendPage } from './web/respond.ts';
 export type AppDeps = {
   config: Config;
   db: Db;
+  /** Tests pass a fake that records messages; otherwise SMTP (EMAIL_HOST set) or no e-mail at all. */
+  mailer?: Mailer;
 };
 
-export async function buildApp({ config, db }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, mailer }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: config.environment === 'test' ? 'silent' : config.logLevel },
+    // ASP.NET Core matches URLs case-insensitively (/account/login = /Account/Login); keep old links working.
+    routerOptions: { caseSensitive: false, ignoreTrailingSlash: true },
   });
+  const emailSender = mailer
+    ?? (config.email ? createSmtpMailer(config.email, app.log) : createNoOpMailer(app.log, config.environment === 'development'));
+
+  // Cookies (sessions, CSRF, flash messages) and HTML form posts (application/x-www-form-urlencoded).
+  await app.register(fastifyCookie);
+  await app.register(fastifyFormbody);
+  // Who is logged in + CSRF checks, for every request (UseAuthentication + UseAntiforgery).
+  registerRequestAuth(app, config, db);
 
   // A few protective response headers on every response (ASP.NET Core sets some of these via UseHsts etc.).
   app.addHook('onSend', async (_request, reply) => {
@@ -37,6 +55,8 @@ export async function buildApp({ config, db }: AppDeps): Promise<FastifyInstance
 
   healthRoutes(app, db);
   await app.register(boardRoutes);
+  accountRoutes(app, { config, db, mailer: emailSender });
+  manageRoutes(app, { config, db, mailer: emailSender });
 
   // Unknown URL → Polish 404 page (UseStatusCodePagesWithReExecute("/not-found") in .NET).
   app.setNotFoundHandler(async (request, reply) =>

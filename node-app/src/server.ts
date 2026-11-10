@@ -2,6 +2,7 @@
 // database, build the app, listen – and shut down cleanly on Ctrl+C or `systemctl stop`.
 
 import { buildApp } from './app.ts';
+import { seedAccounts } from './auth/seed.ts';
 import { ConfigError, loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { pendingMigrations } from './db/migrator.ts';
@@ -29,6 +30,9 @@ if (pending.length > 0) {
 }
 
 const app = await buildApp({ config, db });
+
+// The Owner account and, in development, the 4 test users (IdentitySeeder.SeedAsync in Program.cs).
+await seedAccounts(db, config, app.log);
 
 async function shutdown(signal: string): Promise<void> {
   app.log.info(`${signal} received, shutting down`);

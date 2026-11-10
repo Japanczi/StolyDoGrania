@@ -113,7 +113,7 @@ describe('health', () => {
 describe('layout', () => {
   test('a signed-in user sees the profile button and logout; never more than the short name', () => {
     const page = layout({
-      title: 'T', currentPath: '/', user: { shortName: 'jan', isAdmin: false }, body: html`<p>x</p>`,
+      title: 'T', currentPath: '/', user: { shortName: 'jan', isAdmin: false }, csrfToken: 'tok', body: html`<p>x</p>`,
     }).value;
     assert.match(page, /class="btn btn-outline-light btn-sm app-user" href="\/Account\/Manage" title="Profil">jan</);
     assert.match(page, /Wyloguj/);
@@ -123,7 +123,7 @@ describe('layout', () => {
 
   test('admins see the admin entries in the drawer', () => {
     const page = layout({
-      title: 'T', currentPath: '/admin/logs', user: { shortName: 'ola', isAdmin: true }, body: html``,
+      title: 'T', currentPath: '/admin/logs', user: { shortName: 'ola', isAdmin: true }, csrfToken: 'tok', body: html``,
     }).value;
     assert.match(page, /href="\/admin\/users"/);
     assert.match(page, /class="drawer-link active" href="\/admin\/logs"/);
@@ -131,7 +131,7 @@ describe('layout', () => {
 
   test('the page title and user name are escaped', () => {
     const page = layout({
-      title: '<x>', currentPath: '/', user: { shortName: '<img>', isAdmin: false }, body: html``,
+      title: '<x>', currentPath: '/', user: { shortName: '<img>', isAdmin: false }, csrfToken: 'tok', body: html``,
     }).value;
     assert.match(page, /<title>&lt;x&gt;<\/title>/);
     assert.doesNotMatch(page, /<img>/);

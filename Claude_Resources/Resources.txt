@@ -72,6 +72,38 @@ Phase 1 details (decided 2026-11-10):
   closes it from anywhere on the page (it used to need focus inside the drawer). "/stoly" also highlights
   "Zapisy na gry" in the drawer.
 
+Phase 2 – accounts (decided 2026-11-10):
+- Same pages, wording and rules as the .NET account pages, except these deliberate differences:
+  - Lockout is ON: 5 wrong passwords in a row lock the account for 5 minutes (Identity's defaults). The .NET login
+    passed lockoutOnFailure: false, so its lockout page was never reached.
+  - Login with the right password but an unconfirmed e-mail says so ("Błąd: najpierw potwierdź adres e-mail – link
+    jest w wiadomości od nas."); .NET showed the generic "nieprawidłowy login lub hasło". Only someone who knows the
+    password sees it.
+  - After registering, the confirmation page URL carries the user id instead of the e-mail address
+    (/Account/RegisterConfirmation?userId=…), so addresses don't end up in server logs.
+  - The Owner can't delete their own account on the personal-data page ("nobody can delete the Owner").
+  - Profile menu: Profil, E-mail, Hasło, Dane osobowe (2FA, passkeys and external logins left out of v1). The
+    registration page has no "Zarejestruj się przez inną usługę" column.
+  - The personal-data download has the same keys as .NET, without the 2FA/authenticator entries.
+  - Without EMAIL_HOST, Development also writes each unsent e-mail (with its link) to the log, so password reset and
+    e-mail change can be tried locally. Never in production.
+  - URLs are case-insensitive, as in ASP.NET Core (/account/login works).
+- Sessions: stored in the database (sessions table, SHA-256 of the cookie's random id), 14 days, sliding;
+  "Zapamiętaj mnie" = persistent cookie. Logout deletes the session; a password change logs out the user's other
+  sessions, a password reset logs out all of them. Role changes apply on the next request.
+- Cookies: HttpOnly, SameSite=Lax; in production also Secure with the __Host- prefix (__Host-session, __Host-csrf).
+- CSRF: every POST needs the hidden _csrf field (signed token equal to the csrf cookie) and must not come from
+  another site (Sec-Fetch-Site / Origin). Failure = 403 "Błąd: formularz wygasł albo został wysłany z innej strony…".
+- Passwords: old ASP.NET Identity v3 hashes verify and are replaced by scrypt (N=2^14, r=8, p=5) on the next login.
+  Password rules as Identity: production needs 6+ characters with a digit, lower- and upper-case letter and a
+  special character; development only the length. Forms: 6–100 characters.
+- E-mail links (confirm, change e-mail, reset password) use one-time random tokens valid 24 h, stored hashed.
+- Roles are one column: owner / admin / user. The Owner comes from ADMIN_USER_NAME / ADMIN_EMAIL / ADMIN_PASSWORD.
+- New settings: PUBLIC_URL (links in e-mails), APP_SECRET (required in production), ADMIN_*, EMAIL_* (see
+  node-app/.env.example). Packages added: @fastify/cookie, @fastify/formbody, nodemailer, dev @types/nodemailer.
+- Not yet: what happens to a deleted user's seats and tables (decided in phase 3 with the board tables), admin
+  normal-user mode (phase 4 with the admin pages).
+
 Data (decided 2026-11-10):
 - New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
   .NET app.db, run on a local copy in phase 4 and at cutover in phase 5.
@@ -80,9 +112,9 @@ Data (decided 2026-11-10):
 
 Phases and status:
 - 0 Proposal – approved 2026-11-10 (issue #2, closed).
-- 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – done
-  2026-11-10, waiting for the user's review (issue #3).
-- 2 Accounts – to do.
+- 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – approved
+  2026-11-10 (issue #3, closed).
+- 2 Accounts – done 2026-11-10, waiting for the user's review (issue #4).
 - 3 Board (incl. live updates, BGG, covers) – to do.
 - 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,
   migration script on a local copy of app.db). Ends with the user testing and approving the whole app locally.

@@ -4,7 +4,9 @@
 
 import type { Migration } from 'kysely/migration';
 import * as m0001 from './0001-board-settings.ts';
+import * as m0002 from './0002-accounts.ts';
 
 export const migrations: Record<string, Migration> = {
   '0001-board-settings': m0001,
+  '0002-accounts': m0002,
 };

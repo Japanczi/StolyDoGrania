@@ -13,6 +13,12 @@ import type { Database } from '../../src/db/schema.ts';
  */
 const expectedColumns: { [T in keyof Database]: Record<keyof Database[T], true> } = {
   board_settings: { id: true, auto_reset_enabled: true, auto_reset_checked_utc: true },
+  users: {
+    id: true, user_name: true, normalized_user_name: true, email: true, normalized_email: true, email_confirmed: true,
+    password_hash: true, phone_number: true, role: true, access_failed_count: true, lockout_end_utc: true, created_utc: true,
+  },
+  sessions: { id_hash: true, user_id: true, auth_level: true, persistent: true, created_utc: true, expires_utc: true },
+  user_tokens: { token_hash: true, user_id: true, purpose: true, new_email: true, expires_utc: true },
 };
 
 describe('migrations', () => {

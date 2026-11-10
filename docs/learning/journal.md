@@ -86,3 +86,49 @@ leaking the stack trace in production (it's escaped and development-only), and u
   (`allowScripts`), so we denied the package's compile-from-source fallback.
 - The .NET app's 404 and error pages were still the template's English text; the Node versions are Polish.
 - The .NET app has 35 tests – and so, by coincidence, does phase 1 (different tests: those arrive with their code).
+
+---
+
+## Phase 2 – accounts (2026-11-10)
+
+**What happened.** Register (user name + e-mail), e-mail confirmation, resend confirmation, login (e-mail or user
+name, old .NET password hashes accepted), lockout, logout, forgot/reset password, profile (phone number), e-mail
+change with confirmation, change/set password, personal data download and delete, the Owner account from config and
+the 4 Development-only test users. Sessions, CSRF protection, password hashing and e-mail sending written by hand.
+142 tests (107 new), checked in the browser: register → confirm link → login → profile. Effort: one long session –
+the biggest phase so far relative to its visible result.
+
+**Harder than .NET – by far.** In .NET this whole phase was *one* template option (`--auth Individual`) plus
+translating texts. Here, every piece Identity hid had to be written and tested: session storage and expiry, cookie
+flags, CSRF tokens and origin checks, PBKDF2 header parsing, scrypt, lockout counters, one-time tokens, open-redirect
+protection, the flash-message cookie, case-insensitive URLs. Each is small; together they're ~600 lines plus ~500
+lines of tests. The upside is that each security property now has a test with its name on it.
+
+**Easier.**
+- **No render-mode puzzles.** Identity pages in Blazor had to be static SSR inside an interactive app
+  (`ExcludeFromInteractiveRouting`, `HttpContext` as a cascading parameter, `[SupplyParameterFromForm]`). Here every
+  page is just GET (show) + POST (check, then re-show or redirect).
+- **Reading the real hashes was pleasant:** Identity's format is documented in its source, and `node:crypto` has
+  PBKDF2 built in. Testing against real hashes from the .NET database proved compatibility directly.
+- **Sessions in the database** made "log out everywhere" and "role change applies now" one-line queries.
+
+**Different.**
+- **Types don't validate input.** Every form field is a string (or missing) until checked – `readForm` + the
+  `check*` helpers replaced `[Required]`, `[StringLength]`, `[Compare]` and model binding.
+- **The ecosystem asks for fewer guarantees:** `nodemailer` doesn't ship TypeScript types (a separate
+  `@types/nodemailer` package does); `@fastify/cookie` and `@fastify/formbody` are separate plugins.
+
+**Bugs .NET would have prevented (or caused).**
+- *Caused by .NET, found while porting:* the .NET login called `PasswordSignInAsync(…, lockoutOnFailure: false)`, so
+  the lockout page could never appear – brute-force protection was effectively off. The Node app enables it.
+- *A risk .NET removes:* every form must carry the hidden `_csrf` field by hand (`csrfField(request)`); Blazor's
+  `<EditForm>` added the token automatically. A test checks forms carry it, and a POST without it gets 403.
+- *Found by tests:* in production the CSRF cookie is named `__Host-csrf`, which the test helper didn't know about
+  (a test bug, not an app bug).
+
+**Surprises.**
+- The `__Host-` cookie prefix exists, and matters on shared hosting domains like `wykr.es`.
+- A mail scanner "clicking" a confirmation link first would use up a one-time token; handled by treating an
+  already-confirmed address as success.
+- Two small privacy wins came almost for free: the e-mail no longer appears in the RegisterConfirmation URL (and so
+  not in server logs), and unknown logins take as long as wrong passwords.

@@ -25,6 +25,7 @@ by links to the real files when they exist.
 | 6 | [Kysely + better-sqlite3 vs EF Core](kysely-vs-ef-core.md) | 1 | No change tracker, schema types, hand-written migrations, a synchronous driver |
 | 7 | [Configuration and secrets](config-and-secrets.md) | 1 | `.env` vs appsettings/user-secrets, validating config at startup |
 | 8 | [Testing with `node:test` vs xUnit](testing.md) | 1 | `describe`/`test`, assertions, `app.inject()`, in-memory SQLite |
+| 9 | [Sessions, cookies, password hashing, CSRF vs ASP.NET Identity](sessions-and-passwords.md) | 2 | What the session cookie holds, Identity v3 hashes vs scrypt, lockout, e-mail tokens, why forms carry a hidden token |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)
@@ -40,7 +41,6 @@ by links to the real files when they exist.
 
 ## Planned notes (added in the phase that introduces them)
 
-- Sessions, cookies, password hashing, CSRF vs ASP.NET Identity (phase 2)
 - WebSocket live updates vs Blazor's SignalR connection (phase 3)
 - Calling BGG: `fetch`, XML and throttling vs `HttpClient` (phase 3)
 - Background jobs vs `BackgroundService` (phase 4)

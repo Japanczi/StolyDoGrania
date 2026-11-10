@@ -1,6 +1,8 @@
-// Helpers for sending rendered pages from route handlers.
+// Helpers for route handlers: sending pages, and requiring a logged-in user.
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { SessionUser } from '../auth/sessions.ts';
+import { shortName } from '../domain/user-name.ts';
 import type { SafeHtml } from './html.ts';
 import { layout } from './layout.ts';
 
@@ -11,17 +13,31 @@ export function sendPage(
   page: { title: string; body: SafeHtml },
   statusCode = 200,
 ): FastifyReply {
+  const user = request.user;
   const document = layout({
     title: page.title,
     currentPath: pathOf(request.url),
-    user: null, // Phase 2: the signed-in user from the session.
+    user: user && { shortName: shortName(user.userName), isAdmin: user.role !== 'user' },
+    csrfToken: request.csrfToken,
     body: page.body,
   });
   return reply.code(statusCode).type('text/html; charset=utf-8').send(document.value);
 }
 
+/**
+ * The logged-in user, or null after sending a redirect to the login page (which comes back here afterwards).
+ * The counterpart of [Authorize] on a page. Usage: `const user = requireUser(request, reply); if (!user) return reply;`
+ */
+export function requireUser(request: FastifyRequest, reply: FastifyReply): SessionUser | null {
+  if (request.user) {
+    return request.user;
+  }
+  void reply.redirect(`/Account/Login?ReturnUrl=${encodeURIComponent(request.url)}`, 302);
+  return null;
+}
+
 /** The path part of a request URL, without the query string. */
-function pathOf(url: string): string {
+export function pathOf(url: string): string {
   const query = url.indexOf('?');
   return query === -1 ? url : url.slice(0, query);
 }
