@@ -101,8 +101,12 @@ Phase 2 – accounts (decided 2026-11-10):
 - Roles are one column: owner / admin / user. The Owner comes from ADMIN_USER_NAME / ADMIN_EMAIL / ADMIN_PASSWORD.
 - New settings: PUBLIC_URL (links in e-mails), APP_SECRET (required in production), ADMIN_*, EMAIL_* (see
   node-app/.env.example). Packages added: @fastify/cookie, @fastify/formbody, nodemailer, dev @types/nodemailer.
-- Not yet: what happens to a deleted user's seats and tables (decided in phase 3 with the board tables), admin
-  normal-user mode (phase 4 with the admin pages).
+- Deleting an account (decided 2026-11-10): the user's seats and the tables they own STAY on the board. Only the
+  link to the deleted account is cleared (user id set to null in the database), so the seat keeps showing the
+  player's name and an owned table becomes a table without an owner (PlayTable already handles those).
+  Built in phase 3 with the board tables.
+- Admin "normal user mode" (decided 2026-11-10): stays, ported unchanged (admins switch it on to see the app as a
+  regular user; the Admin/Owner roles are ignored app-wide until switched off). Built in phase 4 with the admin pages.
 
 Data (decided 2026-11-10):
 - New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
