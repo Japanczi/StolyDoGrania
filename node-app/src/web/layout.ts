@@ -21,10 +21,14 @@ export type PageOptions = {
   /** For the hidden field of the logout forms (see auth/csrf.ts). */
   csrfToken: string;
   body: SafeHtml;
+  /** Extra <link>/<meta> tags for this page (e.g. board.css). */
+  head?: SafeHtml;
+  /** Extra <script> tags, loaded after the layout script. */
+  scripts?: SafeHtml;
 };
 
 /** Renders a complete HTML document around a page's body. */
-export function layout({ title, currentPath, user, csrfToken, body }: PageOptions): SafeHtml {
+export function layout({ title, currentPath, user, csrfToken, body, head, scripts }: PageOptions): SafeHtml {
   /** Logout is a POST (a link could be triggered by other sites), protected by the CSRF token like every form. */
   const logoutForm = (returnUrl: string, button: SafeHtml) => html`<form action="/Account/Logout" method="post">
                 <input type="hidden" name="_csrf" value="${csrfToken}" />
@@ -37,11 +41,14 @@ export function layout({ title, currentPath, user, csrfToken, body }: PageOption
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- For fetch() calls from page scripts: sent back in the x-csrf-token header (see auth/csrf.ts). -->
+    <meta name="csrf-token" content="${csrfToken}" />
     <title>${title}</title>
     <link rel="stylesheet" href="/lib/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/app.css" />
     <link rel="stylesheet" href="/css/layout.css" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    ${head}
 </head>
 <body>
 <div class="app board-theme" data-bs-theme="dark">
@@ -72,6 +79,7 @@ export function layout({ title, currentPath, user, csrfToken, body }: PageOption
     </main>
 </div>
 <script src="/js/layout.js"></script>
+${scripts}
 </body>
 </html>`;
 }

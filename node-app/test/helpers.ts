@@ -21,6 +21,7 @@ export const testConfig: Config = {
   secret: 'test-secret-0123456789-0123456789-0123456789',
   email: null,
   adminSeed: null,
+  bggToken: null,
 };
 
 export async function createTestDb(): Promise<Db> {
@@ -113,6 +114,36 @@ export class TestBrowser {
       url,
       headers: { ...this.headers(), 'content-type': 'application/x-www-form-urlencoded', ...opts.headers },
       payload: body.toString(),
+    }));
+  }
+
+  /** Posts JSON like board.js does: the CSRF token in the x-csrf-token header. Pass `csrf: null` to leave it out. */
+  async postJson(url: string, data: object = {}, opts: { csrf?: string | null } = {}): Promise<LightMyRequestResponse> {
+    if (this.csrfCookie() === undefined) {
+      await this.get('/');
+    }
+    const csrf = opts.csrf === undefined ? this.csrfCookie() : opts.csrf;
+    return this.remember(await this.app.inject({
+      method: 'POST',
+      url,
+      headers: { ...this.headers(), 'content-type': 'application/json', ...(csrf ? { 'x-csrf-token': csrf } : {}) },
+      payload: JSON.stringify(data),
+    }));
+  }
+
+  /** Posts multipart form data (fields + files), as board.js does for a new table. */
+  async postMultipart(url: string, form: FormData): Promise<LightMyRequestResponse> {
+    if (this.csrfCookie() === undefined) {
+      await this.get('/');
+    }
+    // The standard Response class knows how to encode FormData as multipart; we borrow its bytes and header.
+    const encoded = new Response(form);
+    const payload = Buffer.from(await encoded.arrayBuffer());
+    return this.remember(await this.app.inject({
+      method: 'POST',
+      url,
+      headers: { ...this.headers(), 'content-type': encoded.headers.get('content-type') ?? '', 'x-csrf-token': this.csrfCookie() ?? '' },
+      payload,
     }));
   }
 

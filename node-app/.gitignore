@@ -4,3 +4,6 @@ node_modules/
 data/
 *.db
 *.db-*
+# Playwright output
+test-results/
+playwright-report/

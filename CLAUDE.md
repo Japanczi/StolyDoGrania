@@ -100,7 +100,7 @@
   before that may need it added to PATH.
 - Show only changed code (full function when small, otherwise a clear diff). Don't rewrite whole files for small changes.
 - Ask before adding npm packages (say what it does, its .NET counterpart, and whether a Node built-in would do).
-- Before committing: `npm run check` and `npm test` in `node-app/` must pass.
+- Before committing: `npm run check` and `npm test` in `node-app/` must pass; run `npm run test:e2e` (Playwright) when the board or its JavaScript changed.
 - You may delegate work to other agents (subagents) whenever that helps, e.g. broad searches or independent
   pieces of a change; you stay responsible for checking their results. Log each delegation in the agent log of
   Claude_Resources/Design/ApplicationDesign.md, including the model used.

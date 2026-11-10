@@ -108,6 +108,22 @@ Phase 2 – accounts (decided 2026-11-10):
 - Admin "normal user mode" (decided 2026-11-10): stays, ported unchanged (admins switch it on to see the app as a
   regular user; the Admin/Owner roles are ignored app-wide until switched off). Built in phase 4 with the admin pages.
 
+Phase 3 – board (decided 2026-11-10):
+- Same board, rules and wording as Tables.razor (admin dock/toolbox, normal user mode and the sheet import come in phase 4).
+- NEW: live updates. After every change the server sends all open pages a small notice (table id + version, no user
+  data); each page re-fetches the changed row(s) with its own rights. Catch-up after a disconnect or server restart
+  by version/boot id; reconnect with growing delays up to 30 s; a small "Łączenie…" notice after 3 s offline.
+  WebSocket connections from other sites are refused (Origin check).
+- Actions are fetch() POSTs (JSON, or multipart for a new table with a cover) with the CSRF token in a header;
+  answers are JSON { ok, message | error } shown as the same dismissible alerts as in .NET.
+- The meeting hour is stored as "HH:MM" only. Covers are served from /covers/<game id> (cacheable), not embedded.
+- Uploaded covers are checked by content (magic bytes), max 2 MB enforced while receiving.
+- The seat count of a hand-added game is still drawn at random (1–6) and re-checked on the server; a BGG game always
+  uses BGG's count. New BGG_TOKEN setting (without it, lookups use the catalog and hand-added games only).
+- Deleted accounts: their seats keep the name, their tables lose the owner (owner/user ids set to null).
+- Packages added: fast-xml-parser, @fastify/websocket, @fastify/multipart; dev @types/ws, @playwright/test
+  (+ Chromium for Playwright, downloaded to the PC only). npm run test:e2e runs the browser test.
+
 Data (decided 2026-11-10):
 - New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
   .NET app.db, run on a local copy in phase 4 and at cutover in phase 5.
@@ -118,8 +134,8 @@ Phases and status:
 - 0 Proposal – approved 2026-11-10 (issue #2, closed).
 - 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – approved
   2026-11-10 (issue #3, closed).
-- 2 Accounts – done 2026-11-10, waiting for the user's review (issue #4).
-- 3 Board (incl. live updates, BGG, covers) – to do.
+- 2 Accounts – approved 2026-11-10 (issue #4, closed).
+- 3 Board (incl. live updates, BGG, covers) – done 2026-11-10, waiting for the user's review (issue #5).
 - 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,
   migration script on a local copy of app.db). Ends with the user testing and approving the whole app locally.
 - 5 Only after approval: merge to master, deploy beside the .NET app on a second port, side-by-side check, switch.

@@ -4,6 +4,10 @@
 //
 // SQLite has no boolean or date types: booleans are INTEGER 0/1, instants are TEXT in ISO 8601 UTC
 // ("2026-11-10T18:00:00.000Z").
+// Generated<T>: a column the database fills in (autoincrement id) – optional on insert, present on select.
+
+import type { Generated } from 'kysely';
+import type { TableKind } from '../domain/play-table.ts';
 
 /** board_settings: one row (id = 1) with board-wide settings. Port of Data/Table/BoardSettings.cs. */
 export type BoardSettingsTable = {
@@ -64,10 +68,78 @@ export type UserTokensTable = {
   expires_utc: string;
 };
 
+/** games: the catalog. Port of Game.cs. */
+export type GamesTable = {
+  id: Generated<number>;
+  /** Unique (case-insensitive). */
+  name: string;
+  kind: TableKind;
+  /** BGG's average weight exactly as given ("2.0488"); "0" = not rated. */
+  weight: string;
+  max_players: number;
+  bgg_url: string | null;
+  /** Null for games added by hand. */
+  bgg_id: number | null;
+  year_published: number | null;
+  cover: Buffer | null;
+  cover_type: string | null;
+};
+
+export type GameAlternateNamesTable = {
+  game_id: number;
+  name: string;
+};
+
+/** play_tables: one table on the board. Port of PlayTable.cs (rules in domain/play-table.ts). */
+export type PlayTablesTable = {
+  id: Generated<number>;
+  game_id: number;
+  game_title: string | null;
+  /** "HH:MM" or null. */
+  start_hour: string | null;
+  max_players: number;
+  kind: TableKind;
+  owner_user_id: string | null;
+  taken_slots: number;
+};
+
+export type TableSlotsTable = {
+  play_table_id: number;
+  slot_number: number;
+  participant_name: string;
+  user_id: string | null;
+};
+
+export type TablePhrasesTable = {
+  id: Generated<number>;
+  phrase: string;
+  game_id: number | null;
+  user_id: string | null;
+  created_utc: string;
+};
+
+export type UserActionLogsTable = {
+  id: Generated<number>;
+  created_utc: string;
+  action: 'JoinedTable' | 'RoleChanged' | 'UserRemoved';
+  actor_user_id: string | null;
+  actor_name: string | null;
+  target_user_id: string | null;
+  target_name: string | null;
+  play_table_id: number | null;
+  details: string | null;
+};
+
 /** All tables, by name. */
 export type Database = {
   board_settings: BoardSettingsTable;
   users: UsersTable;
   sessions: SessionsTable;
   user_tokens: UserTokensTable;
+  games: GamesTable;
+  game_alternate_names: GameAlternateNamesTable;
+  play_tables: PlayTablesTable;
+  table_slots: TableSlotsTable;
+  table_phrases: TablePhrasesTable;
+  user_action_logs: UserActionLogsTable;
 };

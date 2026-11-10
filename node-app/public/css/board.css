@@ -1,0 +1,664 @@
+/* Board page (Zapisy na gry). Ported from Blazor scoped CSS: Tables.razor.css, HourPicker.razor.css,
+   ConfirmButton.razor.css and ConfirmDeleteButton.razor.css (::deep removed; class names are unique enough).
+   Additions for the Node version are at the end. */
+
+/* ===== Tables.razor.css ===== */
+/* Three columns: title left, login prompt centred, mode switch right. */
+.toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .5rem;
+}
+
+    .toolbar h1 {
+        grid-column: 1;
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+    .toolbar .form-switch {
+        grid-column: 3;
+        justify-self: end;
+    }
+
+@media (max-width: 575.98px) {
+    .toolbar {
+        grid-template-columns: 1fr;
+    }
+
+        .toolbar h1, .toolbar .login-prompt, .toolbar .form-switch {
+            grid-column: 1;
+            justify-self: center;
+        }
+}
+
+/* Raised dark-red "3D" button inviting guests to register ("Dołącz do Planszówkarza teraz!"). */
+.login-prompt {
+    grid-column: 2;
+    padding: .45rem 1.1rem;
+    border: 2px solid #000;
+    border-radius: 8px;
+    background: linear-gradient(to bottom, #a01818 0%, #7a0c0c 55%, #5c0606 100%);
+    color: #ffd24a;
+    font-weight: 700;
+    text-shadow: 0 1px 0 #000, 0 0 4px rgba(0, 0, 0, .6);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 -2px 0 rgba(0, 0, 0, .35), 0 4px 0 #2a0000, 0 6px 8px rgba(0, 0, 0, .5);
+    transition: transform .08s, box-shadow .08s, filter .08s;
+}
+
+    .login-prompt:hover,
+    .login-prompt:focus-visible {
+        border-color: #000;
+        color: #ffe27a;
+        filter: brightness(1.12);
+    }
+
+    .login-prompt:active {
+        transform: translateY(4px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -1px 0 rgba(0, 0, 0, .35), 0 0 0 #2a0000, 0 2px 3px rgba(0, 0, 0, .5);
+    }
+
+.table-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-x: auto;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 62px minmax(150px, 1fr) 64px 84px 96px 60px 52px 76px 108px minmax(280px, 4fr);
+    min-width: 1054px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #3b3b40;
+}
+
+/* Separates the app's tables from those imported from the sheet; as wide as the rows, so it scrolls with them. */
+.import-divider {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 1054px;
+    /* About five empty text lines (~106px, per design 20261109-162610) between the app's tables and the divider. */
+    margin-block: 6.5rem .25rem;
+    color: #f0b429;
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-align: center;
+}
+
+    .import-divider::before,
+    .import-divider::after {
+        content: "";
+        flex: 1;
+        border-top: 2px solid #f0b429;
+    }
+
+.table-head {
+    border-radius: 0;
+    background: none;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    opacity: .7;
+}
+
+    .table-head .cell {
+        min-height: 0;
+        padding-block: .1rem;
+    }
+
+.cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 68px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.cell-game {
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Action buttons fill a column top to bottom, then start a new one. */
+.cell-actions {
+    position: relative;
+}
+
+.actions {
+    /* Absolute: gives the wrapping column a definite height that follows the row's. */
+    position: absolute;
+    inset: 4px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 2px;
+}
+
+.action-button,
+.action-anchor .confirm-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    font-size: .625rem;
+    line-height: 1;
+}
+
+/* The delete button is the shared ConfirmDeleteButton component (it styles its own armed ✅ state). */
+.action-anchor .confirm-delete {
+    background: #55555c;
+}
+
+    .action-anchor .confirm-delete:hover:not(.armed) {
+        background: #77777f;
+    }
+
+.action-placeholder {
+    background: #14532d;
+}
+
+.action-rename {
+    background: #14532d;
+}
+
+    .action-rename:hover {
+        background: #1e7a42;
+    }
+
+.action-anchor {
+    display: flex;
+}
+
+/*
+    Fixed without offsets: it stays where it would naturally sit, beside its button,
+    and isn't clipped by the row's overflow. The margin moves it past the button.
+*/
+.action-popup {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    width: 220px;
+    margin-left: 30px;
+    padding: .5rem .6rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+    font-size: .8125rem;
+    text-align: left;
+}
+
+/* Room for the game lookup's list of BGG titles; scrolls rather than running off the screen. */
+.action-popup-wide {
+    width: 360px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.rename-warning {
+    color: #ffc107;
+}
+
+.action-popup-buttons {
+    display: flex;
+    gap: .35rem;
+}
+
+.cell-difficulty {
+    font-weight: 600;
+}
+
+.cell-cover {
+    padding: 0;
+    background: #000;
+}
+
+.cell-slots {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.table-row a {
+    color: #8ab4f8;
+}
+
+.game-name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.thumb {
+    flex: none;
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+}
+
+.thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    overflow: hidden;
+    color: #fff;
+    font-size: .625rem;
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+/* The row for adding a table: its cells line up with the columns of the tables above. */
+.table-draft {
+    outline: 1px dashed #77777f;
+    outline-offset: -1px;
+}
+
+.draft-panel {
+    min-width: 1054px;
+    padding: .5rem .75rem;
+    border-radius: 6px;
+    background: #2c2c30;
+}
+
+/* As wide as the longest title, so the links line up in a column. */
+.candidate-list {
+    display: inline-flex;
+    flex-direction: column;
+    gap: .25rem;
+    max-width: 100%;
+}
+
+.candidate-name {
+    flex: 1;
+    text-align: left;
+}
+
+.candidate-link {
+    flex: none;
+}
+
+.draft-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+}
+
+.draft-cover {
+    position: relative;
+    width: 100px;
+    height: 100px;
+}
+
+/* A quarter of the cover's area. */
+.cover-upload {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50%;
+    height: 50%;
+    margin: 0;
+    background: #d3d3d3;
+    color: #222;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+    .cover-upload:hover {
+        background: #e8e8e8;
+    }
+
+    .cover-upload:focus-within {
+        outline: 2px solid #8ab4f8;
+    }
+
+.kind-small {
+    background: #2f6b4f;
+}
+
+.kind-big {
+    background: #8c4545;
+}
+
+.kind-other {
+    background: #55555c;
+}
+
+.hour-unset {
+    background: #d60000;
+    color: #fff;
+}
+
+.cell-input {
+    width: 100%;
+    min-width: 0;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: .875rem;
+    text-align: center;
+}
+
+    .cell-input:hover {
+        border-color: rgba(255, 255, 255, .4);
+    }
+
+    .cell-input option {
+        background: #fff;
+        color: #000;
+    }
+
+/* Player slots */
+.slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* As tall as a row with a cover (100px, less the cell's padding); grows with the player's name, up to 300% of the base width. */
+    flex: none;
+    min-width: 92px;
+    max-width: 276px;
+    height: 92px;
+    padding: 2px 6px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    font-size: .8125rem;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+}
+
+.slot-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+button.slot:not(:disabled):not(.slot-inert) {
+    cursor: pointer;
+}
+
+    button.slot:not(:disabled):not(.slot-inert):hover {
+        filter: brightness(1.15);
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, .5);
+    }
+
+.slot-inert {
+    cursor: context-menu;
+}
+
+button.slot:focus-visible {
+    outline: 2px solid #8ab4f8;
+    outline-offset: 1px;
+}
+
+.slot-free {
+    background: #fff;
+    color: #555;
+}
+
+.slot-taken {
+    background: #ad2f69;
+    color: #fff;
+}
+
+.slot-blocked {
+    background: #fa8072;
+    color: #3a1410;
+}
+
+.slot-owner {
+    border-color: #d4af37;
+    background: #560c33;
+    color: #fff;
+}
+
+/* Add-player popup */
+.popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+.add-player {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: 260px;
+    height: 320px;
+    padding: .6rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+}
+
+.add-player-title {
+    font-size: .875rem;
+}
+
+.add-player-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.add-player-option {
+    flex: none;
+    padding: .25rem .5rem;
+    border: 0;
+    border-radius: 4px;
+    background: #3b3b40;
+    color: inherit;
+    font-size: .8125rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+    .add-player-option:hover {
+        background: #55555c;
+    }
+
+.add-player-empty {
+    font-size: .8125rem;
+    opacity: .7;
+}
+
+.add-player-free {
+    display: flex;
+    gap: .35rem;
+}
+
+/* Admin controls in the bottom left corner: the help note and the toolbox, bottoms aligned. */
+.admin-dock {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 900;
+    display: flex;
+    align-items: flex-end;
+    gap: .75rem;
+    max-height: calc(100vh - 2rem);
+}
+
+/* A table just created from "Baza gier": golden outline that fades out, so the eye finds it. */
+.table-new {
+    outline: 2px solid #e0b94a;
+    outline-offset: -2px;
+    animation: table-new-fade 4s ease-out 1.5s forwards;
+}
+
+    .table-new:focus {
+        outline: 2px solid #e0b94a;
+    }
+
+@keyframes table-new-fade {
+    to {
+        outline-color: transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .table-new {
+        animation: none;
+    }
+}
+
+/* ===== HourPicker.razor.css ===== */
+.hour-button {
+    width: 100%;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: .875rem;
+}
+
+    .hour-button:hover {
+        border-color: rgba(255, 255, 255, .4);
+    }
+
+.hour-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+/* The offsets in the markup depend on this size: keep them in step. */
+.hour-popup {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    width: 400px;
+    height: 350px;
+    padding: .5rem;
+    border: 1px solid #55555c;
+    border-radius: 8px;
+    outline: none;
+    background: #1f1f22;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+    color: #fff;
+}
+
+/* Two hours per row. */
+.hour-grid {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+}
+
+.hour-option {
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: #3b3b40;
+    color: inherit;
+    font-size: .75rem;
+}
+
+    .hour-option:hover {
+        background: #55555c;
+    }
+
+.hour-option-selected,
+.hour-option-selected:hover {
+    background: #ad2f69;
+}
+
+/* ===== ConfirmButton.razor.css ===== */
+/* Invisible layer: a click anywhere else disarms the button (same approach as the board's popups). */
+.confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+/*
+    Armed: the whole button turns solid green with white content, raised above the backdrop.
+    "button" raises specificity above the callers' base rules, whatever the bundle order;
+    callers keep their own hover colours off an armed button with :not(.armed).
+*/
+button.confirm-button.armed {
+    position: relative;
+    z-index: 1001;
+    background: #22a559;
+    color: #fff;
+    outline: 2px solid #b6f5cf;
+    outline-offset: 1px;
+    box-shadow: 0 0 10px rgba(80, 220, 140, .75);
+}
+
+    button.confirm-button.armed:hover {
+        background: #27b964;
+        box-shadow: 0 0 10px rgba(80, 220, 140, .75), inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 -2px 0 rgba(0, 0, 0, .25);
+    }
+
+/* ===== ConfirmDeleteButton.razor.css ===== */
+/* The armed check fills the button's height: 2em of the button's own (small) font size. */
+.confirm-check {
+    font-size: 2em;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+}
+
+/* ===== Node version additions ===== */
+
+/* Wraps the table rows so live updates can replace them in one go; invisible to the layout. */
+.table-rows {
+    display: contents;
+}
+
+/* Status and error messages from the board's actions (Blazor rendered these alerts on the server). */
+.board-alerts:empty {
+    display: none;
+}
+
+/* Shown while the live connection is down. */
+.live-status {
+    position: fixed;
+    top: 3rem;
+    right: .75rem;
+    z-index: 1060;
+    padding: .25rem .6rem;
+    border-radius: 4px;
+    background: #6c4a00;
+    color: #ffe9b0;
+    font-size: .8125rem;
+}
+
+    .live-status[hidden] {
+        display: none;
+    }

@@ -19,6 +19,20 @@ const expectedColumns: { [T in keyof Database]: Record<keyof Database[T], true> 
   },
   sessions: { id_hash: true, user_id: true, auth_level: true, persistent: true, created_utc: true, expires_utc: true },
   user_tokens: { token_hash: true, user_id: true, purpose: true, new_email: true, expires_utc: true },
+  games: {
+    id: true, name: true, kind: true, weight: true, max_players: true, bgg_url: true, bgg_id: true, year_published: true,
+    cover: true, cover_type: true,
+  },
+  game_alternate_names: { game_id: true, name: true },
+  play_tables: {
+    id: true, game_id: true, game_title: true, start_hour: true, max_players: true, kind: true, owner_user_id: true, taken_slots: true,
+  },
+  table_slots: { play_table_id: true, slot_number: true, participant_name: true, user_id: true },
+  table_phrases: { id: true, phrase: true, game_id: true, user_id: true, created_utc: true },
+  user_action_logs: {
+    id: true, created_utc: true, action: true, actor_user_id: true, actor_name: true, target_user_id: true, target_name: true,
+    play_table_id: true, details: true,
+  },
 };
 
 describe('migrations', () => {

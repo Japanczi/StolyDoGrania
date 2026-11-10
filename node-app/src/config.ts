@@ -41,6 +41,8 @@ export type Config = {
   secret: string;
   email: EmailConfig | null;
   adminSeed: AdminSeedConfig | null;
+  /** Bearer token for the BGG XML API ("Bgg:Token" in .NET); null = BGG lookups off (hand-added games only). */
+  bggToken: string | null;
 };
 
 const environments: readonly Environment[] = ['development', 'production', 'test'];
@@ -102,6 +104,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secret,
     email,
     adminSeed,
+    bggToken: env.BGG_TOKEN?.trim() || null,
   };
 }
 

@@ -15,6 +15,7 @@ describe('loadConfig', () => {
       secret: '(dev)',
       email: null,
       adminSeed: null,
+      bggToken: null,
     });
     assert.ok(config.secret.length >= 32, 'a development secret is filled in');
   });

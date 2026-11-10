@@ -132,3 +132,44 @@ lines of tests. The upside is that each security property now has a test with it
   already-confirmed address as success.
 - Two small privacy wins came almost for free: the e-mail no longer appears in the RegisterConfirmation URL (and so
   not in server logs), and unknown logins take as long as wrong passwords.
+
+---
+
+## Phase 3 – the board (2026-11-10)
+
+**What happened.** The board "Zapisy na gry" works: tables with all PlayTable rules (ported with their tests),
+create via catalog/BGG lookup, rename, quarter-hour picker, table kind, "Zajęte" counter, add player and choose
+owner (right-click), two-click delete, cover upload, the JoinedTable log, `?nowy=` highlighting – and the new
+part: **live updates** over WebSocket. 208 server tests plus one Playwright test with two real browsers.
+Checked in the browser: creating a table, the hour picker, and a second tab updating live. The BGG client was
+ported by a helper agent (Sonnet) and checked; it needed no fixes. Effort: one long session.
+
+**Harder than .NET.**
+- **Blazor did the client side for us.** `Tables.razor` is 1 600 lines of mostly C# with `@onclick`; there was no
+  JavaScript. Here the same behaviour is split three ways: rows rendered on the server (`view.ts`), actions as HTTP
+  routes (`routes.ts`), and ~700 lines of browser JavaScript (`board.js`) for clicks, popups, the lookup panel, the
+  hour picker and the live connection. The lookup state that sat in the circuit now lives in the page.
+- **Persisting a changed table by hand.** EF tracked which seats were added or removed; here `saveTable` replaces the
+  table's seats inside a transaction. Simple, but it had to be designed.
+
+**Easier / better than .NET.**
+- **Live updates were straightforward** once the design was clear ("notify, then fetch"): ~100 lines on the server,
+  ~50 in the browser. Rights stay correct automatically, because each page fetches its own HTML.
+- **Rules as plain functions** ported almost line by line from C#, and their tests too.
+- **Clicks no longer depend on a live connection.** If the WebSocket drops, actions still work (they're plain HTTP);
+  in Blazor a lost circuit froze the page behind the reconnect dialog.
+
+**Different.**
+- The meeting hour is stored as `"HH:MM"` (the .NET app stored a full date-time and only showed the hour).
+- Covers are served from `/covers/:id` (cacheable) instead of being embedded as base64 `data:` URLs in every page.
+- Uploaded covers are checked by their bytes, not by the browser's label.
+
+**Bugs .NET would have prevented (or caused).**
+- *Prevented by .NET:* in Blazor the page couldn't send a forged seat count – the value lived on the server. Over
+  HTTP the browser sends it, so the server re-checks it (a hand-added game: 1–6; a BGG game: BGG's count). Tested.
+- *Found by tests:* a WebSocket test hung because the plugin's `injectWS` helper never resolved; the tests now use a
+  real listening server. And Node's own WebSocket client sends no `Origin` header – our server rightly refused it.
+
+**Surprises.**
+- Playwright's first run passed: two browsers, create → take a seat → free it → delete, each seen live by the other.
+- The `display: contents` CSS trick let live updates swap all rows at once without changing the grid layout.

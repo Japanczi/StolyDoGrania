@@ -5,11 +5,15 @@
 import { join } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyFormbody from '@fastify/formbody';
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerRequestAuth } from './auth/request-auth.ts';
 import type { Config } from './config.ts';
 import type { Db } from './db/database.ts';
+import { maxCoverBytes } from './domain/game.ts';
+import { createBggClient, type BggClient } from './integrations/bgg/client.ts';
+import { createLiveHub, registerLive } from './live/hub.ts';
 import { createNoOpMailer, createSmtpMailer, type Mailer } from './integrations/email/mailer.ts';
 import { healthRoutes } from './web/health.ts';
 import { manageRoutes } from './web/pages/account/manage-routes.ts';
@@ -23,9 +27,13 @@ export type AppDeps = {
   db: Db;
   /** Tests pass a fake that records messages; otherwise SMTP (EMAIL_HOST set) or no e-mail at all. */
   mailer?: Mailer;
+  /** Tests pass a fake BGG client; otherwise the real one (lookups need BGG_TOKEN). */
+  bgg?: BggClient;
+  /** The live-update hub; tests pass their own to watch notifications. */
+  hub?: ReturnType<typeof createLiveHub>;
 };
 
-export async function buildApp({ config, db, mailer }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, mailer, bgg, hub }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     logger: { level: config.environment === 'test' ? 'silent' : config.logLevel },
     // ASP.NET Core matches URLs case-insensitively (/account/login = /Account/Login); keep old links working.
@@ -37,6 +45,8 @@ export async function buildApp({ config, db, mailer }: AppDeps): Promise<Fastify
   // Cookies (sessions, CSRF, flash messages) and HTML form posts (application/x-www-form-urlencoded).
   await app.register(fastifyCookie);
   await app.register(fastifyFormbody);
+  // File uploads (new-table cover): the limit is applied while receiving, so a huge file is cut off early.
+  await app.register(fastifyMultipart, { limits: { fileSize: maxCoverBytes, files: 1, fields: 10 } });
   // Who is logged in + CSRF checks, for every request (UseAuthentication + UseAntiforgery).
   registerRequestAuth(app, config, db);
 
@@ -54,7 +64,9 @@ export async function buildApp({ config, db, mailer }: AppDeps): Promise<Fastify
   });
 
   healthRoutes(app, db);
-  await app.register(boardRoutes);
+  const liveHub = hub ?? createLiveHub();
+  await registerLive(app, liveHub, config.publicUrl);
+  boardRoutes(app, { config, db, bgg: bgg ?? createBggClient({ token: config.bggToken }), hub: liveHub });
   accountRoutes(app, { config, db, mailer: emailSender });
   manageRoutes(app, { config, db, mailer: emailSender });
 

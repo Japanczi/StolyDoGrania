@@ -10,7 +10,7 @@ import { layout } from './layout.ts';
 export function sendPage(
   request: FastifyRequest,
   reply: FastifyReply,
-  page: { title: string; body: SafeHtml },
+  page: { title: string; body: SafeHtml; head?: SafeHtml; scripts?: SafeHtml },
   statusCode = 200,
 ): FastifyReply {
   const user = request.user;
@@ -20,6 +20,8 @@ export function sendPage(
     user: user && { shortName: shortName(user.userName), isAdmin: user.role !== 'user' },
     csrfToken: request.csrfToken,
     body: page.body,
+    ...(page.head ? { head: page.head } : {}),
+    ...(page.scripts ? { scripts: page.scripts } : {}),
   });
   return reply.code(statusCode).type('text/html; charset=utf-8').send(document.value);
 }

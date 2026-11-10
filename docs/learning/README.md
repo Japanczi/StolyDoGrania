@@ -26,6 +26,8 @@ by links to the real files when they exist.
 | 7 | [Configuration and secrets](config-and-secrets.md) | 1 | `.env` vs appsettings/user-secrets, validating config at startup |
 | 8 | [Testing with `node:test` vs xUnit](testing.md) | 1 | `describe`/`test`, assertions, `app.inject()`, in-memory SQLite |
 | 9 | [Sessions, cookies, password hashing, CSRF vs ASP.NET Identity](sessions-and-passwords.md) | 2 | What the session cookie holds, Identity v3 hashes vs scrypt, lockout, e-mail tokens, why forms carry a hidden token |
+| 10 | [Live updates: WebSocket vs Blazor's SignalR connection](live-updates.md) | 3 | "Notify, then fetch", catching up after a disconnect, why messages carry no user data, the Origin check |
+| 11 | [Calling BGG: fetch, XML and throttling vs HttpClient](calling-bgg.md) | 3 | `fetch` + `AbortSignal`, a promise queue instead of `SemaphoreSlim`, stateless lookups, checking uploads by content |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)
@@ -37,12 +39,11 @@ by links to the real files when they exist.
 | `npm run dev` | Apply migrations, then run with auto-restart on file changes, at http://localhost:5180 | `dotnet watch` |
 | `npm run check` | Type-check server and browser code | `dotnet build` |
 | `npm test` | Run all tests | `dotnet test Planszowkarz.Tests` |
+| `npm run test:e2e` | Browser tests with Playwright (two browsers, live updates) | – (Microsoft.Playwright exists for .NET too) |
 | `npm run migrate` | Apply pending migrations | `dotnet ef database update` |
 
 ## Planned notes (added in the phase that introduces them)
 
-- WebSocket live updates vs Blazor's SignalR connection (phase 3)
-- Calling BGG: `fetch`, XML and throttling vs `HttpClient` (phase 3)
 - Background jobs vs `BackgroundService` (phase 4)
 - Building and deploying to Mikrus vs `dotnet publish` (phase 5)
 
