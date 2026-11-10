@@ -1,0 +1,10 @@
+// The list of migrations, in order. Adding a migration = a new numbered file + one line here.
+// Listed explicitly (instead of scanning the folder) so it's visible what runs and in which order.
+// Never edit or rename a migration that has run on any database; add a new one instead.
+
+import type { Migration } from 'kysely/migration';
+import * as m0001 from './0001-board-settings.ts';
+
+export const migrations: Record<string, Migration> = {
+  '0001-board-settings': m0001,
+};

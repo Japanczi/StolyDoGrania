@@ -54,6 +54,24 @@ Stack (decided 2026-11-10, phase 0 approved with all recommendations):
   @fastify/static, @fastify/multipart, @fastify/websocket, kysely, better-sqlite3, nodemailer, fast-xml-parser;
   dev: typescript, @types/node, @types/better-sqlite3, @playwright/test. Others: ask first.
 
+Phase 1 details (decided 2026-11-10):
+- Node 26 LTS (installed on the PC with winget), npm 11, TypeScript 7. Installed so far: fastify, @fastify/static,
+  kysely, better-sqlite3 (13: bundles Windows + Linux binaries, so nothing is compiled and the same packages work on
+  Mikrus; its compile-from-source install script is denied via "allowScripts").
+- Local dev runs on port 5180 (the .NET app uses 5223), so both can run side by side. Run from node-app/:
+  npm run dev. Local database: node-app/data/planszowkarz.db (git-ignored).
+- Migrations are applied explicitly (npm run migrate; npm run dev runs it first). The server refuses to start while
+  migrations are pending.
+- Pages are served with lang="pl" (the .NET app had "en"). The 404 and error pages are Polish ("Nie znaleziono
+  strony", "Wystąpił błąd"); the .NET versions still had the template's English text. The error page shows the
+  stack only in development.
+- Every response sends X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Referrer-Policy:
+  strict-origin-when-cross-origin.
+- GET /health returns {"status":"ok"} when the database answers (for deploy checks later).
+- The drawer's Escape / link-click closing moved from inline attributes to public/js/layout.js; Escape now
+  closes it from anywhere on the page (it used to need focus inside the drawer). "/stoly" also highlights
+  "Zapisy na gry" in the drawer.
+
 Data (decided 2026-11-10):
 - New clean schema (snake_case) plus a one-time, tested migration script (scripts/import-dotnet-db.ts) from the
   .NET app.db, run on a local copy in phase 4 and at cutover in phase 5.
@@ -62,7 +80,8 @@ Data (decided 2026-11-10):
 
 Phases and status:
 - 0 Proposal – approved 2026-11-10 (issue #2, closed).
-- 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – to do (issue #3).
+- 1 Skeleton: server, layout (ribbon, drawer, theme), SQLite access, test setup, local run script – done
+  2026-11-10, waiting for the user's review (issue #3).
 - 2 Accounts – to do.
 - 3 Board (incl. live updates, BGG, covers) – to do.
 - 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,

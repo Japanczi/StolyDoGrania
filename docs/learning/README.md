@@ -19,16 +19,27 @@ by links to the real files when they exist.
 |---|---|---|---|
 | 1 | [Node basics: the event loop and async/await](node-basics.md) | 0 | How one thread serves many users; Promises vs `Task`; what blocks the loop |
 | 2 | [TypeScript vs C#](typescript-vs-csharp.md) | 0 | Types that disappear at runtime, `null`/`undefined`, unions instead of `out` parameters, how Node runs `.ts` |
-| 3 | [npm vs NuGet](npm-vs-nuget.md) | 0 | `package.json` vs `.csproj`, `node_modules`, lock files, scripts vs `dotnet` commands |
+| 3 | [npm vs NuGet](npm-vs-nuget.md) | 0, 1 | `package.json` vs `.csproj`, `node_modules`, lock files, scripts vs `dotnet` commands, native packages |
+| 4 | [How a request flows: Fastify vs ASP.NET Core](http-request-flow.md) | 1 | Startup, hooks vs middleware, routes vs `@page`, 404 and error pages, no DI container |
+| 5 | [Server-rendered HTML + plain JS vs Blazor Server](server-rendered-html.md) | 1 | The `html` tagged template, escaping, Razor side by side, the CSS-only drawer, scoped CSS |
+| 6 | [Kysely + better-sqlite3 vs EF Core](kysely-vs-ef-core.md) | 1 | No change tracker, schema types, hand-written migrations, a synchronous driver |
+| 7 | [Configuration and secrets](config-and-secrets.md) | 1 | `.env` vs appsettings/user-secrets, validating config at startup |
+| 8 | [Testing with `node:test` vs xUnit](testing.md) | 1 | `describe`/`test`, assertions, `app.inject()`, in-memory SQLite |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
+
+## How to run the Node app (from `node-app/`)
+
+| Command | What it does | .NET counterpart |
+|---|---|---|
+| `npm ci` | Install the exact packages from `package-lock.json` | `dotnet restore` |
+| `copy .env.example .env` | Local settings (once) | user-secrets |
+| `npm run dev` | Apply migrations, then run with auto-restart on file changes, at http://localhost:5180 | `dotnet watch` |
+| `npm run check` | Type-check server and browser code | `dotnet build` |
+| `npm test` | Run all tests | `dotnet test Planszowkarz.Tests` |
+| `npm run migrate` | Apply pending migrations | `dotnet ef database update` |
 
 ## Planned notes (added in the phase that introduces them)
 
-- How an HTTP request flows through Fastify vs ASP.NET Core middleware and routing (phase 1)
-- Server-rendered HTML with the `html` tag + plain JS vs Blazor Server (phase 1)
-- Data access and migrations with Kysely vs EF Core (phase 1)
-- Configuration and secrets: `.env` vs `appsettings.json` / user-secrets (phase 1)
-- Testing with `node:test` vs xUnit (phase 1)
 - Sessions, cookies, password hashing, CSRF vs ASP.NET Identity (phase 2)
 - WebSocket live updates vs Blazor's SignalR connection (phase 3)
 - Calling BGG: `fetch`, XML and throttling vs `HttpClient` (phase 3)

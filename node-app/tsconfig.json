@@ -1,0 +1,26 @@
+{
+  // Type-check settings for the server code. Nothing is emitted: Node runs the .ts files directly
+  // (type stripping), so this file only tells `tsc` how strictly to check. See docs/learning/typescript-vs-csharp.md.
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["esnext"],
+    "types": ["node"],
+    "noEmit": true,
+
+    // Only TypeScript syntax Node can strip: no enum, namespace or constructor parameter properties.
+    "erasableSyntaxOnly": true,
+    // Type-only imports must say so (`import type`), because stripping deletes them.
+    "verbatimModuleSyntax": true,
+    // Relative imports name the real file (`./html.ts`), as Node needs.
+    "allowImportingTsExtensions": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "test"]
+}

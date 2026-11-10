@@ -1,0 +1,31 @@
+{
+  "name": "planszowkarz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Planszówkarz – board game table sign-ups (Node rewrite)",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env src/db/migrate.ts && node --env-file-if-exists=.env --watch src/server.ts",
+    "start": "node src/server.ts",
+    "migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
+    "check": "tsc -p . && tsc -p public/js",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.10",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.8",
+    "kysely": "^0.29.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "better-sqlite3": false
+  }
+}

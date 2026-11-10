@@ -26,7 +26,7 @@
 
 ## Stack
 - Node.js (current LTS, pinned in `node-app/package.json` `engines` and `.nvmrc`), TypeScript run directly by
-  Node (type stripping); `npm run check` (`tsc --noEmit`) type-checks. Only erasable TS syntax: no `enum`,
+  Node (type stripping); `npm run check` (`tsc`, noEmit) type-checks server code and `public/js`. Only erasable TS syntax: no `enum`,
   `namespace` or constructor parameter properties – use union types and plain fields.
 - Fastify (HTTP), server-rendered HTML with our `html` tagged template (`src/web/html.ts`), Bootstrap 5,
   plain browser JS in `public/js/` (`// @ts-check` + JSDoc types, no bundler, no front-end framework, no htmx).
@@ -94,7 +94,10 @@
 
 ## Workflow
 - Schema changes: add a new numbered migration in `src/db/migrations/` (never edit one that has run on any
-  database), update `src/db/schema.ts`, run `npm run migrate`. Mention every migration explicitly.
+  database), list it in `src/db/migrations/index.ts`, update `src/db/schema.ts` and the `expectedColumns` list in
+  `test/db/migrations.test.ts`, run `npm run migrate`. Mention every migration explicitly.
+- Run commands from `node-app/`. Node lives in `C:\Program Files\nodejs` (installed 2026-11-10); a shell started
+  before that may need it added to PATH.
 - Show only changed code (full function when small, otherwise a clear diff). Don't rewrite whole files for small changes.
 - Ask before adding npm packages (say what it does, its .NET counterpart, and whether a Node built-in would do).
 - Before committing: `npm run check` and `npm test` in `node-app/` must pass.

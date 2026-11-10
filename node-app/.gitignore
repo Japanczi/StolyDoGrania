@@ -1,0 +1,6 @@
+node_modules/
+.env
+# Local SQLite databases (incl. -wal / -shm files)
+data/
+*.db
+*.db-*

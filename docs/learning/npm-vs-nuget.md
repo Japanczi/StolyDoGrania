@@ -1,6 +1,7 @@
 # npm vs NuGet
 
-*Phase 0. The `package.json` below is a sketch; phase 1 creates the real `node-app/package.json`.*
+*Phase 0, updated in phase 1. The real file is [`node-app/package.json`](../../node-app/package.json); the version
+below is shortened.*
 
 ## What it is and why we need it
 
@@ -54,7 +55,8 @@ In Node, `package.json` does the same job (*sketch*):
 }
 ```
 
-(Version numbers are placeholders; phase 1 installs current ones and the lock file pins them.)
+(Phase 1 installed: fastify 5.12, @fastify/static 10.1, kysely 0.29, better-sqlite3 13.0, typescript 7.0 – the
+lock file pins the exact versions. `nodemailer` and the others come in the phases that need them.)
 
 | `.csproj` / .NET | `package.json` / npm | Note |
 |---|---|---|
@@ -102,16 +104,22 @@ project documents its own commands. .NET has no exact equivalent; the closest is
 ## Native packages (relevant for better-sqlite3)
 
 Most npm packages are pure JavaScript. A few contain compiled C/C++ code – **better-sqlite3** is one (SQLite itself
-is C). Its install step downloads a **prebuilt binary for your OS and Node version**; only if none exists does it
-try to compile (which needs build tools). That's why the binary on the Windows PC differs from the one Mikrus
-(Linux) needs, and why the deploy script must handle it (proposal, section 3b). NuGet solves the same problem
-with "runtime-specific assets" (`runtimes/linux-x64/native/…` inside the package – that's how
+is C). Older versions downloaded a prebuilt binary for your OS in an install script. **Version 13 (ours) ships
+the binaries inside the package** – `node_modules/better-sqlite3/prebuilds/` has `win32-x64.node`,
+`linux-x64.node` and others – and picks the right one when loaded. So the same `node_modules` works on the Windows
+PC and on Mikrus (Linux), which settles the deploy question from the proposal (section 3b). NuGet solves the same
+problem the same way: "runtime-specific assets" (`runtimes/linux-x64/native/…` inside the package – that's how
 `Microsoft.Data.Sqlite` ships SQLite for Linux in today's self-contained build).
+
+**Install scripts need approval (npm 11).** better-sqlite3 still declares a fallback `install: node-gyp rebuild`
+script (compile from source). npm 11 no longer runs install scripts silently: `npm install` warned, and
+`npm install-scripts deny better-sqlite3` recorded `"allowScripts": { "better-sqlite3": false }` in `package.json`.
+Nothing is compiled, and no Visual Studio build tools are needed.
 
 ## Pitfalls
 
-- **Install scripts run code from the internet** on your machine (that's how better-sqlite3 fetches its binary).
-  Fewer packages = less risk; this is one reason the proposal prefers Node built-ins where they exist.
+- **Install scripts run code from the internet** on your machine. npm 11 asks first (`allowScripts`); keep it that
+  way. Fewer packages = less risk; this is one reason the proposal prefers Node built-ins where they exist.
 - Committing `node_modules/` by accident – it must be in `.gitignore`.
 - Running `npm install` on a fresh checkout and getting a modified `package-lock.json` – use `npm ci`.
 - Tutorials mixing `require(...)` (CommonJS, old) and `import` (ES modules, ours).
