@@ -129,7 +129,7 @@ export type TablePhrasesTable = {
 export type UserActionLogsTable = {
   id: Generated<number>;
   created_utc: string;
-  action: 'JoinedTable' | 'RoleChanged' | 'UserRemoved';
+  action: 'JoinedTable' | 'RoleChanged' | 'UserRemoved' | 'UserRenamed';
   actor_user_id: string | null;
   actor_name: string | null;
   target_user_id: string | null;

@@ -113,6 +113,25 @@ export async function setPhoneNumber(db: Db, userId: string, phoneNumber: string
   await db.updateTable('users').set({ phone_number: phoneNumber }).where('id', '=', userId).execute();
 }
 
+/**
+ * Changes a user name (already normalised and validated). The seats the user holds show the new name too – seat
+ * names are copied when a seat is taken, so they're updated here in the same transaction.
+ * Returns false when the name is taken by another account (case-insensitively). Call inside the caller's
+ * transaction, so the change and its action-log entry are saved together.
+ */
+export async function setUserName(db: Db, userId: string, userName: string, seatName: string): Promise<boolean> {
+  const owner = await findUserByUserName(db, userName);
+  if (owner && owner.id !== userId) {
+    return false;
+  }
+  await db.updateTable('users')
+    .set({ user_name: userName, normalized_user_name: normalizeKey(userName) })
+    .where('id', '=', userId)
+    .execute();
+  await db.updateTable('table_slots').set({ participant_name: seatName }).where('user_id', '=', userId).execute();
+  return true;
+}
+
 export async function setRole(db: Db, userId: string, role: Role): Promise<void> {
   await db.updateTable('users').set({ role }).where('id', '=', userId).execute();
 }

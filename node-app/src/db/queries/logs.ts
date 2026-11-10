@@ -6,7 +6,7 @@ import type { Database, UserActionLogsTable } from '../schema.ts';
 export const logPageSize = 50;
 
 export type LogAction = UserActionLogsTable['action'];
-export const logActions: readonly LogAction[] = ['JoinedTable', 'RoleChanged', 'UserRemoved'];
+export const logActions: readonly LogAction[] = ['JoinedTable', 'RoleChanged', 'UserRemoved', 'UserRenamed'];
 
 export type LogRow = {
   id: number;

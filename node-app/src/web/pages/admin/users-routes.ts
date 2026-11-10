@@ -9,11 +9,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../../../config.ts';
 import type { Db } from '../../../db/database.ts';
-import { createUser, deleteUser, findUserById, setRole, type User } from '../../../db/queries/users.ts';
+import { createUser, deleteUser, findUserById, isUniqueViolation, setRole, setUserName, type User } from '../../../db/queries/users.ts';
 import type { Role } from '../../../db/schema.ts';
 import { passwordStrengthErrors } from '../../../domain/password-policy.ts';
 import { canManage, isAdminRole } from '../../../domain/roles.ts';
-import { normalizeUserName } from '../../../domain/user-name.ts';
+import { normalizeUserName, shortName } from '../../../domain/user-name.ts';
 import { hashPassword } from '../../../auth/password-hash.ts';
 import { field, hasErrors, readForm, setFlash, takeFlash, type FieldErrors } from '../../forms.ts';
 import { html } from '../../html.ts';
@@ -22,6 +22,7 @@ import { checkEmail, checkNewPasswordSimple, checkUserName } from './users-valid
 import { usersPage, type UserRow } from './users-view.ts';
 
 export const protectedAdminHint = 'Tylko główny administrator (Owner) może odebrać rolę administratora lub usunąć jego konto.';
+export const protectedRenameHint = 'Tylko główny administrator (Owner) może zmienić nazwę konta administratora.';
 const assignable: readonly Role[] = ['admin', 'user'];
 
 export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db }): void {
@@ -43,7 +44,10 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     return row;
   }
 
-  async function show(request: FastifyRequest, reply: FastifyReply, me: User, extra: { errors?: FieldErrors; values?: Record<string, string>; error?: string | null } = {}) {
+  async function show(
+    request: FastifyRequest, reply: FastifyReply, me: User,
+    extra: { errors?: FieldErrors; values?: Record<string, string>; error?: string | null; renameId?: string } = {},
+  ) {
     const users = await db.selectFrom('users').select(['id', 'user_name', 'email', 'role']).orderBy('email').execute();
     const rows: UserRow[] = users.map(u => ({
       id: u.id, userName: u.user_name, email: u.email, role: u.role,
@@ -58,6 +62,7 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
       body: usersPage(request, {
         rows,
         confirmDeleteId: String((request.query as Record<string, unknown>).usun ?? ''),
+        renameId: extra.renameId ?? String((request.query as Record<string, unknown>).zmien ?? ''),
         status: flash && !flash.startsWith('Błąd') ? flash : null,
         error: extra.error ?? (flash?.startsWith('Błąd') ? flash.slice('Błąd: '.length) : null),
         errors: extra.errors ?? {},
@@ -124,6 +129,50 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
       }).execute();
     });
     return done(`Zmieniono rolę użytkownika ${target.user_name} na ${roleName(newRole)}.`);
+  });
+
+  /**
+   * Renames a user (new in the Node app, requested 2026-11-11). Same rules as roles and deletion: admins rename
+   * regular users, only the Owner renames admins, nobody renames the Owner or themselves here. The name follows
+   * the registration rules and must be unique; their seats show the new name; the change is logged.
+   */
+  app.post('/admin/users/:id/name', async (request, reply) => {
+    const me = await actor(request, reply);
+    if (!me) return reply;
+    const id = (request.params as Record<string, string>).id ?? '';
+    const done = (message: string) => { setFlash(reply, message); return reply.redirect('/admin/users', 303); };
+    if (id === me.id) return done('Błąd: Nie możesz zmienić tutaj własnej nazwy użytkownika.');
+    const target = await findUserById(db, id);
+    if (!target) return done('Błąd: Nie znaleziono użytkownika.');
+    if (!canManage(target.role, me.role === 'owner')) {
+      return done(`Błąd: ${target.role === 'owner' ? 'Nie można zmienić nazwy głównego administratora.' : protectedRenameHint}`);
+    }
+
+    const form = readForm(request.body);
+    const errors: FieldErrors = {};
+    const raw = checkUserName(form, errors);
+    // A form error keeps the rename form open with what was typed.
+    if (hasErrors(errors)) return show(request, reply, me, { errors, renameId: id, values: { UserName: raw } });
+    const newName = normalizeUserName(raw);
+    if (newName === target.user_name) return reply.redirect('/admin/users', 303);
+
+    let renamed = false;
+    try {
+      renamed = await db.transaction().execute(async trx => {
+        if (!(await setUserName(trx, target.id, newName, shortName(newName)))) return false;
+        await trx.insertInto('user_action_logs').values({
+          created_utc: new Date().toISOString(), action: 'UserRenamed', actor_user_id: me.id, actor_name: me.user_name,
+          target_user_id: target.id, target_name: newName, play_table_id: null, details: `${target.user_name} → ${newName}`,
+        }).execute();
+        return true;
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+    }
+    if (!renamed) {
+      return show(request, reply, me, { error: 'Ta nazwa użytkownika jest już zajęta.', renameId: id, values: { UserName: raw } });
+    }
+    return done(`Zmieniono nazwę użytkownika ${target.user_name} na ${newName}.`);
   });
 
   app.post('/admin/users/:id/delete', async (request, reply) => {

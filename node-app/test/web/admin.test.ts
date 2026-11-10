@@ -164,3 +164,56 @@ describe('admin toolbox', () => {
     assert.equal((await (await s.as('Gracz')).post('/api/admin/feedback/download', {})).statusCode, 403);
   });
 });
+
+describe('renaming users (admin users page)', () => {
+  test('an admin renames a regular user: normalised, seats follow, logged, login works with the new name', async t => {
+    const s = await setUp();
+    t.after(s.close);
+    // Gracz holds a seat, so the board must show the new name too.
+    const gameId = (await s.db.insertInto('games').values({ name: 'Gra', kind: 'small', weight: '0', max_players: 4, bgg_url: null, bgg_id: null, year_published: null, cover: null, cover_type: null }).returning('id').executeTakeFirstOrThrow()).id;
+    const tableId = (await s.db.insertInto('play_tables').values({ game_id: gameId, game_title: null, start_hour: null, max_players: 4, kind: 'small', owner_user_id: null, taken_slots: 0 }).returning('id').executeTakeFirstOrThrow()).id;
+    await s.db.insertInto('table_slots').values({ play_table_id: tableId, slot_number: 2, participant_name: 'Gracz', user_id: s.user.id }).execute();
+
+    const adam = await s.as('Adam');
+    assert.match((await adam.get(`/admin/users?zmien=${s.user.id}`)).body, new RegExp(`action="/admin/users/${s.user.id}/name"`));
+    const res = await adam.post(`/admin/users/${s.user.id}/name`, { UserName: '  Nowy   Gracz ' });
+    assert.equal(res.statusCode, 303);
+    assert.match((await adam.get('/admin/users')).body, /Zmieniono nazwę użytkownika Gracz na Nowy Gracz\./);
+
+    assert.equal((await findUserByUserName(s.db, 'nowy gracz'))?.id, s.user.id);
+    const seat = await s.db.selectFrom('table_slots').select('participant_name').where('user_id', '=', s.user.id).executeTakeFirstOrThrow();
+    assert.equal(seat.participant_name, 'Nowy Gracz');
+    const log = await s.db.selectFrom('user_action_logs').select(['action', 'actor_name', 'target_name', 'details']).execute();
+    assert.deepEqual(log, [{ action: 'UserRenamed', actor_name: 'Adam', target_name: 'Nowy Gracz', details: 'Gracz → Nowy Gracz' }]);
+    assert.equal((await new TestBrowser(s.app).login('Nowy Gracz', 'haslo1')).statusCode, 303);
+  });
+
+  test('invalid or taken names are refused with the form kept open', async t => {
+    const s = await setUp();
+    t.after(s.close);
+    const adam = await s.as('Adam');
+    const bad = await adam.post(`/admin/users/${s.user.id}/name`, { UserName: 'x@y' });
+    assert.match(bad.body, /Nazwa użytkownika: 3–20 znaków/);
+    assert.match(bad.body, /value="x@y"/);
+    const taken = await adam.post(`/admin/users/${s.user.id}/name`, { UserName: 'BEATA' });
+    assert.match(taken.body, /Ta nazwa użytkownika jest już zajęta\./);
+    assert.equal(await roleOf(s, 'Gracz'), 'user', 'unchanged');
+  });
+
+  test('same rules as roles: only the Owner renames admins; nobody renames the Owner or themselves here', async t => {
+    const s = await setUp();
+    t.after(s.close);
+    const adam = await s.as('Adam');
+    await adam.post(`/admin/users/${s.admin2.id}/name`, { UserName: 'Inna' });
+    await adam.post(`/admin/users/${s.owner.id}/name`, { UserName: 'Inny' });
+    await adam.post(`/admin/users/${s.admin.id}/name`, { UserName: 'Adam2' });
+    assert.ok(await findUserByUserName(s.db, 'Beata'));
+    assert.ok(await findUserByUserName(s.db, 'Szef'));
+    assert.ok(await findUserByUserName(s.db, 'Adam'));
+    assert.doesNotMatch((await adam.get('/admin/users')).body, new RegExp(`zmien=${s.admin2.id}`), 'no rename link for other admins');
+
+    await (await s.as('Szef')).post(`/admin/users/${s.admin2.id}/name`, { UserName: 'Beata K' });
+    assert.ok(await findUserByUserName(s.db, 'Beata K'));
+    assert.equal((await (await s.as('Gracz')).post(`/admin/users/${s.user.id}/name`, { UserName: 'Hack' })).headers.location, '/Account/AccessDenied');
+  });
+});

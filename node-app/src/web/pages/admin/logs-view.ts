@@ -7,12 +7,14 @@ const actionLabels: Record<LogAction, string> = {
   JoinedTable: 'Dołączenie do stołu',
   RoleChanged: 'Zmiana roli',
   UserRemoved: 'Usunięcie konta',
+  UserRenamed: 'Zmiana nazwy użytkownika',
 };
 
 const actionBadges: Record<LogAction, string> = {
   JoinedTable: 'text-bg-success',
   RoleChanged: 'text-bg-warning',
   UserRemoved: 'text-bg-danger',
+  UserRenamed: 'text-bg-info',
 };
 
 const polishTime = new Intl.DateTimeFormat('pl-PL', {

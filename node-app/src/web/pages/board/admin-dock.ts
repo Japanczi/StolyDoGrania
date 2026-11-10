@@ -73,9 +73,9 @@ function helpBox(): SafeHtml {
         </ul>
         <p class="admin-help-intro admin-help-section">Użytkownicy:</p>
         <ul>
-            <li>Nadanie roli Admin, usuwanie zwykłych kont</li>
-            <li>Odebranie roli Admin lub usunięcie konta admina może tylko główny administrator (Owner)</li>
-            <li>Dołączenia do stołów, zmiany ról i usunięcia kont są zapisywane w dzienniku (Menu → Dziennik)</li>
+            <li>Nadanie roli Admin, zmiana nazwy i usuwanie zwykłych kont</li>
+            <li>Odebranie roli Admin, zmianę nazwy lub usunięcie konta admina może tylko główny administrator (Owner)</li>
+            <li>Dołączenia do stołów, zmiany ról i nazw oraz usunięcia kont są zapisywane w dzienniku (Menu → Dziennik)</li>
         </ul>
         <p class="admin-help-intro admin-help-section">Baza gier:</p>
         <ul>

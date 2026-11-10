@@ -12,11 +12,14 @@ const hint = 'Tylko główny administrator (Owner) może odebrać rolę administ
 const assignable = [['admin', 'Admin'], ['user', 'User']] as const;
 
 export function usersPage(request: FastifyRequest, m: {
-  rows: UserRow[]; confirmDeleteId: string; status: string | null; error: string | null; errors: FieldErrors; values: Record<string, string>;
+  rows: UserRow[]; confirmDeleteId: string;
+  /** The row whose user name is being edited (?zmien=…); form errors then belong to it, not to "Dodaj użytkownika". */
+  renameId: string;
+  status: string | null; error: string | null; errors: FieldErrors; values: Record<string, string>;
 }): SafeHtml {
   const newRole = m.values.Role ?? 'user';
   return html`<h1>Zarządzanie użytkownikami</h1>
-<p><a href="/admin/logs">Dziennik działań</a> – dołączenia do stołów, zmiany ról i usunięcia kont.</p>
+<p><a href="/admin/logs">Dziennik działań</a> – dołączenia do stołów, zmiany ról i nazw oraz usunięcia kont.</p>
 ${m.status && html`<div class="alert alert-success" role="alert">${m.status}</div>`}
 ${m.error && html`<div class="alert alert-danger" role="alert">${m.error}</div>`}
 <div class="card mb-4">
@@ -24,7 +27,7 @@ ${m.error && html`<div class="alert alert-danger" role="alert">${m.error}</div>`
         <h5 class="card-title">Dodaj użytkownika</h5>
         <form method="post" action="/admin/users/add" novalidate>
             ${csrfField(request)}
-            ${validationSummary(m.errors)}
+            ${validationSummary(m.renameId ? {} : m.errors)}
             <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label" for="nu-name">Nazwa użytkownika</label>
@@ -54,15 +57,24 @@ ${m.error && html`<div class="alert alert-danger" role="alert">${m.error}</div>`
 <table class="table align-middle">
     <thead><tr><th>Nazwa użytkownika</th><th>E-mail</th><th style="width:180px">Rola</th><th style="width:220px"></th></tr></thead>
     <tbody>
-        ${m.rows.map(u => row(request, u, m.confirmDeleteId === u.id))}
+        ${m.rows.map(u => row(request, u, m.confirmDeleteId === u.id, m.renameId === u.id ? { errors: m.errors, value: m.values.UserName ?? u.userName } : null))}
     </tbody>
 </table>`;
 }
 
-function row(request: FastifyRequest, u: UserRow, confirming: boolean): SafeHtml {
+function row(request: FastifyRequest, u: UserRow, confirming: boolean, renaming: { errors: FieldErrors; value: string } | null): SafeHtml {
   const locked = u.isSelf || !u.manageable;
   return html`<tr>
-            <td>${u.userName} ${u.isSelf && html`<span class="badge text-bg-secondary">to Ty</span>`}</td>
+            <td>${renaming && u.manageable
+              ? html`<form method="post" action="/admin/users/${u.id}/name" class="d-flex flex-wrap gap-1 m-0" novalidate>
+                    ${csrfField(request)}
+                    <input name="UserName" class="form-control form-control-sm w-auto" value="${renaming.value}" maxlength="20" aria-label="Nowa nazwa użytkownika: ${u.userName}" autofocus />
+                    <button type="submit" class="btn btn-sm btn-success">Zapisz</button>
+                    <a class="btn btn-sm btn-outline-secondary" href="/admin/users">Anuluj</a>
+                    ${validationSummary(renaming.errors)}
+                </form>`
+              : html`${u.userName} ${u.isSelf && html`<span class="badge text-bg-secondary">to Ty</span>`}
+                ${u.manageable && html`<a class="btn btn-sm btn-link p-0 ms-1" href="/admin/users?zmien=${u.id}" title="Zmień nazwę użytkownika">Zmień nazwę</a>`}`}</td>
             <td>${u.email}</td>
             <td>${u.role === 'owner'
               ? html`<span class="badge text-bg-warning" title="Główny administrator">Owner</span>`
