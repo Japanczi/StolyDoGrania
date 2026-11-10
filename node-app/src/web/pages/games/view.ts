@@ -44,7 +44,7 @@ export function gamesPage(m: GamesPageModel): SafeHtml {
   return html`<div class="toolbar">
     <h1>Baza gier</h1>
     <span class="count">${countLabel}</span>
-    <form class="search-form" method="get" action="/gry" role="search">
+    <form class="search-form" method="get" action="/gry" role="search" data-history="replace">
         ${m.sort !== 'name' && html`<input type="hidden" name="sort" value="${m.sort}" />`}
         ${m.descending && html`<input type="hidden" name="dir" value="desc" />`}
         <input type="search" name="q" value="${m.search}" class="form-control form-control-sm search" placeholder="Szukaj gry…" aria-label="Szukaj gry" data-search />

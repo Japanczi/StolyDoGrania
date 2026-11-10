@@ -97,7 +97,8 @@
     if (!response.ok) return;
     version = Math.max(version, Number(response.headers.get('X-Board-Version')));
     boot = response.headers.get('X-Board-Boot') ?? boot;
-    rows.innerHTML = await response.text();
+    // Patched in place (morph.js), not replaced: unchanged rows, covers and inputs stay as they are – no flash.
+    window.morph.morphChildren(rows, window.morph.parseFragment(await response.text()));
     if (!loggedIn) {
       const empty = rows.children.length === 0;
       document.getElementById('board-empty')?.toggleAttribute('hidden', !empty);
@@ -112,8 +113,8 @@
     const response = await fetch(`/fragments/table/${id}`, { credentials: 'same-origin' });
     if (response.status === 404) { row?.remove(); return; }
     if (!response.ok) return;
-    const html = await response.text();
-    if (row) row.outerHTML = html; else await refreshBoard();
+    const fresh = window.morph.parseFragment(await response.text()).firstElementChild;
+    if (row && fresh) window.morph.morphElement(row, fresh); else await refreshBoard();
   }
 
   function popupClosed() {

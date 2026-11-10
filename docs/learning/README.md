@@ -29,6 +29,7 @@ by links to the real files when they exist.
 | 10 | [Live updates: WebSocket vs Blazor's SignalR connection](live-updates.md) | 3 | "Notify, then fetch", catching up after a disconnect, why messages carry no user data, the Origin check |
 | 11 | [Calling BGG: fetch, XML and throttling vs HttpClient](calling-bgg.md) | 3 | `fetch` + `AbortSignal`, a promise queue instead of `SemaphoreSlim`, stateless lookups, checking uploads by content |
 | 12 | [Background jobs: timers vs BackgroundService](background-jobs.md) | 4 | `setInterval` jobs, no overlapping runs, catching up a missed Monday, time zones with Temporal |
+| 13 | [Updating pages without flashing: fetch + morphing](no-flash.md) | 4+ | Why pages flashed, morphing vs Blazor's DOM diffing, links and forms via fetch, proving it with Playwright |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)

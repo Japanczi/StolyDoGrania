@@ -41,6 +41,7 @@ export function gamesRoutes(app: FastifyInstance, deps: GamesDeps): void {
     }
 
     return sendPage(request, reply, {
+      enhance: true,
       title: 'Baza gier',
       head: html`<link rel="stylesheet" href="/css/games.css" />`,
       scripts: html`<script src="/js/games.js"></script>`,

@@ -124,6 +124,11 @@ Phase 3 – board (decided 2026-11-10):
 - Packages added: fast-xml-parser, @fastify/websocket, @fastify/multipart; dev @types/ws, @playwright/test
   (+ Chromium for Playwright, downloaded to the PC only). npm run test:e2e runs the browser test.
 
+No flashing (decided 2026-11-11): in-page actions never reload the page. The board patches changed rows in place
+(morph.js); the users page, Baza gier and Dziennik send their links and forms with fetch and patch the page
+(enhance.js; plain links/forms remain the no-JavaScript fallback). Moving to another page may still load normally.
+The branch CLAUDE.md now allows using JavaScript for this.
+
 Phase 4 – the rest (decided 2026-11-10):
 - Baza gier, the admin users page, Dziennik, the admin dock (note + toolbox), normal user mode, the weekly reset, the
   feedback box, the sheet import and the page designer work as in the main spec, with these differences:

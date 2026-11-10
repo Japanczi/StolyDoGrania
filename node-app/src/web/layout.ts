@@ -29,10 +29,12 @@ export type PageOptions = {
   feedback?: SafeHtml;
   /** Development only: load the page designer (checked on the server by the caller). */
   designer?: boolean;
+  /** Update this page in place for its own links and forms (public/js/enhance.js) instead of reloading it. */
+  enhance?: boolean;
 };
 
 /** Renders a complete HTML document around a page's body. */
-export function layout({ title, currentPath, user, csrfToken, body, head, scripts, feedback, designer }: PageOptions): SafeHtml {
+export function layout({ title, currentPath, user, csrfToken, body, head, scripts, feedback, designer, enhance }: PageOptions): SafeHtml {
   /** Logout is a POST (a link could be triggered by other sites), protected by the CSRF token like every form. */
   const logoutForm = (returnUrl: string, button: SafeHtml) => html`<form action="/Account/Logout" method="post">
                 <input type="hidden" name="_csrf" value="${csrfToken}" />
@@ -79,12 +81,14 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
         ${drawer(currentPath, user, logoutForm(currentPath, html`<button type="submit" class="drawer-link"><span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj</button>`))}
     </aside>
 
-    <main class="app-main">
+    <main class="app-main"${enhance ? html` data-enhance` : ''}>
         ${body}
     </main>
     ${feedback}
 </div>
 <script src="/js/layout.js"></script>
+<script src="/js/morph.js"></script>
+<script src="/js/enhance.js"></script>
 <script src="/js/feedback.js"></script>
 ${designer && html`<script src="/tools/designer.js"></script>`}
 ${scripts}

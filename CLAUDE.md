@@ -30,6 +30,12 @@
   `namespace` or constructor parameter properties – use union types and plain fields.
 - Fastify (HTTP), server-rendered HTML with our `html` tagged template (`src/web/html.ts`), Bootstrap 5,
   plain browser JS in `public/js/` (`// @ts-check` + JSDoc types, no bundler, no front-end framework, no htmx).
+- No full page reloads for in-page actions (decided 2026-11-11: "I do not want to see this flashing"). Use
+  JavaScript freely for this: actions go through `fetch()`, and the page is updated in place with the morph helper
+  (`public/js/morph.js`) – never by replacing big chunks with `innerHTML`/`outerHTML` or by reloading. Server-rendered
+  pages with links/forms opt in with `sendPage(…, { enhance: true })` (`public/js/enhance.js`); the plain link/form
+  behaviour stays as the no-JavaScript fallback. Moving to *another* page may still load normally. Prove it with a
+  Playwright test (see `test/e2e/no-flash.spec.ts`: a `window` marker survives, unchanged elements stay the same nodes).
 - SQLite via better-sqlite3 + Kysely. WebSocket via `@fastify/websocket`. Tests: `node:test`, Playwright for a
   few end-to-end tests.
 

@@ -11,5 +11,5 @@
     "noEmit": true,
     "strict": true
   },
-  "include": ["*.js"]
+  "include": ["*.js", "globals.d.ts"]
 }

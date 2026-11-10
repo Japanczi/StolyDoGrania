@@ -16,6 +16,10 @@ export default defineConfig({
     command: 'node test/e2e/start-server.ts',
     url: `http://localhost:${port}/health`,
     reuseExistingServer: false,
-    env: { NODE_ENV: 'development', PORT: String(port), HOST: '127.0.0.1', DATABASE_PATH: 'data/e2e.db', LOG_LEVEL: 'warn', PUBLIC_URL: `http://localhost:${port}` },
+    env: {
+      NODE_ENV: 'development', PORT: String(port), HOST: '127.0.0.1', DATABASE_PATH: 'data/e2e.db', LOG_LEVEL: 'warn', PUBLIC_URL: `http://localhost:${port}`,
+      // A throw-away Owner account for the admin tests (this database is deleted before every run).
+      ADMIN_USER_NAME: 'Szef', ADMIN_EMAIL: 'szef@example.com', ADMIN_PASSWORD: 'gracz',
+    },
   },
 });

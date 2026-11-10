@@ -32,10 +32,11 @@ export function logsRoutes(app: FastifyInstance, deps: { db: Db }): void {
       request.log.error(error);
       const empty: LogPage = { rows: [], total: 0, page: 0, pageCount: 1 };
       return sendPage(request, reply, {
+        enhance: true,
         title: 'Dziennik',
         body: logsPage({ data: empty, action, search, error: 'Nie udało się wczytać dziennika.' }),
       });
     }
-    return sendPage(request, reply, { title: 'Dziennik', body: logsPage({ data, action, search }) });
+    return sendPage(request, reply, { title: 'Dziennik', enhance: true, body: logsPage({ data, action, search }) });
   });
 }

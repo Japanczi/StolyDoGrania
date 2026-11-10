@@ -18,7 +18,7 @@ declare module 'fastify' {
 export function sendPage(
   request: FastifyRequest,
   reply: FastifyReply,
-  page: { title: string; body: SafeHtml; head?: SafeHtml; scripts?: SafeHtml },
+  page: { title: string; body: SafeHtml; head?: SafeHtml; scripts?: SafeHtml; enhance?: boolean },
   statusCode = 200,
 ): FastifyReply {
   const user = request.user;
@@ -32,6 +32,7 @@ export function sendPage(
     ...(page.scripts ? { scripts: page.scripts } : {}),
     feedback: feedbackBox(request),
     designer: request.server.isDevelopment,
+    enhance: page.enhance === true,
   });
   return reply.code(statusCode).type('text/html; charset=utf-8').send(document.value);
 }

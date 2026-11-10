@@ -57,6 +57,7 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     }));
     const flash = takeFlash(request, reply);
     return sendPage(request, reply, {
+      enhance: true,
       title: 'Użytkownicy',
       scripts: html`<script src="/js/admin-users.js"></script>`,
       body: usersPage(request, {
