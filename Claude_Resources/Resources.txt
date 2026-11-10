@@ -1,11 +1,11 @@
 Planszówkarz – Node rewrite: branch spec (rewrite/node)
 
-This is the spec for the Node version of the app on branch rewrite/node. It is versioned with the branch
-(Claude_Resources/ is git-ignored, so the main spec can't live here).
+This is the spec for the Node version of the app on branch rewrite/node. On this branch Resources.txt is
+tracked by git (un-ignored in .gitignore); the rest of Claude_Resources/ stays ignored.
 
 How the two specs fit together:
-- Features, wording, layout and rules: the MAIN spec, C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\Resources.txt,
-  and the design log Claude_Resources/Design/ApplicationDesign.md (main checkout). They apply unchanged to the Node app
+- Features, wording, layout and rules: the MAIN spec, i.e. the untracked Resources.txt in the main checkout
+  (C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\Resources.txt, same path, different file), and the design log Claude_Resources/Design/ApplicationDesign.md (main checkout). They apply unchanged to the Node app
   unless this file says otherwise. Don't copy them here; point to them.
 - This file: what is different in the Node app, technical decisions, and the rewrite's status. Decisions made in
   conversation about the Node app are written back here, in the same work.

@@ -8,10 +8,11 @@
 - Never merge to or change `master`, never deploy, never touch the live server until the user has approved the
   fully working local app (brief phase 5). Work phase by phase; stop and show the user after each phase.
 - The .NET app stays in the repo root as the reference implementation. Don't edit it on this branch.
-- `Claude_Resources/` is git-ignored and not in worktrees: read the spec, design log and feedback from the main
-  checkout by absolute path (`C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\`).
-- The branch's own spec is `docs/rewrite/Resources.txt`: Node-specific decisions, differences from the main spec,
-  and phase status. When a decision about the Node app is made in conversation, write it back there in the same
+- `Claude_Resources/` is git-ignored (except `Tools/` and, on this branch, `Resources.txt`) and mostly not in
+  worktrees: read the main spec, design log, brief and feedback from the main checkout by absolute path
+  (`C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\`).
+- The branch's own spec is `Claude_Resources/Resources.txt` in this branch (tracked): Node-specific decisions,
+  differences from the main spec, and phase status. When a decision about the Node app is made in conversation, write it back there in the same
   work. Features and wording still come from the main spec unless the branch spec says otherwise.
 
 ## Goal: learning

@@ -38,5 +38,5 @@ by links to the real files when they exist.
 ## Related documents
 
 - Phase 0 proposal (the choices these notes explain): [`docs/rewrite/phase0-proposal.md`](../rewrite/phase0-proposal.md)
-- The branch's spec (decisions and phase status): [`docs/rewrite/Resources.txt`](../rewrite/Resources.txt)
+- The branch's spec (decisions and phase status): [`Claude_Resources/Resources.txt`](../../Claude_Resources/Resources.txt)
 - The brief (main checkout, git-ignored): `Claude_Resources/Rewrite/NodeRewrite.md`

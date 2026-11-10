@@ -365,9 +365,10 @@ FodyWeavers.xsd
 # Local secrets
 BGGToken.txt
 
-# Local reference material for Claude (design tool files are versioned)
+# Local reference material for Claude (design tool files and the spec Resources.txt are versioned)
 Claude_Resources/*
 !Claude_Resources/Tools/
+!Claude_Resources/Resources.txt
 # Saved page designs are working files, not history.
 Claude_Resources/Tools/Designs/
 
