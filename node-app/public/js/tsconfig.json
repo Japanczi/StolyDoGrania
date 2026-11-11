@@ -1,0 +1,15 @@
+{
+  // Type-checks the plain browser scripts in this folder (each starts with // @ts-check).
+  // Separate from the server's tsconfig because the browser has the DOM and no Node APIs.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": [],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true
+  },
+  "include": ["*.js", "globals.d.ts"]
+}
