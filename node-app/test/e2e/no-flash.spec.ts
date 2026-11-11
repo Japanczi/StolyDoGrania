@@ -89,3 +89,20 @@ test('"Pokaż e-mail" fetches one address in place: no reload; an in-place updat
   await expect(row.getByText('gracz1@example.com')).toHaveCount(0);
   expect(await stillSamePage(szef)).toBe(true);
 });
+
+test('changing your own user name on "Profil" saves in place: no reload, the field keeps the new name', async ({ browser }) => {
+  const page = await loggedIn(browser, 'Małgorzata Szczepańska-Dąbrowska');
+  await page.goto('/Account/Manage');
+  await mark(page);
+
+  const name = page.getByLabel('Nazwa użytkownika');
+  await name.fill('a@b');
+  await page.getByRole('button', { name: 'Zapisz' }).click();
+  await expect(page.getByText(/Nazwa użytkownika: 3–20 znaków/).first()).toBeVisible();
+
+  await name.fill('Gosia S');
+  await page.getByRole('button', { name: 'Zapisz' }).click();
+  await expect(page.getByText('Profil został zaktualizowany.')).toBeVisible();
+  await expect(name).toHaveValue('Gosia S');
+  expect(await stillSamePage(page)).toBe(true);
+});

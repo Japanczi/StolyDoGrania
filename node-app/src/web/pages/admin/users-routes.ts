@@ -9,11 +9,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../../../config.ts';
 import type { Db } from '../../../db/database.ts';
-import { createUser, deleteUser, findUserById, isUniqueViolation, setRole, setUserName, type User } from '../../../db/queries/users.ts';
+import type { LiveHub } from '../../../live/hub.ts';
+import { createUser, deleteUser, findUserById, renameUser, setRole, type User } from '../../../db/queries/users.ts';
 import type { Role } from '../../../db/schema.ts';
 import { passwordStrengthErrors } from '../../../domain/password-policy.ts';
 import { canManage, isAdminRole } from '../../../domain/roles.ts';
-import { normalizeUserName, shortName } from '../../../domain/user-name.ts';
+import { normalizeUserName } from '../../../domain/user-name.ts';
 import { hashPassword } from '../../../auth/password-hash.ts';
 import { field, hasErrors, readForm, setFlash, takeFlash, type FieldErrors } from '../../forms.ts';
 import { html } from '../../html.ts';
@@ -25,8 +26,8 @@ export const protectedAdminHint = 'Tylko główny administrator (Owner) może od
 export const protectedRenameHint = 'Tylko główny administrator (Owner) może zmienić nazwę konta administratora.';
 const assignable: readonly Role[] = ['admin', 'user'];
 
-export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db }): void {
-  const { db, config } = deps;
+export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db; hub: LiveHub }): void {
+  const { db, config, hub } = deps;
 
   /** The logged-in admin, re-read from the database; null if not logged in or not an admin (normal user mode included). */
   async function adminFromDb(request: FastifyRequest): Promise<User | null> {
@@ -157,7 +158,7 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     if (!me) return reply;
     const id = (request.params as Record<string, string>).id ?? '';
     const done = (message: string) => { setFlash(reply, message); return reply.redirect('/admin/users', 303); };
-    if (id === me.id) return done('Błąd: Nie możesz zmienić tutaj własnej nazwy użytkownika.');
+    if (id === me.id) return done('Błąd: Własną nazwę użytkownika zmienisz w Profilu.');
     const target = await findUserById(db, id);
     if (!target) return done('Błąd: Nie znaleziono użytkownika.');
     if (!canManage(target.role, me.role === 'owner')) {
@@ -172,22 +173,11 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     const newName = normalizeUserName(raw);
     if (newName === target.user_name) return reply.redirect('/admin/users', 303);
 
-    let renamed = false;
-    try {
-      renamed = await db.transaction().execute(async trx => {
-        if (!(await setUserName(trx, target.id, newName, shortName(newName)))) return false;
-        await trx.insertInto('user_action_logs').values({
-          created_utc: new Date().toISOString(), action: 'UserRenamed', actor_user_id: me.id, actor_name: me.user_name,
-          target_user_id: target.id, target_name: newName, play_table_id: null, details: `${target.user_name} → ${newName}`,
-        }).execute();
-        return true;
-      });
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
-    }
-    if (!renamed) {
+    if (!(await renameUser(db, target, newName, me))) {
       return show(request, reply, me, { error: 'Ta nazwa użytkownika jest już zajęta.', renameId: id, values: { UserName: raw } });
     }
+    // Open boards refresh, so the user's seats show the new name.
+    hub.notify({ tableId: null });
     return done(`Zmieniono nazwę użytkownika ${target.user_name} na ${newName}.`);
   });
 

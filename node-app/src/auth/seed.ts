@@ -3,7 +3,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { Config } from '../config.ts';
 import type { Db } from '../db/database.ts';
-import { createUser, findUserByUserName, setRole } from '../db/queries/users.ts';
+import { createUser, findUserByEmail, findUserByUserName, setRole } from '../db/queries/users.ts';
 import { passwordStrengthErrors } from '../domain/password-policy.ts';
 import { hashPassword } from './password-hash.ts';
 
@@ -34,7 +34,8 @@ async function seedOwner(db: Db, config: Config, log: FastifyBaseLogger): Promis
     log.warn('ADMIN_USER_NAME / ADMIN_EMAIL / ADMIN_PASSWORD not set – skipping the Owner account.');
     return;
   }
-  const existing = await findUserByUserName(db, seed.userName);
+  // By e-mail too: the Owner may have changed their user name in the profile since.
+  const existing = await findUserByUserName(db, seed.userName) ?? await findUserByEmail(db, seed.email);
   if (existing) {
     if (existing.role !== 'owner') {
       await setRole(db, existing.id, 'owner');
@@ -56,11 +57,12 @@ async function seedOwner(db: Db, config: Config, log: FastifyBaseLogger): Promis
 
 async function seedTestUsers(db: Db, log: FastifyBaseLogger): Promise<void> {
   for (const [i, userName] of testUserNames.entries()) {
-    if (await findUserByUserName(db, userName)) {
+    const email = `gracz${i + 1}@example.com`;
+    if (await findUserByUserName(db, userName) ?? await findUserByEmail(db, email)) {
       continue;
     }
     const created = await createUser(db, {
-      userName, email: `gracz${i + 1}@example.com`, passwordHash: await hashPassword(testUserPassword), emailConfirmed: true, role: 'user',
+      userName, email, passwordHash: await hashPassword(testUserPassword), emailConfirmed: true, role: 'user',
     });
     if (!created.ok) {
       log.error(`Could not create test user ${userName}: ${created.taken} already taken.`);

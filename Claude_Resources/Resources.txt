@@ -120,6 +120,12 @@ Accounts / user names (decided 2026-11-08):
 - The admin "Dodaj użytkownika" form also asks for a user name, with the same rules as registration.
 - Changing the e-mail in the profile doesn't change the user name. Older accounts whose user name is their
   e-mail keep both in sync (and keep showing the part before '@').
+- NEW (requested 2026-11-11): every user can change their own user name on "Profil" (/Account/Manage; the field
+  was read-only before), admins and the Owner included. Same rules as registration and unique. Saved together with
+  the phone number ("Zapisz"); with any field error nothing is saved. Their seats show the new name, open boards
+  refresh, and it's logged in Dziennik as UserRenamed (actor = the user, under the new name). The page saves in
+  place (no reload). The Owner and the development test users are found by e-mail at startup too, so a renamed
+  account isn't created again.
 
 E-mail (account confirmation, password reset):
 - Sent over SMTP with MailKit (Data/Email/MailKitEmailSender.cs); settings in the "Email" config section.

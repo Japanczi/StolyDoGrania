@@ -81,10 +81,10 @@ export async function buildApp({ config, db, mailer, bgg, hub, normalUserMode }:
   feedbackRoutes(app, { dir: config.feedbackDir });
   // Development only: the route isn't registered at all otherwise.
   designerRoutes(app, { dir: config.designsDir, enabled: config.environment === 'development' });
-  usersRoutes(app, { config, db });
+  usersRoutes(app, { config, db, hub: liveHub });
   logsRoutes(app, { db });
   accountRoutes(app, { config, db, mailer: emailSender });
-  manageRoutes(app, { config, db, mailer: emailSender });
+  manageRoutes(app, { config, db, mailer: emailSender, hub: liveHub });
 
   // Unknown URL → Polish 404 page (UseStatusCodePagesWithReExecute("/not-found") in .NET).
   app.setNotFoundHandler(async (request, reply) =>

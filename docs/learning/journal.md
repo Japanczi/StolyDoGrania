@@ -256,3 +256,21 @@ HTML now applies to our updates too.
 
 **Lesson.** Things between the server and the browser (CDN, proxy) are part of the system; test in-place updates
 behind them too, not only locally.
+
+---
+
+## Own user name in the profile (2026-11-11)
+
+**What happened.** The "Nazwa użytkownika" field on Profil was read-only (as in the .NET Identity template); now
+everyone can change their own name there. The admin rename and the profile share one query function,
+`renameUser()` in `db/queries/users.ts`: the new name, the seats' names and the Dziennik entry are written in one
+transaction (like `await using var tx = await db.Database.BeginTransactionAsync()` in EF Core), and a UNIQUE-index
+error from a race maps to "name taken". Both now also tell open boards to refresh (`hub.notify`), so seats show the
+new name at once – the admin rename didn't do that before. The Profil page opted into `enhance` (no reload).
+
+**Caught before it shipped.** The startup seed looked the Owner up by user name only. After an Owner renamed
+themselves, the next restart would not find them and try to create the account again (refused, since the e-mail is
+taken, but logged as an error every start). The seed now falls back to the e-mail. Identity's seeder had the same
+weakness; it never showed because the .NET app never let anyone change their name.
+
+**Lesson.** When something that used to be fixed becomes editable, look for code that used it as a key.

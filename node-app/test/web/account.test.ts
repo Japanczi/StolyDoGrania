@@ -263,13 +263,46 @@ describe('profile pages', () => {
     const b = new TestBrowser(app);
     await b.login('Jan Nowak', 'haslo1');
 
-    assert.match((await b.post('/Account/Manage', { PhoneNumber: 'abc' })).body, /Podaj prawidłowy numer telefonu\./);
-    const res = await b.post('/Account/Manage', { PhoneNumber: '+48 600 100 200' });
+    assert.match((await b.post('/Account/Manage', { UserName: 'Jan Nowak', PhoneNumber: 'abc' })).body, /Podaj prawidłowy numer telefonu\./);
+    const res = await b.post('/Account/Manage', { UserName: 'Jan Nowak', PhoneNumber: '+48 600 100 200' });
     assert.equal(res.headers.location, '/Account/Manage');
     const page = await b.get('/account/manage');
     assert.match(page.body, /Profil został zaktualizowany\./);
     assert.match(page.body, /value="\+48 600 100 200"/);
     assert.doesNotMatch((await b.get('/Account/Manage')).body, /Profil został zaktualizowany/, 'the message shows once');
+  });
+
+  test('everyone may change their own user name: normalised, seats follow, logged, login works with the new name', async t => {
+    const { app, db, close } = await createTestApp();
+    t.after(close);
+    const jan = await addUser(db, 'Jan Nowak', 'haslo1');
+    await addUser(db, 'Ola', 'haslo1');
+    const gameId = (await db.insertInto('games').values({ name: 'Gra', kind: 'small', weight: '0', max_players: 4, bgg_url: null, bgg_id: null, year_published: null, cover: null, cover_type: null }).returning('id').executeTakeFirstOrThrow()).id;
+    const tableId = (await db.insertInto('play_tables').values({ game_id: gameId, game_title: null, start_hour: null, max_players: 4, kind: 'small', owner_user_id: null, taken_slots: 0 }).returning('id').executeTakeFirstOrThrow()).id;
+    await db.insertInto('table_slots').values({ play_table_id: tableId, slot_number: 1, participant_name: 'Jan Nowak', user_id: jan.id }).execute();
+    const b = new TestBrowser(app);
+    await b.login('Jan Nowak', 'haslo1');
+
+    assert.match((await b.get('/Account/Manage')).body, /name="UserName" id="UserName" value="Jan Nowak"/);
+    // Errors: nothing is saved, not even a valid phone number sent with them.
+    const bad = await b.post('/Account/Manage', { UserName: 'x@y', PhoneNumber: '600100200' });
+    assert.match(bad.body, /Nazwa użytkownika: 3–20 znaków/);
+    assert.match(bad.body, /value="x@y"/, 'what was typed stays in the field');
+    assert.match((await b.post('/Account/Manage', { UserName: 'ola', PhoneNumber: '' })).body, /Ta nazwa użytkownika jest już zajęta\./);
+    assert.equal((await findUserByUserName(db, 'Jan Nowak'))?.phone_number, null);
+
+    const res = await b.post('/Account/Manage', { UserName: '  Janek   N ', PhoneNumber: '' });
+    assert.equal(res.headers.location, '/Account/Manage');
+    assert.equal((await findUserByUserName(db, 'janek n'))?.id, jan.id);
+    const seat = await db.selectFrom('table_slots').select('participant_name').where('user_id', '=', jan.id).executeTakeFirstOrThrow();
+    assert.equal(seat.participant_name, 'Janek N');
+    const log = await db.selectFrom('user_action_logs').select(['action', 'actor_name', 'target_name', 'details']).execute();
+    assert.deepEqual(log, [{ action: 'UserRenamed', actor_name: 'Janek N', target_name: 'Janek N', details: 'Jan Nowak → Janek N' }]);
+
+    // Saving again with the same name changes nothing and logs nothing.
+    await b.post('/Account/Manage', { UserName: 'Janek N', PhoneNumber: '' });
+    assert.equal((await db.selectFrom('user_action_logs').select('id').execute()).length, 1);
+    assert.equal((await new TestBrowser(app).login('Janek N', 'haslo1')).statusCode, 303);
   });
 
   test('change password: wrong old password refused; success keeps this session, ends the others', async t => {
@@ -381,5 +414,17 @@ describe('seeding', () => {
     }
     await seedAccounts(db, { ...config, environment: 'development' }, log);
     assert.equal((await db.selectFrom('users').select('id').execute()).length, 5, 'running twice adds nothing');
+  });
+
+  test('a renamed Owner or test user is found by e-mail: nothing is created again', async t => {
+    const { db, close } = await createTestApp();
+    t.after(close);
+    const config = { ...testConfig, environment: 'development' as const, adminSeed: { userName: 'Szef', email: 'szef@example.com', password: 'tajne1' } };
+    await seedAccounts(db, config, log);
+    await db.updateTable('users').set({ user_name: 'Nowy Szef', normalized_user_name: 'NOWY SZEF' }).where('email', '=', 'szef@example.com').execute();
+    await db.updateTable('users').set({ user_name: 'Janek', normalized_user_name: 'JANEK' }).where('email', '=', 'gracz1@example.com').execute();
+    await seedAccounts(db, config, log);
+    assert.equal((await db.selectFrom('users').select('id').execute()).length, 5);
+    assert.equal((await findUserByUserName(db, 'Nowy Szef'))?.role, 'owner');
   });
 });

@@ -45,7 +45,7 @@ window.morph.morphElement(row, window.morph.parseFragment(html).firstElementChil
 
 ## enhance.js: links and forms without reloads
 
-For server-rendered pages (users page, Baza gier, Dziennik), `<main data-enhance>` turns on a small script that
+For server-rendered pages (users page, Baza gier, Dziennik, the "Profil" page), `<main data-enhance>` turns on a small script that
 intercepts clicks on links and form submits inside it:
 
 1. sends the same request with `fetch()` – a GET for links and search forms, a POST for forms (the hidden `_csrf`
