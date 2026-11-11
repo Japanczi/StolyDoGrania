@@ -1,4 +1,4 @@
-// Profile pages (/Account/Manage/*): phone number, e-mail change, password change/set, personal data.
+// Profile pages (/Account/Manage/*): user name and phone number, e-mail change, password change/set, personal data.
 // All need a logged-in user. Ports of Components/Account/Pages/Manage/*.razor, ConfirmEmailChange.razor and
 // the DownloadPersonalData endpoint.
 
@@ -7,27 +7,28 @@ import { hashPassword, verifyPassword } from '../../../auth/password-hash.ts';
 import { clearSessionCookie } from '../../../auth/request-auth.ts';
 import { deleteUserSessions } from '../../../auth/sessions.ts';
 import { consumeUserToken, createUserToken, deleteUserTokens } from '../../../db/queries/user-tokens.ts';
-import { changeEmail, deleteUser, findUserById, setPasswordHash, setPhoneNumber, type User } from '../../../db/queries/users.ts';
-import { normalizeKey } from '../../../domain/user-name.ts';
+import { changeEmail, deleteUser, findUserById, renameUser, setPasswordHash, setPhoneNumber, type User } from '../../../db/queries/users.ts';
+import { normalizeKey, normalizeUserName } from '../../../domain/user-name.ts';
+import type { LiveHub } from '../../../live/hub.ts';
 import { passwordStrengthErrors } from '../../../domain/password-policy.ts';
 import { confirmAccountEmail, confirmEmailChangeEmail } from '../../../integrations/email/account-emails.ts';
 import type { SafeHtml } from '../../html.ts';
 import { addError, field, hasErrors, readForm, setFlash, takeFlash, type FieldErrors } from '../../forms.ts';
 import { pathOf, requireUser, sendPage } from '../../respond.ts';
 import type { AccountDeps } from './routes.ts';
-import { checkEmail, checkNewPassword, checkRequired, errorLine } from './validation.ts';
+import { checkEmail, checkNewPassword, checkRequired, checkUserName, errorLine } from './validation.ts';
 import {
   changePasswordPage, deletePersonalDataPage, emailPage, manageLayout, personalDataPage, profilePage, setPasswordPage,
 } from './manage-views.ts';
-import { emptyForm, resultPage } from './views.ts';
+import { emptyForm, resultPage, type FormState } from './views.ts';
 
 type Query = Record<string, string | undefined>;
 
 // Digits, spaces, "+", "-", ".", "()" – roughly what .NET's [Phone] attribute accepts.
 const phonePattern = /^\+?[0-9 ().-]{3,30}$/;
 
-export function manageRoutes(app: FastifyInstance, deps: AccountDeps): void {
-  const { config, db, mailer } = deps;
+export function manageRoutes(app: FastifyInstance, deps: AccountDeps & { hub: LiveHub }): void {
+  const { config, db, mailer, hub } = deps;
   const strictPasswords = config.environment === 'production';
   const link = (path: string, params: Record<string, string>) =>
     `${config.publicUrl}${path}?${new URLSearchParams(params).toString()}`;
@@ -55,23 +56,46 @@ export function manageRoutes(app: FastifyInstance, deps: AccountDeps): void {
     return reply.redirect(pathOf(request.url), 303);
   };
 
-  // ---------- profile (phone number) ----------
+  // ---------- profile (user name, phone number) ----------
+
+  /** "Profil" saves in place (enhance.js): no reload when the form is sent. The other profile pages still reload. */
+  const profilePageFor = (request: FastifyRequest, reply: FastifyReply, user: User, s: FormState) =>
+    sendPage(request, reply, {
+      title: 'Profil', enhance: true, body: manageLayout(pathOf(request.url), profilePage(request, user, s)),
+    });
 
   app.get('/Account/Manage', async (request, reply) => {
     const user = await currentUser(request, reply);
     if (!user) return reply;
-    return page(request, reply, 'Profil', profilePage(request, user, { ...emptyForm, message: takeFlash(request, reply) }));
+    return profilePageFor(request, reply, user, { ...emptyForm, message: takeFlash(request, reply) });
   });
 
+  /**
+   * Saves the user name and the phone number. Everyone may change their own user name (requested 2026-11-11):
+   * the registration rules apply (3–20 characters, normalised, no '@', unique), their seats show the new name
+   * and it's logged in Dziennik (UserRenamed). Nothing is saved while any field has an error.
+   */
   app.post('/Account/Manage', async (request, reply) => {
     const user = await currentUser(request, reply);
     if (!user) return reply;
     const form = readForm(request.body);
     const errors: FieldErrors = {};
+    const rawName = checkUserName(form, errors);
     const phone = field(form, 'PhoneNumber').trim();
     if (phone !== '' && !phonePattern.test(phone)) {
       addError(errors, 'PhoneNumber', 'Podaj prawidłowy numer telefonu.');
-      return page(request, reply, 'Profil', profilePage(request, user, { values: form, errors, message: null }));
+    }
+    const again = () => profilePageFor(request, reply, user, { values: form, errors, message: null });
+    if (hasErrors(errors)) return again();
+
+    const newName = normalizeUserName(rawName);
+    if (newName !== user.user_name) {
+      if (!(await renameUser(db, user, newName, user))) {
+        addError(errors, 'UserName', 'Ta nazwa użytkownika jest już zajęta.');
+        return again();
+      }
+      // Open boards refresh, so the user's seats show the new name.
+      hub.notify({ tableId: null });
     }
     await setPhoneNumber(db, user.id, phone === '' ? null : phone);
     return done(request, reply, 'Profil został zaktualizowany.');

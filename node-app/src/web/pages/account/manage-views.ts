@@ -44,7 +44,9 @@ ${statusMessage(s.message)}
         <form method="post" novalidate>
             ${csrfField(request)}
             ${validationSummary(s.errors)}
-            ${floatingInput({ name: 'username', label: 'Nazwa użytkownika', value: user.user_name, placeholder: 'Wybierz nazwę użytkownika.', disabled: true })}
+            ${floatingInput({ name: 'UserName', label: 'Nazwa użytkownika', value: s.values.UserName ?? user.user_name, placeholder: 'Wybierz nazwę użytkownika.',
+                autocomplete: 'username', errors: s.errors,
+                help: 'Widoczna dla innych graczy, także przy Twoich miejscach przy stołach. 3–20 znaków: litery, cyfry, spacje, „.”, „_”, „-”.' })}
             ${floatingInput({ name: 'PhoneNumber', label: 'Numer telefonu', type: 'tel', value: s.values.PhoneNumber ?? user.phone_number ?? '', placeholder: 'Podaj numer telefonu', errors: s.errors })}
             <button type="submit" class="w-100 btn btn-lg btn-primary">Zapisz</button>
         </form>

@@ -2,7 +2,7 @@
 
 import type { Selectable } from 'kysely';
 import { newUserId } from '../../auth/random.ts';
-import { normalizeKey } from '../../domain/user-name.ts';
+import { normalizeKey, shortName } from '../../domain/user-name.ts';
 import type { Db } from '../database.ts';
 import type { Role, UsersTable } from '../schema.ts';
 
@@ -130,6 +130,31 @@ export async function setUserName(db: Db, userId: string, userName: string, seat
     .execute();
   await db.updateTable('table_slots').set({ participant_name: seatName }).where('user_id', '=', userId).execute();
   return true;
+}
+
+/**
+ * Renames a user and logs it (UserRenamed, "old → new") in one transaction; their seats show the new name.
+ * Used by the admin users page and by the profile page (own name). `newName` must already be validated and
+ * normalised. Returns false when another account has the name (checked first, and by the UNIQUE index for races).
+ */
+export async function renameUser(
+  db: Db, target: Pick<User, 'id' | 'user_name'>, newName: string, actor: Pick<User, 'id' | 'user_name'>,
+): Promise<boolean> {
+  try {
+    return await db.transaction().execute(async trx => {
+      if (!(await setUserName(trx, target.id, newName, shortName(newName)))) return false;
+      await trx.insertInto('user_action_logs').values({
+        created_utc: new Date().toISOString(), action: 'UserRenamed', actor_user_id: actor.id,
+        // An own rename is logged under the new name, as the target is.
+        actor_name: actor.id === target.id ? newName : actor.user_name,
+        target_user_id: target.id, target_name: newName, play_table_id: null, details: `${target.user_name} → ${newName}`,
+      }).execute();
+      return true;
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) return false;
+    throw err;
+  }
 }
 
 export async function setRole(db: Db, userId: string, role: Role): Promise<void> {
