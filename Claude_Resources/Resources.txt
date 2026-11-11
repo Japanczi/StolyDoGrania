@@ -348,6 +348,11 @@ Phase 4 – the rest (decided 2026-11-10):
     Owner or themselves there. Registration rules apply (3–20 characters, normalised, unique, no '@'). The seats the
     user holds show the new name; logged in Dziennik as "Zmiana nazwy użytkownika" (UserRenamed, "old → new").
     The admin permissions note mentions it.
+  - NEW (requested 2026-11-11): e-mail addresses on the users page are hidden by default; each row has a
+    "Pokaż e-mail" button that loads that one address from the database (GET /admin/users/:id/email, JSON, admins
+    only, re-checked against the database, no-store). Reason: Cloudflare's e-mail obfuscation rewrote addresses in
+    the HTML fetched for in-place updates into "[email protected]". Without JavaScript the button is a link to
+    /admin/users?email=<id>. Any later in-place update of the page hides the address again.
   - Baza gier search/sort, Dziennik filter/search/page are in the URL (?q=…&sort=…, ?action=…&q=…&page=…).
   - The weekly reset uses Europe/Warsaw explicitly (Temporal), not the server's zone.
   - Feedback download: the zip, then the page asks the server to delete exactly the files that were in it.

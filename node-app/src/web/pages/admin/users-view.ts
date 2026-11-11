@@ -1,12 +1,18 @@
 // Template of "Użytkownicy" (/admin/users). Port of the markup in Components/Pages/Admin/Users.razor.
-// E-mail addresses are shown here because the page is admin-only (never publicly).
+// E-mail addresses are admin-only and hidden until asked for: each row has a "Pokaż e-mail" button
+// (public/js/admin-users.js fetches the address as JSON); without JavaScript it's a link to ?email=<id>.
 
 import type { FastifyRequest } from 'fastify';
 import type { Role } from '../../../db/schema.ts';
 import { csrfField, validationSummary, type FieldErrors } from '../../forms.ts';
 import { html, type SafeHtml } from '../../html.ts';
 
-export type UserRow = { id: string; userName: string; email: string; role: Role; isSelf: boolean; manageable: boolean };
+export type UserRow = {
+  id: string; userName: string;
+  /** Only the address asked for with ?email=<id>; null = hidden behind the "Pokaż e-mail" button. */
+  email: string | null;
+  role: Role; isSelf: boolean; manageable: boolean;
+};
 
 const hint = 'Tylko główny administrator (Owner) może odebrać rolę administratora lub usunąć jego konto.';
 const assignable = [['admin', 'Admin'], ['user', 'User']] as const;
@@ -75,7 +81,7 @@ function row(request: FastifyRequest, u: UserRow, confirming: boolean, renaming:
                 </form>`
               : html`${u.userName} ${u.isSelf && html`<span class="badge text-bg-secondary">to Ty</span>`}
                 ${u.manageable && html`<a class="btn btn-sm btn-link p-0 ms-1" href="/admin/users?zmien=${u.id}" title="Zmień nazwę użytkownika">Zmień nazwę</a>`}`}</td>
-            <td>${u.email}</td>
+            <td>${u.email ?? html`<a class="btn btn-sm btn-outline-secondary" href="/admin/users?email=${u.id}" data-show-email="${u.id}" data-no-enhance>Pokaż e-mail</a>`}</td>
             <td>${u.role === 'owner'
               ? html`<span class="badge text-bg-warning" title="Główny administrator">Owner</span>`
               : html`<form method="post" action="/admin/users/${u.id}/role" class="m-0">

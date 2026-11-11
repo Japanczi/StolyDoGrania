@@ -95,6 +95,33 @@ describe('admin users page', () => {
     await (await s.as('Adam')).post(`/admin/users/${s.user.id}/role`, { Role: 'admin' });
     assert.match((await gracz.get('/')).body, /href="\/admin\/users"/);
   });
+
+  test('e-mail addresses are hidden behind "Pokaż e-mail"; only admins can fetch one', async t => {
+    const s = await setUp();
+    t.after(s.close);
+    const adam = await s.as('Adam');
+    const page = (await adam.get('/admin/users')).body;
+    assert.doesNotMatch(page, /@example\.com/, 'no address in the page by default');
+    assert.match(page, new RegExp(`href="/admin/users\\?email=${s.user.id}" data-show-email="${s.user.id}" data-no-enhance>Pokaż e-mail<`));
+
+    const answer = await adam.get(`/admin/users/${s.user.id}/email`);
+    assert.deepEqual(answer.json(), { ok: true, email: 'gracz@example.com' });
+    assert.equal(answer.headers['cache-control'], 'no-store');
+    assert.equal((await adam.get('/admin/users/no-such-id/email')).statusCode, 404);
+
+    // The no-JavaScript fallback shows just that one address.
+    const fallback = (await adam.get(`/admin/users?email=${s.user.id}`)).body;
+    assert.match(fallback, /<td>gracz@example\.com<\/td>/);
+    assert.doesNotMatch(fallback, /szef@example\.com/);
+
+    for (const who of [new TestBrowser(s.app), await s.as('Gracz')]) {
+      const refused = await who.get(`/admin/users/${s.owner.id}/email`);
+      assert.equal(refused.statusCode, 403);
+      assert.doesNotMatch(refused.body, /@/);
+    }
+    await adam.postJson('/api/admin/normal-user-mode', { active: true });
+    assert.equal((await adam.get(`/admin/users/${s.user.id}/email`)).statusCode, 403, 'not in normal user mode either');
+  });
 });
 
 describe('normal user mode', () => {
