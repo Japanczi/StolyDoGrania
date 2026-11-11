@@ -81,6 +81,15 @@ and have now rebuilt in a small, visible form.
 - An input's *current* value lives in a property, not the `value` attribute – morph copies it explicitly, except for the
   field being typed in.
 - After a POST that re-shows the form (a validation error), the address bar must not change to the POST's URL.
+- **A proxy can rewrite the HTML you fetch.** In production the site sits behind Cloudflare, whose "Email Address
+  Obfuscation" replaces every e-mail address in an HTML response with `[email protected]` and adds a script that
+  decodes them – once, on page load. Full page loads looked fine; HTML fetched by `enhance.js` and morphed in stayed
+  encoded. Our fix: the users page no longer puts addresses in its HTML at all. A "Pokaż e-mail" button asks
+  `GET /admin/users/:id/email` and gets **JSON** (Cloudflare only rewrites `text/html`), and the script writes it with
+  `textContent`. Other ways out: wrap the address in `<!--email_off-->…<!--email_on-->`, send
+  `Cache-Control: no-transform`, or switch the feature off in the Cloudflare dashboard.
+  The old Blazor page never hit this: its updates came over the SignalR WebSocket, which Cloudflare doesn't rewrite.
+  - Docs: https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/
 
 ## Official docs
 

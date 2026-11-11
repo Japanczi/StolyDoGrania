@@ -28,19 +28,18 @@ const assignable: readonly Role[] = ['admin', 'user'];
 export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db }): void {
   const { db, config } = deps;
 
-  /** The acting admin, re-read from the database (null after redirecting). Normal user mode makes role 'user'. */
+  /** The logged-in admin, re-read from the database; null if not logged in or not an admin (normal user mode included). */
+  async function adminFromDb(request: FastifyRequest): Promise<User | null> {
+    if (!request.user || !isAdminRole(request.user.role)) return null;
+    const row = await findUserById(db, request.user.id);
+    return row && isAdminRole(row.role) ? row : null;
+  }
+
+  /** The acting admin for page requests (null after redirecting to the login or "access denied" page). */
   async function actor(request: FastifyRequest, reply: FastifyReply): Promise<User | null> {
-    const sessionUser = requireUser(request, reply);
-    if (!sessionUser) return null;
-    if (!isAdminRole(sessionUser.role)) {
-      void reply.redirect('/Account/AccessDenied', 303);
-      return null;
-    }
-    const row = await findUserById(db, sessionUser.id);
-    if (!row || !isAdminRole(row.role)) {
-      void reply.redirect('/Account/AccessDenied', 303);
-      return null;
-    }
+    if (!requireUser(request, reply)) return null;
+    const row = await adminFromDb(request);
+    if (!row) void reply.redirect('/Account/AccessDenied', 303);
     return row;
   }
 
@@ -49,8 +48,11 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     extra: { errors?: FieldErrors; values?: Record<string, string>; error?: string | null; renameId?: string } = {},
   ) {
     const users = await db.selectFrom('users').select(['id', 'user_name', 'email', 'role']).orderBy('email').execute();
+    // E-mail addresses are hidden behind "Pokaż e-mail" (decided 2026-11-11); only the one asked for with
+    // ?email=<id> (the no-JavaScript fallback of that button) is put into the page.
+    const shownEmailId = String((request.query as Record<string, unknown>).email ?? '');
     const rows: UserRow[] = users.map(u => ({
-      id: u.id, userName: u.user_name, email: u.email, role: u.role,
+      id: u.id, userName: u.user_name, email: u.id === shownEmailId ? u.email : null, role: u.role,
       isSelf: u.id === me.id,
       // Mirrors the checks in the POST handlers, which are what actually enforce them.
       manageable: u.id !== me.id && canManage(u.role, me.role === 'owner'),
@@ -76,6 +78,19 @@ export function usersRoutes(app: FastifyInstance, deps: { config: Config; db: Db
     const me = await actor(request, reply);
     if (!me) return reply;
     return show(request, reply, me);
+  });
+
+  /**
+   * One user's e-mail address as JSON, for the "Pokaż e-mail" button (public/js/admin-users.js). JSON rather than
+   * HTML because Cloudflare's e-mail obfuscation rewrites addresses only in HTML; it also keeps the addresses out of
+   * the page until an admin asks for one. Admin-only, re-checked against the database like every action here.
+   */
+  app.get('/admin/users/:id/email', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    if (!(await adminFromDb(request))) return reply.code(403).send({ ok: false, error: 'Brak dostępu.' });
+    const target = await findUserById(db, (request.params as Record<string, string>).id ?? '');
+    if (!target) return reply.code(404).send({ ok: false, error: 'Nie znaleziono użytkownika.' });
+    return reply.send({ ok: true, email: target.email });
   });
 
   app.post('/admin/users/add', async (request, reply) => {

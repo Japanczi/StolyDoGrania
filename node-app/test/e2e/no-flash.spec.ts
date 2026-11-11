@@ -69,3 +69,23 @@ test('renaming a user on the admin page happens in place: no reload, the address
   await expect(szef.getByText(/Nazwa użytkownika: 3–20 znaków/).first()).toBeVisible();
   expect(await stillSamePage(szef)).toBe(true);
 });
+
+test('"Pokaż e-mail" fetches one address in place: no reload; an in-place update hides it again', async ({ browser }) => {
+  const szef = await loggedIn(browser, 'Szef');
+  await szef.goto('/admin/users');
+  await expect(szef.getByText('gracz1@example.com')).toHaveCount(0);
+  await mark(szef);
+
+  const row = szef.locator('tr', { hasText: 'Jan Nowak' });
+  await row.getByRole('link', { name: 'Pokaż e-mail' }).click();
+  await expect(row.getByText('gracz1@example.com')).toBeVisible();
+  expect(await stillSamePage(szef)).toBe(true);
+  expect(new URL(szef.url()).search).toBe(''); // the JavaScript path, not the ?email= fallback
+
+  // Another action morphs the server's HTML in ("Usuń" only asks for confirmation): the address is hidden again.
+  await row.getByRole('link', { name: 'Usuń' }).click();
+  await expect(row.getByRole('button', { name: 'Potwierdź usunięcie' })).toBeVisible();
+  await expect(row.getByRole('link', { name: 'Pokaż e-mail' })).toBeVisible();
+  await expect(row.getByText('gracz1@example.com')).toHaveCount(0);
+  expect(await stillSamePage(szef)).toBe(true);
+});

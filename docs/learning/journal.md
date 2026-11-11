@@ -239,3 +239,20 @@ existed with `dotnet publish`.
 
 **Surprise.** Everything that mattered for users – passwords, the Owner, the imported sheet tables, covers – came
 across on the first conversion; the hard part of the cutover was tooling, not data.
+
+---
+
+## After going live – hidden e-mails on the users page (2026-11-11)
+
+**What happened.** In production, renaming a user on the admin users page turned every e-mail address into
+"[email protected]". Cause: Cloudflare's e-mail obfuscation rewrites addresses in HTML responses and decodes them only
+on a full page load, and our in-place updates (fetch + morph) bring fresh HTML without that decoding. Addresses are now
+hidden by default; "Pokaż e-mail" fetches one address as JSON (`GET /admin/users/:id/email`, admin-only) and writes it
+into the cell. Details in the no-flash note's pitfalls.
+
+**Different from .NET.** Blazor's updates travelled over SignalR, which a proxy doesn't rewrite, so the .NET app
+never showed the problem. Replacing a framework's transport with plain HTTP means every proxy feature that touches
+HTML now applies to our updates too.
+
+**Lesson.** Things between the server and the browser (CDN, proxy) are part of the system; test in-place updates
+behind them too, not only locally.

@@ -102,6 +102,9 @@
   `test/db/migrations.test.ts`, run `npm run migrate`. Mention every migration explicitly.
 - Run commands from `node-app/`. Node lives in `C:\Program Files\nodejs` (installed 2026-11-10); a shell started
   before that may need it added to PATH.
+- "Let me test": start the dev server yourself (`npm run dev` in `node-app/`, in the background; it migrates, then
+  runs with `--watch`), wait until it listens, then open http://localhost:5180 (`PORT` from `.env`) in my default
+  browser (`Start-Process http://localhost:5180`), not the in-app browser pane. Leave it running for me.
 - Show only changed code (full function when small, otherwise a clear diff). Don't rewrite whole files for small changes.
 - Ask before adding npm packages (say what it does, its .NET counterpart, and whether a Node built-in would do).
 - Before committing: `npm run check` and `npm test` in `node-app/` must pass; run `npm run test:e2e` (Playwright) when the board or its JavaScript changed.
