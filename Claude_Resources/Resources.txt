@@ -378,4 +378,6 @@ Phases and status:
 - 4 The rest (Baza gier, admin pages, Dziennik, toolbox, weekly reset, feedback box, sheet import, page designer,
   migration script on a local copy of app.db) – done 2026-11-10 (issue #6). Next: the user tests and approves the
   whole app locally.
-- 5 Only after approval: merge to master, deploy beside the .NET app on a second port, side-by-side check, switch.
+- 4 approved 2026-11-11 (issue #6, closed by PR #7).
+- 5 Done 2026-11-11: master is the Node app (PR #7); .NET saved on the `dotnet` branch; the public site runs Node
+  (service planszowkarz-node on port 30347); .NET stopped and disabled but installed (switch back: deploy/CUTOVER.md).
