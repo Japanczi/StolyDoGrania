@@ -33,6 +33,7 @@ by links to the real files when they exist.
 | 11 | [Calling BGG: fetch, XML and throttling vs HttpClient](calling-bgg.md) | 3 | `fetch` + `AbortSignal`, a promise queue instead of `SemaphoreSlim`, stateless lookups, checking uploads by content |
 | 12 | [Background jobs: timers vs BackgroundService](background-jobs.md) | 4 | `setInterval` jobs, no overlapping runs, catching up a missed Monday, time zones with Temporal |
 | 13 | [Updating pages without flashing: fetch + morphing](no-flash.md) | 4+ | Why pages flashed, morphing vs Blazor's DOM diffing, links and forms via fetch, proving it with Playwright |
+| 14 | [Building and deploying to Mikrus vs `dotnet publish`](deploying.md) | 5 | What gets copied, Node on the server, the cutover and switching back, deployment pitfalls |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)
@@ -47,10 +48,6 @@ by links to the real files when they exist.
 | `npm run test:e2e` | Browser tests with Playwright (two browsers, live updates) | – (Microsoft.Playwright exists for .NET too) |
 | `npm run migrate` | Apply pending migrations | `dotnet ef database update` |
 | `npm run import-dotnet-db -- <app.db copy> <new.db>` | One-time conversion of the .NET database (cutover) | – |
-
-## Planned notes (added in the phase that introduces them)
-
-- Building and deploying to Mikrus vs `dotnet publish` (phase 5)
 
 ## Related documents
 

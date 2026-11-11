@@ -218,3 +218,24 @@ import agent was cut off by the usage limit halfway and resumed from where it st
 coordination slip between helpers and wiring, not an app bug.
 
 **Surprises.** Node 26 has Temporal built in, and TypeScript 7 already knows its types.
+
+---
+
+## Phase 5 – going live (2026-11-11)
+
+**What happened.** The .NET app was saved on the `dotnet` branch, `master` became the Node app (PR #7, merge commit),
+and the public site switched to Node: trial on port 20347 beside .NET with a converted copy of the live database, then
+a fresh conversion and the switch of port 30347 (a few seconds of downtime). .NET is stopped and disabled but
+installed, so switching back is two commands (deploy/CUTOVER.md). Live data: 2 accounts (incl. the Owner), 10 games,
+5 tables, 14 seats, 11 phrases, 6 log entries.
+
+**Easier than .NET.** The upload is ~17 MB instead of a ~100 MB self-contained build, and there's no build step at all.
+Running both versions side by side on one small server was easy: the Node service uses about 80 MB of RAM
+(systemd's count right after the switch).
+
+**Harder.** Node has to be installed on the server (and needed `libatomic1`), and four small Windows/PowerShell/bash
+quirks broke the first deploy runs (see the learning note on deploying). Each was a one-line fix, but none of them
+existed with `dotnet publish`.
+
+**Surprise.** Everything that mattered for users – passwords, the Owner, the imported sheet tables, covers – came
+across on the first conversion; the hard part of the cutover was tooling, not data.
