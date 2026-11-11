@@ -1,0 +1,17 @@
+[Unit]
+Description=Planszowkarz (Node)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/planszowkarz/node
+# Node is installed by server-setup-node.sh into /opt/node (no system package needed).
+ExecStart=/opt/node/bin/node src/server.ts
+EnvironmentFile=/opt/planszowkarz/planszowkarz-node.env
+Restart=always
+RestartSec=5
+# SIGTERM lets the app finish running requests and close the database (src/server.ts).
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

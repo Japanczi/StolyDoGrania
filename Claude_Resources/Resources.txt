@@ -1,3 +1,211 @@
+I made a screenshot of currently in-excel platform for people creating and managing board game tables.
+Terminology: table owner = the user who created the table, or whoever took it over later.
+Columns as follow from the left (order and placement per the screenshot):
+- Action buttons (far left: delete shown as ❌, rename shown as 🏷️ on dark green, plus 3 placeholder buttons shown as 🛠️ on dark green for owner options coming later; stacked vertically, starting a new column when out of space),
+- Game name (set by table owner),
+- Slots taken (set by table owner),
+- Table type (small, large, whatever; set by table owner),
+- Hour of meeting (hour only, no date - users know what day it refers to; set by table owner; picked in 15-minute steps from a popup showing the entire list at once, without scrolling),
+- Number of players (from BGG's max players; randomized 1-6 for games not found on BGG. Games over the limit get an error and no table; the limit is Tables:MaximumSpotsAllowed in appsettings.json, currently 20),
+- BGG Link (the game's BGG page; bgg.com for games not found on BGG),
+- Difficulty (BGG's average weight, stored and displayed exactly as BGG gives it, with a dot: 2.0488; comes only from BGG and can't be entered by users, so games not found on BGG show "–"),
+- Game picture (set by BGG API and stored in database; random colored square with game name text on top when there is none.
+Users can upload a cover only for a game not found on BGG: the box shows the 🗁 button on a light-gray background, covering 1/4 of it. Users can't replace an existing cover;
+BGG images must never be hot-linked: download once, resize as needed and serve a copy from our server, per a BGG admin's forum post.
+That post also says image licences are set by the original uploader, and using an image without a suitable licence needs the uploader's permission),
+- Game slots (interactable by users; users can click on a slot to take it, or click again to free it; table owner can also click on a slot to free it,
+including other users' slots;
+number of slots equals number of players: taken from BGG API from max players count; for early development randomize 1-6),
+
+Navigation:
+- The tables page, named "Zapisy na gry", is the landing page at "/" ("/stoly" kept as an alias). There is no separate menu page.
+- Top ribbon on every page, from the left: brand (links to "/"), "Menu", then the profile button (short user name, links to Account/Manage) when logged in. "Zaloguj się" / "Wyloguj" sit at the right edge, as outlined buttons like "Menu".
+  No register button in the ribbon (2026-11-09); logged-out visitors see a centred "Dołącz do Planszówkarza teraz!" button on the board,
+  which opens registration.
+- The "Menu" button slides a menu drawer in from the left, over the page (the page layout does not move). It holds all menu options: Zapisy na gry, Baza gier, Użytkownicy (admin), Profil + Wyloguj or Zarejestruj się + Zaloguj się. It closes on ✕, a click outside, following a link, or Escape.
+- No template demo pages (Counter, Weather, Auth Required were removed).
+- "Baza gier" page at "/gry": list of all games in the catalog (cover, name with year, "Utwórz stół" button, table kind, max players, difficulty, number of current tables, BGG link). Alternate names aren't shown, but search matches them. Sortable by clicking column headers. Visible to everyone.
+  - "Utwórz stół" (logged in) creates a table with that game at once: the game's table kind and player count, no hour, creator in the first slot as owner. The board then opens, scrolled to the new table, which is briefly outlined in gold.
+  - Admin can delete a game (two clicks: ❌ turns the whole button green with a white ✓, a second click deletes), but only if no table uses it. Used to clean out old placeholder games.
+- The whole app (tables page, account pages) shares the tables board's dark theme with the diagonal weave background. Menus and bars are compact.
+- Buttons, app-wide: hovered = pseudo-3D shading (lit from above); pressed = nudged down and shaded inwards; disabled = dimmed. Each button keeps its own colours. Links, menu entries, sort headers and close ✕ are not box buttons and stay flat; player slots keep their own hover ring and are not dimmed when disabled.
+- Layout/design decisions are logged in Claude_Resources/Design/ApplicationDesign.md.
+
+Layout should follow the screenshot, but with some changes:
+- A compact list of games, spanning from top to bottom of the screen, with slight spacing between them.
+- Player slot width: slots grow horizontally with the player's name, up to 300% of their original width; beyond that the name is cut with '...'.
+- Player slot size: squares as tall as the row (row height is set by the 100px cover). The game name column is kept narrow so that 6 slots fit on one line from about 1360px window width.
+- Player slots design: squares with round edges, white background = free, dark-pink = taken (with player name in it), salmon = slot marked as taken by owner,
+very dark pink with 2px golden border = table owner's slot (owner automatically assigned the first slot after creating a table)
+- Slots taken set by owner - users unable to take these slots
+- Raising the slots taken counter marks the highest-numbered free slots, passing over seated players, so marks can have gaps between them. The limit is the number of free slots.
+- Table type: the expanded list has black text on a white background.
+- List of game titles suggested when creating a table: ordered vertically, white text and borders.
+- No hour of meeting set = red background
+- BGG Link should be clickable and open in a new tab
+- Game picture should be displayed as a small thumbnail in its own column, between difficulty and game slots, sizable enough to be recognizable, but not too large to take up too much space (100px square)
+- Background of entire subpage - dark gray, with a subtle pattern or texture to add visual interest without being distracting
+
+Game lookup (adding a table):
+- No "new table" form: the last row of the list is, for logged-in users, a free-text game name field with a "Utwórz stół" button that creates the table.
+- When that field loses focus the game is looked up, and the rest of the row's columns appear (slots taken, table type, hour, players, BGG link, difficulty, cover). Enter doesn't create the table.
+- Users can type any title of a game. The catalog is checked first, by primary and alternate names, and only then BGG (also by all names).
+- A single exact match is picked automatically; otherwise the user picks from a list (BGG lists separate editions, e.g. Citadels 2000 and 2016), or rejects it and adds the game by hand.
+- The picked game is saved to the catalog with its alternate names and cover (BGG thumbnail), so BGG is only contacted once per game. The BGG button searches BGG again, e.g. for another edition.
+- A table shows the title the user typed, even when it's an alternate name. In the catalog, editions sharing a name get the year added, because catalog names are unique.
+- BGG takes priority over hand-added games: they're used only when BGG finds nothing or can't be reached, or the user rejects its results. A hand-added game matching an imported BGG game becomes that game, including its cover.
+- BGG is contacted only from the server, at most once per 5 seconds. The "Powered by BGG" logo linking to BGG is shown in the bottom-right corner of the menu drawer, as BGG's terms require.
+- Every table created with "Utwórz stół" (on the board or on Baza gier) records the game name used in the database (TablePhrases: phrase, game, user, time). Phrases outlive tables and the weekly reset; the user is stored but never shown. Renaming a table doesn't record one.
+- No "recently used names" list under the game-name field (the "Ostatnio:" chips were removed); the phrases are only recorded.
+
+Table owner:
+- Owner can rename the table (🏷️): the game name is typed again and looked up like a new table (catalog, then BGG). A BGG game brings its own player count; otherwise the table keeps its count. Renaming wipes all slots: every player leaves and the slots taken counter goes to 0; a seated owner keeps the first slot. The popup warns about this before saving. Hour and table type stay.
+- Owner always sits in the first slot and can free it; while it is vacant they keep owner rights and can only return to the first slot.
+- The player who takes the vacated first slot becomes the new owner; the previous owner becomes a regular player.
+- The first slot can't be marked as taken by owner.
+- Owner can remove the table entirely (two clicks: ❌ turns the whole button solid green with a large white ✓, a second click deletes; it reverts on Escape, a click anywhere else, or after 4 seconds); the game stays in the catalog.
+- Popups triggered by the action buttons (renaming, and any future action behind the placeholders) open next to the button that called them.
+- Owner can add other players by right-clicking a free or "taken by owner" slot (not the first slot, which stays the owner's). A popup lists registered users, with a free-text name field at the bottom.
+- Adding a player to a slot marked as taken lowers the slots taken counter by one; the player lands on the chosen slot.
+
+Admin:
+- Admin can do everything the owner can on any table: change settings, add and remove players (including removing the owner by left-clicking their slot), remove the table.
+- Admin can right-click the first slot to assign a new owner, choosing from registered users. Whoever sat there leaves the table; a new owner already seated elsewhere moves to the first slot.
+
+- A button in the bottom left corner, visible only to admins, expands a note reminding them of their capabilities. Keep the note up to date when admin capabilities change.
+- Admin toolbox: a "🧰 Narzędzia admina" button right of the note's button; the toolbox expands upwards above it.
+  Toolbox: dark-gray background with a white border; list items are dark-gray buttons with white text;
+  switches are light-gray, distinguishable from the background (the knob's side shows ON/OFF).
+  Items:
+  - "Wyczyść listę stołów": removes every table, in two clicks: the first turns the button green and says how many tables will go ("✓ Kliknij ponownie – usunie N stołów"), the second clears the list; it reverts like the delete buttons. Games stay in the catalog.
+  - "Auto" switch next to it (tooltip explains it): when ON, the list of tables is cleared every Monday at midnight,
+    server time. A Monday missed while the app was down is caught up once on startup. Turning it on midweek
+    doesn't clear the board until the next Monday.
+  - "💾 Miejsce na dysku" (added 2026-11-08): one click shows, under the button, the server disk's used/total
+    space with a bar (green, yellow from 75%, red from 90%), free space, and the sizes of the database file
+    (incl. -wal/-shm; covers live in it) and of the feedback folder. Clicking again refreshes it. Read-only.
+
+Roles (decided 2026-11-08):
+- Roles: Owner (main admin), Admin, User. The Owner always also has Admin, so everything an admin can do, the Owner can.
+- The Owner is the account configured as Admin:UserName; the seeder gives it Owner + Admin. It can't be assigned,
+  changed or deleted on the users page (shown as an "Owner" badge).
+- Admins can make users admins and delete regular users. Only the Owner can take the Admin role away from
+  someone or delete an admin's account. Enforced on the server (re-checked against the database on each action);
+  the controls are also disabled for other admins.
+- Normal user mode hides Owner as well as Admin.
+
+Action log (decided 2026-11-08):
+- Table UserActionLogs (time, action, actor id + name, target id + name, table id, details). Names are copied in,
+  so entries survive deleted users and the weekly table reset; user names are stored, never e-mails.
+- Logged so far: a user taking a seat at a table themselves (JoinedTable, saved in the same transaction as the seat),
+  an admin changing someone's role (RoleChanged, "old → new"), an admin deleting an account (UserRemoved).
+- "Dziennik" page at /admin/logs (admins only; Menu → Dziennik, also linked from Użytkownicy and the admin note):
+  newest first, 50 per page ("← Nowsze" / "Starsze →"), filter by action and a search over names and details.
+  Times shown in Polish time (Europe/Warsaw). Read-only: entries can't be edited or deleted in the app.
+
+Debug tools:
+- Development environment only: 4 preset regular users with Polish names, for testing how the UI scales.
+- Admin can enter a normal user mode to test the UI: the Admin role is ignored across the whole app until they leave the mode (switch on this subpage). Not a real role swap. Expected to be expanded later.
+- Feedback box on every page of the app (including login/registration/profile), shown only to logged-in users (hidden from anonymous visitors; saving is also refused on the server for them), in every environment (also on the public site): a round green 💬 chat bubble in the bottom-right corner opens a small card ("Masz uwagę?", text box with a character counter, "Wyślij"); Escape, ✕ or the bubble closes it. Comments are saved automatically to Claude_Resources/Feedback for review, one .md file each. Front matter: date, page (the subpage, read at save time), user (short name), userName (full Identity user name, usually the e-mail) and userId. The message is the body. The full user name is only in these server-side files, never shown in the UI.
+
+Accounts / user names (decided 2026-11-08):
+- Registration asks for a user name ("Nazwa użytkownika") separate from the e-mail. It is shown to other players.
+  Rules: 3–20 characters, letters (incl. Polish), digits, spaces, ".", "_", "-"; no "@". Must be unique.
+  Spaces at the edges are trimmed and runs of spaces collapse to one before checking ("  Jan   Nowak " → "Jan Nowak").
+- E-mail addresses must be unique. Login accepts either the e-mail or the user name.
+- E-mail format is checked wherever an address is saved (registration, admin "Dodaj użytkownika", e-mail change
+  in the profile): name@domain.tld, ASCII letters/digits and . _ % + - before '@', no leading/trailing/double dots,
+  top-level domain of at least 2 letters, max 254 chars. Surrounding spaces are trimmed.
+  Error: "Podaj poprawny adres e-mail, np. jan.nowak@example.com."
+- The admin "Dodaj użytkownika" form also asks for a user name, with the same rules as registration.
+- Changing the e-mail in the profile doesn't change the user name. Older accounts whose user name is their
+  e-mail keep both in sync (and keep showing the part before '@').
+
+E-mail (account confirmation, password reset):
+- Sent over SMTP with MailKit (Data/Email/MailKitEmailSender.cs); settings in the "Email" config section.
+- Account: planszowkarz.szczecinski@gmail.com, a dedicated Gmail account used only by the app, with an app password
+  (2-Step Verification on). Set up and tested locally on 2026-11-08: confirmation e-mails arrive.
+  Settings stay provider-agnostic so a transactional provider on an own domain can replace Gmail later.
+- Credentials only in user-secrets / environment variables, never in appsettings.json.
+- If Email:Host isn't set, no e-mail is sent and the registration confirmation page shows the confirm link (development fallback).
+- E-mail texts are in Polish and gender-neutral. Layout of every e-mail: greeting line, then
+  "Kliknij Tutaj (link) albo wejdź pod ten link: (full link)", then "Miłej zabawy!".
+  - Confirmation: "Hej, dzięki za założenie konta na Planszówkarzu :)"
+  - E-mail change in the profile: "Hej, potwierdź nowy adres e-mail dla swojego konta na Planszówkarzu."
+  - Subjects end with " – Planszówkarz"; sender name "Planszówkarz" (Planszówkarz is the app's main title).
+
+Name: the app is "Planszówkarz" (formerly StolyDoGrania). Visible text uses "Planszówkarz"; project, namespaces,
+assembly and other identifiers use "Planszowkarz". The UserSecretsId keeps the old name so existing secrets load.
+  - Password reset link/code: "Hej, dostaliśmy prośbę o zresetowanie hasła do Twojego konta na Planszówkarzu."
+    (the code version shows "Twój kod: X" instead of the links)
+
+Hosting (live since 2026-11-08):
+- Mikrus VPS wanda347 (srv72, Ubuntu 24.04), self-contained .NET build run as systemd service "planszowkarz" on port 30347;
+  public address https://planszowkarz.toadres.pl (Mikrus panel subdomain; https://srv72-30347.wykr.es also works).
+- Deploy from the PC with .\deploy.ps1 (templates and server-setup.sh in deploy/). Secrets live only in /opt/planszowkarz/planszowkarz.env on the server.
+- Possible own domain later: planszowkarz-szczecinski.pl (registrar with cheap renewals, e.g. Hostido or OVH), via Cloudflare.
+- Full instructions, propositions and open questions: Claude_Resources/Deployment/MikrusSetup.md
+
+Design image: "C:\Users\xerov\Documents\ShareX\Screenshots\2026-11\chrome_5DUDzW1rOX.png"
+
+
+Testing (decided 2026-11-08, after a friend's advice: "automate the rest, let the tester only test the diff"):
+- Automated suite: xUnit project Planszowkarz.Tests/ (in the solution; excluded from the app's build via
+  DefaultItemExcludes). Run with: dotnet test Planszowkarz.Tests. Costs no AI tokens.
+  - Domain rules (PlayTable, AppRoles, ...) as plain unit tests; queries and authorization filters against
+    in-memory SQLite (real SQL translation, no mocks).
+  - Authorization rules live in testable code: TableSlot.RemovableBy (slot removal filter used by Tables.razor),
+    AppRoles.MainRole / AppRoles.CanManage (used by the admin users page).
+- Tester agent: .claude/agents/tester.md. Reads only the git diff, adds/updates tests for changed behaviour,
+  runs the whole suite, never changes production code (reports suspected bugs instead). Model: sonnet, to save tokens.
+- Not yet: bUnit component tests, Playwright end-to-end tests, an automatic hook running dotnet test after edits.
+
+Sign-up sheet import (decided 2026-11-08) – TEMPORARY:
+- Only a transition aid: sign-ups are moving from the Google sheet to this app, and people need time to adjust.
+  Once everyone uses the app, switch it off (SheetImport:Enabled = false) and then remove it (Data/Import/,
+  PlayTable.ApplyImport/ImportKey, TableSlot.IsImported, Game.IsFromSheet, with a migration). Keep it isolated meanwhile:
+  no new features should depend on it.
+- The board mirrors the Google sheet "Zapisy" (https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg).
+  SheetImportService reads it at startup and every 30 minutes (config section "SheetImport": Enabled, SourceUrl, IntervalMinutes).
+- Source: the public Google Visualization JSON feed, tab picked by name (sheet=Zapisy; the feed ignores gid, so a renamed
+  tab needs SourceUrl changed). If the download fails or the tab doesn't look like the sign-up sheet, nothing changes.
+- Columns by header label: Tytul → table title / game, Stół (Mały/Duży/other) → table kind, Start → hour, Max → seats,
+  Waga → weight, Slot N → seats: a name = imported player, "Zajęte" = marked as taken (counted), "WOLNE"/empty = free.
+  Column B "Zajęte" is ignored (the slot cells are what the sheet shows). BGG links and covers are NOT imported (user's call).
+- 1:1: imported tables (PlayTable.ImportKey = normalized title + "#occurrence") and imported seats (TableSlot.IsImported)
+  are added, updated and removed to match the sheet. Renaming a row in the sheet replaces its table.
+- App data stays: tables created in the app are never touched; seats taken in the app at an imported table are kept,
+  moved to the lowest free seat if the sheet gives theirs to someone else, and dropped (logged) only when no seat is left.
+  A table removed from the sheet goes with all its seats.
+- Games: a catalog game with the same name / alternate name is reused unchanged (only a missing weight is filled in);
+  otherwise a game is created with Game.IsFromSheet, deleted again once no table uses it. Attaching BGG data clears the flag.
+- Imported tables list in the sheet's row order (PlayTable.ImportOrder, set at every import).
+  The "imported from Excel" divider line sits directly after the website's own tables, with about five empty text
+  lines (~106px) above it; all imported tables are below it (design 20261109-162610, decided 2026-11-09).
+- Known difference: the app places "Zajęte" marks on the highest-numbered free seats, the sheet usually on the first ones;
+  the count matches, the positions may not. Admin edits to an imported table are overwritten at the next import.
+
+Node rewrite (planned, decided 2026-11-10):
+- A rewrite to Node is planned on branch rewrite/node, in its own session. Nothing is merged to master or deployed
+  until the whole Node app works locally and the user has approved it; the .NET app stays live until then.
+- Decided: TypeScript; server-rendered HTML + Bootstrap 5 + plain JS; WebSocket live board updates (new);
+  keep accounts and passwords (verify ASP.NET Identity hashes, re-hash on login); stay on SQLite and Mikrus 2.1;
+  dev-only tools and the (temporary) sheet import are ported too.
+- Passkeys and 2FA left out of the first version; 2FA will be added later, so the login flow must allow a second
+  step. Existing 2FA/passkey settings aren't migrated (no real users yet).
+- Why: learning. The user is new to web apps and wants to see how a different technology changes development.
+  Every phase writes learning notes in docs/learning/ on the branch (how Node works, syntax, how each technology
+  differs from .NET and whether it could be used with .NET, side by side with this app's C# code) plus a
+  comparison journal (docs/learning/journal.md). Prefer options that show how things work over "magic" ones.
+- Brief: Claude_Resources/Rewrite/NodeRewrite.md (draft 3, no open TODOs). Issue: https://github.com/Japanczi/StolyDoGrania/issues/1
+
+
+==================================================================================================
+Node app (since 2026-11-11 the live app; the sections above describe features, wording and rules, which apply
+unless the decisions below say otherwise. Hosting details above about the .NET build are historical: the .NET
+version is on the `dotnet` branch, deployment is now deploy.ps1 + deploy/CUTOVER.md).
+==================================================================================================
+
 Planszówkarz – Node rewrite: branch spec (rewrite/node)
 
 This is the spec for the Node version of the app on branch rewrite/node. On this branch Resources.txt is

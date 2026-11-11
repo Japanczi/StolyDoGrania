@@ -10,6 +10,9 @@ Every note follows the same shape:
 3. **How it differs from .NET**, and **whether it could be used with .NET**.
 4. **Pitfalls** we actually hit, and links to official docs.
 
+The C# files these notes compare with (`Data/…`, `Components/…`) are on the `dotnet` branch since the switch to Node
+(2026-11-11): `git show dotnet:Data/Table/PlayTable.cs`, or browse that branch on GitHub.
+
 Code marked *sketch* was written before the app code existed (phase 0); it shows the idea and will be replaced
 by links to the real files when they exist.
 

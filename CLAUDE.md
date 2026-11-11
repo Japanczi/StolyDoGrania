@@ -1,19 +1,17 @@
-# Planszówkarz (Node rewrite branch) – project instructions
+# Planszówkarz – project instructions
 
-> Adopted 2026-11-10, when the user approved all recommendations of `docs/rewrite/phase0-proposal.md`.
+> Node.js app since 2026-11-11 (the rewrite's phase 5). The previous ASP.NET Core / Blazor app is preserved on the
+> `dotnet` branch; C# files mentioned in the learning notes live there.
 
-## Branch rules
-- This is branch `rewrite/node`: the Node.js rewrite of the ASP.NET Core app. Brief:
-  `C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\Rewrite\NodeRewrite.md`.
-- Never merge to or change `master`, never deploy, never touch the live server until the user has approved the
-  fully working local app (brief phase 5). Work phase by phase; stop and show the user after each phase.
-- The .NET app stays in the repo root as the reference implementation. Don't edit it on this branch.
-- `Claude_Resources/` is git-ignored (except `Tools/` and, on this branch, `Resources.txt`) and mostly not in
-  worktrees: read the main spec, design log, brief and feedback from the main checkout by absolute path
+## Repository and deployment
+- `master` is the Node app (`node-app/`), live at https://planszowkarz.toadres.pl. Don't edit the `dotnet` branch.
+- Deploy with `.\deploy.ps1` (Mikrus, service `planszowkarz-node`). Cutover and switching back to .NET:
+  `deploy/CUTOVER.md`. Ask before deploying or touching the server.
+- The spec is `Claude_Resources/Resources.txt` (tracked): features, wording, rules, and the Node app's decisions.
+  When a decision is made in conversation, write it back there in the same work.
+- The rest of `Claude_Resources/` is git-ignored (except `Tools/`) and mostly not in worktrees: read the design log,
+  rewrite brief and feedback from the main checkout by absolute path
   (`C:\Users\xerov\source\repos\StolyDoGrania\Claude_Resources\`).
-- The branch's own spec is `Claude_Resources/Resources.txt` in this branch (tracked): Node-specific decisions,
-  differences from the main spec, and phase status. When a decision about the Node app is made in conversation, write it back there in the same
-  work. Features and wording still come from the main spec unless the branch spec says otherwise.
 
 ## Goal: learning
 - The rewrite exists so the user can learn Node and compare it with .NET. Explaining is part of every task.
@@ -64,7 +62,7 @@
 ## Domain model
 - Business rules live in `src/domain/play-table.ts` (tryCreate / tryTakeSlot / tryAddPlayer / tryAssignOwner /
   tryChangeGame / trySetTakenSlots / isSlotTaken / applyImport) and the other `domain/` modules, ported from
-  `Data/Table/*.cs`, `Data/AppRoles.cs`, `Data/Valid*Attribute.cs`. Prefer extending these over duplicating logic
+  `Data/Table/*.cs`, `Data/AppRoles.cs`, `Data/Valid*Attribute.cs` (on the `dotnet` branch). Prefer extending these over duplicating logic
   in routes, views or browser JS.
 - Rule functions return `{ ok: true, ... } | { ok: false, error: string }` (Polish error) instead of throwing,
   mirroring the C# `TryX(out error)` pattern.
