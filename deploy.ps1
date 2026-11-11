@@ -19,7 +19,8 @@ $sshArgs = @("-i", $Key, "-p", $SshPort, "-o", "StrictHostKeyChecking=accept-new
 $scpArgs = @("-i", $Key, "-P", $SshPort, "-o", "StrictHostKeyChecking=accept-new")
 
 function Invoke-Remote([string]$command) {
-    & ssh @sshArgs $target $command
+    # Remote messages go to stdout: PowerShell 5.1 turns any stderr line into a fatal error under "Stop".
+    & ssh @sshArgs $target "exec 2>&1; $command"
     if ($LASTEXITCODE -ne 0) { throw "Remote command failed: $command" }
 }
 
@@ -54,8 +55,19 @@ try {
 }
 
 $package = Join-Path $env:TEMP "planszowkarz-node-deploy.tgz"
-tar -czf $package -C $stage .
-if ($LASTEXITCODE -ne 0) { throw "Packing failed." }
+# GNU tar from Git for Windows: Windows' own tar.exe (bsdtar) crashed on this folder (2026-11-11).
+# Run from the stage folder with a relative output path, so the drive letter's ":" never reaches tar.
+$gitBin = Join-Path (Split-Path (Split-Path (Get-Command git).Source)) "usr\bin"
+$savedPath = $env:Path
+$env:Path = "$gitBin;$env:Path"   # tar calls gzip from the same folder
+Push-Location $stage
+try {
+    & (Join-Path $gitBin "tar.exe") --owner=0 --group=0 -czf "../planszowkarz-node-deploy.tgz" .
+    if ($LASTEXITCODE -ne 0) { throw "Packing failed." }
+} finally {
+    Pop-Location
+    $env:Path = $savedPath
+}
 
 Write-Host "Uploading..."
 & scp @scpArgs $package "${target}:/root/planszowkarz-node-deploy.tgz"
@@ -66,8 +78,8 @@ Write-Host "Installing and restarting..."
 Invoke-Remote ("set -e; ENV=/opt/planszowkarz/planszowkarz-node.env; " +
     "systemctl stop planszowkarz-node 2>/dev/null || true; " +
     "find /opt/planszowkarz/node -mindepth 1 -maxdepth 1 -exec rm -rf {} +; " +
-    "tar -xzf /root/planszowkarz-node-deploy.tgz -C /opt/planszowkarz/node && rm /root/planszowkarz-node-deploy.tgz; " +
-    "cd /opt/planszowkarz/node && (set -a; . `$ENV; set +a; /opt/node/bin/node src/db/migrate.ts); " +
+    "tar --no-same-owner -xzf /root/planszowkarz-node-deploy.tgz -C /opt/planszowkarz/node && rm /root/planszowkarz-node-deploy.tgz; " +
+    "cd /opt/planszowkarz/node && /opt/node/bin/node --env-file=`$ENV src/db/migrate.ts; " +
     "systemctl enable planszowkarz-node >/dev/null; systemctl start planszowkarz-node; sleep 3; " +
     "systemctl is-active planszowkarz-node; " +
     "curl -fsS http://127.0.0.1:`$(grep '^PORT=' `$ENV | cut -d= -f2)/health; echo")

@@ -12,6 +12,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 mkdir -p "$ROOT/node" "$ROOT/data" "$ROOT/backup" "$ROOT/app/Claude_Resources/Feedback"
 
+# Node's Linux build needs libatomic, which minimal Ubuntu images (like Mikrus's) don't have.
+if ! ldconfig -p | grep -q libatomic.so.1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -q
+    apt-get install -y -q libatomic1
+fi
+
 # Node.js: the official Linux x64 build, checked against nodejs.org's published SHA-256 list.
 if [ "$(/opt/node/bin/node -v 2>/dev/null || true)" != "v$NODE_VERSION" ]; then
     TMP="$(mktemp -d)"
