@@ -82,8 +82,9 @@
     align-items: center;
     gap: .75rem;
     min-width: 1054px;
-    /* About five empty text lines (~106px, per design 20261109-162610) between the app's tables and the divider. */
-    margin-block: 6.5rem .25rem;
+    /* Space between the new-table row and the divider: design 20261109-162610's ~106px, made 30% smaller on
+       2026-11-12 (6.5rem → 4.55rem, ~74px). */
+    margin-block: 4.55rem .25rem;
     color: #f0b429;
     font-size: .8rem;
     font-weight: 700;

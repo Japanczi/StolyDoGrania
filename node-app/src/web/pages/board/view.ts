@@ -60,27 +60,37 @@ export function boardPage(m: BoardPageModel): SafeHtml {
             <div class="cell">Okładka</div>
             <div class="cell cell-slots">Miejsca</div>
         </div>
-        <div class="table-rows" id="table-rows">${tableRows(m.viewer, m.tables, m.highlightId)}</div>
+        ${ownRows(m.viewer, m.tables, m.highlightId)}
         ${loggedIn && draftRow(m.catalogNames, m.bggConfigured)}
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
+        ${importedRows(m.viewer, m.tables, m.highlightId)}
     </div>
 </div>
 ${m.admin && adminDock(m.admin)}`;
 }
 
 /**
- * All table rows. Re-fetched by live updates (GET /fragments/board) and swapped into #table-rows, so the new-table
- * row below them (which may be half filled in) is left alone.
+ * All table rows, in two containers: the app's own tables (#table-rows) and – TEMPORARY (sheet import) – the tables
+ * mirrored from the sign-up sheet (#imported-rows, below the divider, in the sheet's order). The new-table row sits
+ * between them on the page. Live updates re-fetch this (GET /fragments/board) and patch each container separately,
+ * so the new-table row (which may be half filled in) is left alone.
  */
 export function tableRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null = null): SafeHtml {
-  // TEMPORARY (sheet import): tables mirrored from the sign-up sheet sit below the app's own, in the sheet's order.
+  return html`${ownRows(viewer, tables, highlightId)}${importedRows(viewer, tables, highlightId)}`;
+}
+
+function ownRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null): SafeHtml {
   const own = tables.filter(t => t.importKey === null);
+  return html`<div class="table-rows" id="table-rows">${own.map(t => tableRow(viewer, t, t.id === highlightId))}</div>`;
+}
+
+// TEMPORARY (sheet import).
+function importedRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null): SafeHtml {
   const imported = tables.filter(t => t.importKey !== null).toSorted((a, b) => (a.importOrder ?? 0) - (b.importOrder ?? 0));
-  return html`${own.map(t => tableRow(viewer, t, t.id === highlightId))}
-${imported.length > 0 && html`<div class="import-divider" role="separator">
+  return html`<div class="table-rows" id="imported-rows">${imported.length > 0 && html`<div class="import-divider" role="separator">
     <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
 </div>`}
-${imported.map(t => tableRow(viewer, t, t.id === highlightId))}`;
+${imported.map(t => tableRow(viewer, t, t.id === highlightId))}</div>`;
 }
 
 /** One table's row (GET /fragments/table/:id). */
