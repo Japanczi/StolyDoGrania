@@ -86,7 +86,10 @@
 
   // ---------- refreshing rows ----------
 
-  const rows = /** @type {HTMLElement} */ (document.getElementById('table-rows'));
+  // The app's own tables, then (below the new-table row) the ones imported from the sheet – TEMPORARY (sheet import).
+  const rowContainers = ['table-rows', 'imported-rows'].map(id => /** @type {HTMLElement} */ (document.getElementById(id)));
+  /** @param {Node} node */
+  const inRows = node => rowContainers.some(c => c.contains(node));
   /** While a popup is open its row must not be replaced; refreshes wait until it closes. */
   let popupOpen = false;
   let refreshPending = false;
@@ -98,9 +101,14 @@
     version = Math.max(version, Number(response.headers.get('X-Board-Version')));
     boot = response.headers.get('X-Board-Boot') ?? boot;
     // Patched in place (morph.js), not replaced: unchanged rows, covers and inputs stay as they are – no flash.
-    window.morph.morphChildren(rows, window.morph.parseFragment(await response.text()));
+    // Each container is patched separately, so the new-table row between them is left alone.
+    const fresh = window.morph.parseFragment(await response.text());
+    for (const container of rowContainers) {
+      const source = fresh.querySelector(`#${container.id}`);
+      if (source) window.morph.morphChildren(container, source);
+    }
     if (!loggedIn) {
-      const empty = rows.children.length === 0;
+      const empty = rowContainers.every(c => c.children.length === 0);
       document.getElementById('board-empty')?.toggleAttribute('hidden', !empty);
       document.getElementById('table-list')?.toggleAttribute('hidden', empty);
     }
@@ -130,7 +138,7 @@
   board.addEventListener('click', e => {
     const target = /** @type {HTMLElement} */ (e.target);
     const button = /** @type {HTMLElement | null} */ (target.closest('[data-action]'));
-    if (!button || !rows.contains(button)) return;
+    if (!button || !inRows(button)) return;
     const id = tableIdOf(button);
     const slot = Number(button.dataset.slot);
     switch (button.dataset.action) {
@@ -144,7 +152,7 @@
 
   board.addEventListener('change', e => {
     const input = /** @type {HTMLInputElement} */ (e.target);
-    if (!rows.contains(input)) return;
+    if (!inRows(input)) return;
     const id = tableIdOf(input);
     if (input.dataset.action === 'taken') void act(() => post(`/api/tables/${id}/taken`, { count: input.value }), id);
     if (input.dataset.action === 'kind') void act(() => post(`/api/tables/${id}/kind`, { kind: input.value }), id);
@@ -153,7 +161,7 @@
   // Right-click on a seat: the owner's "add player" / the admin's "choose owner" popup.
   board.addEventListener('contextmenu', e => {
     const seat = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-popup]'));
-    if (!seat || !rows.contains(seat)) return;
+    if (!seat || !inRows(seat)) return;
     e.preventDefault();
     void openAddPlayer(tableIdOf(seat), Number(seat.dataset.slot), e.clientX, e.clientY);
   });

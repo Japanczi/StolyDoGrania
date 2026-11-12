@@ -188,6 +188,9 @@ Sign-up sheet import (decided 2026-11-08) – TEMPORARY:
 - Imported tables list in the sheet's row order (PlayTable.ImportOrder, set at every import).
   The "imported from Excel" divider line sits directly after the website's own tables, with about five empty text
   lines (~106px) above it; all imported tables are below it (design 20261109-162610, decided 2026-11-09).
+  The new-table row (and its draft panel) belongs to the website's part: it sits after the website's own tables,
+  above the divider, not at the very bottom below the imported ones (decided 2026-11-12). The blank space between
+  the new-table row and the divider is 30% smaller than the original five lines: ~74px (4.55rem, decided 2026-11-12).
 - Known difference: the app places "Zajęte" marks on the highest-numbered free seats, the sheet usually on the first ones;
   the count matches, the positions may not. Admin edits to an imported table are overwritten at the next import.
 
