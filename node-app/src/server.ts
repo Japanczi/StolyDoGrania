@@ -7,6 +7,7 @@ import { ConfigError, loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { pendingMigrations } from './db/migrator.ts';
 import { startSheetImport } from './import/sheet-import-job.ts';
+import { createBggClient } from './integrations/bgg/client.ts';
 import { startWeeklyReset } from './jobs/weekly-reset.ts';
 import { createLiveHub } from './live/hub.ts';
 
@@ -34,7 +35,10 @@ if (pending.length > 0) {
 
 // The live-update hub is shared by the routes and the background jobs (they tell open pages about changes too).
 const hub = createLiveHub();
-const app = await buildApp({ config, db, hub });
+// One BGG client for the whole process: its 5-second spacing between requests then covers the board's lookups and
+// the sheet import together.
+const bgg = createBggClient({ token: config.bggToken });
+const app = await buildApp({ config, db, hub, bgg });
 
 // The Owner account and, in development, the 4 test users (IdentitySeeder.SeedAsync in Program.cs).
 await seedAccounts(db, config, app.log);
@@ -42,7 +46,7 @@ await seedAccounts(db, config, app.log);
 // Background jobs (AddHostedService in Program.cs): plain timers in this process. See docs/learning/background-jobs.md.
 const weeklyReset = startWeeklyReset({ db, hub, log: app.log });
 // TEMPORARY: the Google sign-up sheet import (off unless SHEET_IMPORT_ENABLED=true).
-const sheetImport = startSheetImport({ db, hub, log: app.log, settings: config.sheetImport });
+const sheetImport = startSheetImport({ db, hub, bgg, log: app.log, settings: config.sheetImport });
 
 async function shutdown(signal: string): Promise<void> {
   app.log.info(`${signal} received, shutting down`);

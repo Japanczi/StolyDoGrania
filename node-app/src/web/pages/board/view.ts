@@ -6,7 +6,7 @@
 
 import type { BoardTable, Viewer } from '../../../db/queries/board.ts';
 import {
-  catalogLabel, defaultBggUrl, difficultyLabel, difficultyStyle, kindClass, kindLabel, placeholderHue,
+  catalogLabel, defaultBggUrl, difficultyLabel, difficultyStyle, kindClass, kindLabel, maximumSpotsAllowed, placeholderHue,
 } from '../../../domain/game.ts';
 import { isOwner, isSlotTaken, maxTakenSlots, ownerSlot, tableKinds, type TableKind } from '../../../domain/play-table.ts';
 import { html, type SafeHtml } from '../../html.ts';
@@ -18,7 +18,6 @@ const assignOwnerHint = 'Prawy przycisk: wybierz właściciela';
 export type BoardPageModel = {
   viewer: Viewer;
   tables: BoardTable[];
-  catalogNames: string[];
   bggConfigured: boolean;
   /** Board version for live updates (see live/hub.ts). */
   version: number;
@@ -61,7 +60,7 @@ export function boardPage(m: BoardPageModel): SafeHtml {
             <div class="cell cell-slots">Miejsca</div>
         </div>
         ${ownRows(m.viewer, m.tables, m.highlightId)}
-        ${loggedIn && draftRow(m.catalogNames, m.bggConfigured)}
+        ${loggedIn && draftRow(m.bggConfigured)}
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
         ${importedRows(m.viewer, m.tables, m.highlightId)}
     </div>
@@ -88,7 +87,7 @@ function ownRows(viewer: Viewer, tables: BoardTable[], highlightId: number | nul
 function importedRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null): SafeHtml {
   const imported = tables.filter(t => t.importKey !== null).toSorted((a, b) => (a.importOrder ?? 0) - (b.importOrder ?? 0));
   return html`<div class="table-rows" id="imported-rows">${imported.length > 0 && html`<div class="import-divider" role="separator">
-    <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
+    <span><span aria-hidden="true">👇👇👇 </span>(TYMCZASOWE) GRY IMPORTOWANE Z EXCELA CO 60 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
 </div>`}
 ${imported.map(t => tableRow(viewer, t, t.id === highlightId))}</div>`;
 }
@@ -210,13 +209,12 @@ function placeholder(title: string): SafeHtml {
  * The last row: a game-name field for a new table. The other cells are filled in by board.js once the game has
  * been looked up (catalog, then BGG). Not a <form>: Enter must not create a table (as in .NET).
  */
-function draftRow(catalogNames: string[], bggConfigured: boolean): SafeHtml {
+function draftRow(bggConfigured: boolean): SafeHtml {
   return html`<div class="table-row table-draft" id="draft">
     <div class="cell"></div>
     <div class="cell cell-game">
-        <input id="new-name" class="form-control form-control-sm" list="catalog-names" maxlength="200" autocomplete="off"
+        <input id="new-name" class="form-control form-control-sm" maxlength="200" autocomplete="off"
                placeholder="Nazwa gry" aria-label="Nazwa gry nowego stołu" />
-        <datalist id="catalog-names">${catalogNames.map(n => html`<option value="${n}"></option>`)}</datalist>
         <div class="draft-actions">
             <button type="button" class="btn btn-success btn-sm" id="draft-create">Utwórz stół</button>
             ${bggConfigured && html`<button type="button" class="btn btn-outline-light btn-sm" id="draft-bgg" hidden title="Szukaj tej gry na BoardGameGeek, np. innego wydania">BGG</button>`}
@@ -226,7 +224,7 @@ function draftRow(catalogNames: string[], bggConfigured: boolean): SafeHtml {
     <div class="cell" data-draft-detail hidden><input id="new-taken" type="number" class="cell-input" min="0" value="0" aria-label="Liczba miejsc oznaczonych jako zajęte" /></div>
     <div class="cell kind-small" data-draft-detail id="new-kind-cell" hidden>${kindSelect('small', 'Rodzaj stołu', null)}</div>
     <div class="cell hour-unset" data-draft-detail id="new-hour-cell" hidden>${hourButton(null, 'Godzina spotkania')}</div>
-    <div class="cell" data-draft-detail id="new-max" hidden></div>
+    <div class="cell" data-draft-detail id="new-max-cell" hidden><input id="new-max" type="number" class="cell-input" min="1" max="${maximumSpotsAllowed}" value="1" aria-label="Liczba graczy" /></div>
     <div class="cell" data-draft-detail id="new-link" hidden></div>
     <div class="cell cell-difficulty" data-draft-detail id="new-difficulty" hidden></div>
     <div class="cell cell-cover" data-draft-detail hidden>

@@ -18,7 +18,7 @@ import {
   logJoinedTable, notOwnerError, type Viewer,
 } from '../../../db/queries/board.ts';
 import {
-  catalogNames, findGameById, findGameByName, getCover, insertHandAddedGame, setUploadedCover, type CatalogGame,
+  findGameById, findGameByName, getCover, insertHandAddedGame, setUploadedCover, type CatalogGame,
 } from '../../../db/queries/games.ts';
 import { findUserById, isUniqueViolation } from '../../../db/queries/users.ts';
 import { allowedCoverTypes, maxCoverBytes, sniffImageType, tooManySpotsError } from '../../../domain/game.ts';
@@ -71,7 +71,6 @@ export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
           normalUserMode: user && (user.normalUserMode || isAdminRole(user.role)) ? { active: user.normalUserMode } : null,
           viewer,
           tables,
-          catalogNames: viewer.userId !== null ? await catalogNames(db) : [],
           bggConfigured: bgg.isConfigured,
           version: hub.version,
           highlightId: highlighted?.id ?? null,
@@ -176,13 +175,10 @@ export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
     const known: CatalogGame | null = Number.isInteger(gameId) && gameId > 0
       ? await findGameById(db, gameId)
       : await findGameByName(db, name);
-    // A BGG game brings its own seat count. Otherwise the count drawn in the browser (1–6 during early
-    // development, as in .NET) – checked here, so it can't be forged above that.
-    const drawn = Number(form.fields.maxPlayers);
-    const maxPlayers = known && known.bggId !== null && known.maxPlayers > 0 ? known.maxPlayers : drawn;
-    if (!(known && known.bggId !== null && known.maxPlayers > 0) && (!Number.isInteger(drawn) || drawn < 1 || drawn > 6)) {
-      return send(reply, { ok: false, error: 'Nieprawidłowa liczba miejsc.' });
-    }
+    // The player count chosen in the new-table row (prefilled from BGG, or drawn 1–6 for other games, but the
+    // user may change it). Checked here: a whole number from 1 up to the limit.
+    const maxPlayers = Number(form.fields.maxPlayers);
+    if (!Number.isInteger(maxPlayers) || maxPlayers < 1) return send(reply, { ok: false, error: 'Nieprawidłowa liczba miejsc.' });
     const tooMany = tooManySpotsError(maxPlayers);
     if (tooMany) return send(reply, { ok: false, error: tooMany });
     if (takenSlots >= maxPlayers) return send(reply, { ok: false, error: 'Przy stole musi zostać co najmniej jedno miejsce dla Ciebie.' });

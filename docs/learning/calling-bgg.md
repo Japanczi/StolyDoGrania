@@ -37,9 +37,28 @@ can never inject HTML. The `lookupVersion` trick stayed: a late answer to an out
 
 ## Trusting nothing from the browser
 
-The page sends a game id and, for games not on BGG, a seat count drawn at random (1–6 during development, as in
-.NET). The server re-reads the game from the database: a BGG game always gets BGG's seat count, and a hand-added
-one must be 1–6 – a page can't create a 15-seat table by editing the request (tested).
+The page sends a game id and the seat count the user chose (prefilled with BGG's count, or drawn 1–6 for other
+games; since 2026-11-22 the user may change it). The server re-reads the game from the database and checks the count
+itself: a whole number from 1 to the limit (20) – a page can't create a 50-seat table by editing the request
+(tested). The chosen count goes to the table only; the catalog game keeps BGG's count.
+
+## One client per process: the throttle lives in the object
+
+The 5-second queue is a field of the client object (`queueTail` in `createBggClient`). Two clients = two queues that
+know nothing of each other, so BGG could get two requests at once. Since the sheet import also talks to BGG
+(2026-11-22), `server.ts` creates **one** client and passes it to both the routes (`buildApp({ bgg })`) and the import
+(`startSheetImport({ bgg })`). In ASP.NET Core this is what registering `BggClient` as a **singleton** in DI did for
+us; without a DI container we do the same by hand, by creating it once at startup and passing it along.
+
+Because the import `await`s each BGG call before queueing the next, a user's lookup slips in between – it waits for
+at most one import request (~5 s), not for the whole import.
+
+## Slow calls stay outside the transaction
+
+The sheet import finds its games on BGG (`findSheetGamesOnBgg`, src/import/sheet-games.ts) **before** it opens the
+sync transaction, and passes the result in. SQLite allows one writer at a time; a transaction that waited 5 s per BGG
+request would make every other write in the app (taking a seat, creating a table) wait too. Same rule as in EF Core:
+don't call an external service between `BeginTransaction` and `Commit`.
 
 ## Cover uploads: checked by content, limited while receiving
 
@@ -62,6 +81,10 @@ more comfortable of the two. Magic-number checks work the same way in C#.
 - `fast-xml-parser` accepts almost anything; the client validates the XML first so a broken BGG answer becomes
   `BggUnavailableError`, like C#'s `XmlException`.
 - BGG's weight must stay text (`"2.0488"`): turning it into a JavaScript `number` and back could change the digits.
+- Google's JSON feed of a sheet gives a hyperlinked cell's **text** ("Link"), not its URL. The URLs are only in the
+  sheet's HTML view, wrapped in Google's redirect (`google.com/url?q=https://boardgamegeek.com/boardgame/123&…`).
+  `parseSheetLinks` scrapes that page; since a page for people can change any time, a parse that finds nothing just
+  means "no links" and the import searches BGG by name instead.
 
 ## Official docs
 

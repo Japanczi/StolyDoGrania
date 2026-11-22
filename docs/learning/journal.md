@@ -274,3 +274,44 @@ taken, but logged as an error every start). The seed now falls back to the e-mai
 weakness; it never showed because the .NET app never let anyone change their name.
 
 **Lesson.** When something that used to be fixed becomes editable, look for code that used it as a key.
+
+---
+
+## Table kind and player count in the new-table row (2026-11-22)
+
+**What happened.** The new-table row showed a "Stół" (kind) select that couldn't really be changed: every
+`update()` of the row copied the looked-up game's kind into it again, so the user's choice snapped straight back.
+Now the game's defaults (kind and player count) are copied only when the looked-up game *changes* (`appliedGame` in
+`public/js/board.js`). The "Graczy" cell became an `<input type="number">` (the browser's own up/down arrows) while
+creating a table; existing rows still show the count as text. The server (`POST /api/tables`) now accepts the chosen
+count for any game – a whole number from 1 to 20 – and no longer forces BGG's count onto the table. The catalog game
+keeps BGG's count: table creation never writes to a known game's `max_players`.
+
+**Different from .NET.** In Blazor the select would have been `@bind="draft.Kind"`: the component's field is the
+single source of truth and re-rendering never overwrites it. With plain DOM code, the DOM *is* the state, and a
+"redraw everything from the data" function like `update()` must be careful not to re-apply defaults over what the
+user typed. The fix is the same idea Blazor has built in: remember what you last applied, and only apply on change.
+
+**Lesson.** A render function that both *derives* values and *sets defaults* needs to tell the two apart.
+
+---
+
+## Sheet import finds its games on BGG (2026-11-22)
+
+**What happened.** Games imported from the Google sheet used to become sheet-only catalog entries (no cover, no BGG
+data). Now each title is looked up on BGG and the game added to the catalog with its details and cover. The sheet's
+BGG link says which game it is: that's how "Nieświadomy umysł" became *Unconscious Mind* and "Inventions: Ewolucja
+Idei" *Inventions: Evolution of Ideas* – no name search could have found those. Without a link, a title is searched
+and used only when there is one clear match. A real import against BGG matched all 6 games in about 16 seconds.
+
+**Surprise: the link wasn't in the data we read.** The JSON feed gives only the cell's text, "Link". The URLs are in
+the sheet's HTML view, so the import downloads that too and scrapes it (`src/import/sheet-links.ts`) – fragile by
+nature, so any failure there just falls back to searching by name.
+
+**Different from .NET.** Two things DI used to do invisibly: the BGG client must be one object for the whole process
+(its throttle queue lives inside it – in ASP.NET Core a singleton registration gave us that), so `server.ts` creates
+it once and passes it to both users. And the shared "fetch from BGG and save" step moved out of the board's lookup
+into `integrations/bgg/add-to-catalog.ts`, so the import reuses it instead of copying it.
+
+**Lesson.** Keep slow external calls out of database transactions: BGG work happens first, then one short sync
+transaction. See the BGG note's new sections.

@@ -8,7 +8,7 @@
 ## What it is and why we need it
 
 Some work isn't triggered by a request: clearing the board every Monday at midnight, and importing the Google
-sign-up sheet every 30 minutes. In .NET these were **hosted services**: classes deriving from `BackgroundService`,
+sign-up sheet every 60 minutes (30 until 2026-11-22). In .NET these were **hosted services**: classes deriving from `BackgroundService`,
 registered with `builder.Services.AddHostedService<…>()`; the host started them with the app and cancelled them on
 shutdown.
 

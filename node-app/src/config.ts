@@ -45,8 +45,8 @@ export type Config = {
   feedbackDir: string;
   /** Folder for page designs saved by the Development-only designer. */
   designsDir: string;
-  /** TEMPORARY sheet import (src/import/): on/off, the public gviz feed URL, minutes between imports. */
-  sheetImport: { enabled: boolean; sourceUrl: string; intervalMinutes: number };
+  /** TEMPORARY sheet import (src/import/): on/off, the public gviz feed URL, its HTML view (BGG links), minutes between imports. */
+  sheetImport: { enabled: boolean; sourceUrl: string; linksUrl: string; intervalMinutes: number };
   /** Bearer token for the BGG XML API ("Bgg:Token" in .NET); null = BGG lookups off (hand-added games only). */
   bggToken: string | null;
 };
@@ -96,7 +96,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const adminSeed = readAdminSeed(env, problems);
 
   // TEMPORARY Google sign-up sheet import (src/import/), "SheetImport" section in .NET. Off unless switched on.
-  const intervalText = env.SHEET_IMPORT_INTERVAL_MINUTES ?? '30';
+  const intervalText = env.SHEET_IMPORT_INTERVAL_MINUTES ?? '60';
   const intervalMinutes = Number(intervalText);
   if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1) {
     problems.push(`SHEET_IMPORT_INTERVAL_MINUTES must be a whole number of at least 1 (got "${intervalText}").`);
@@ -105,6 +105,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     enabled: env.SHEET_IMPORT_ENABLED === 'true',
     sourceUrl: env.SHEET_IMPORT_URL
       ?? 'https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg/gviz/tq?tqx=out:json&headers=1&sheet=Zapisy',
+    // The same tab's HTML view, only for its BGG links (the JSON feed has just the text "Link"). Empty = no links.
+    linksUrl: env.SHEET_IMPORT_LINKS_URL
+      ?? 'https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg/htmlview/sheet?headers=true&gid=0',
     intervalMinutes,
   };
 

@@ -425,7 +425,7 @@
     const kindSelect = /** @type {HTMLSelectElement} */ (kindCell.querySelector('select'));
     const hourCell = /** @type {HTMLElement} */ (document.getElementById('new-hour-cell'));
     const hourButton = /** @type {HTMLElement} */ (hourCell.querySelector('button'));
-    const maxCell = /** @type {HTMLElement} */ (document.getElementById('new-max'));
+    const maxInput = /** @type {HTMLInputElement} */ (document.getElementById('new-max'));
     const linkCell = /** @type {HTMLElement} */ (document.getElementById('new-link'));
     const difficultyCell = /** @type {HTMLElement} */ (document.getElementById('new-difficulty'));
     const coverPreview = /** @type {HTMLElement} */ (document.getElementById('new-cover-preview'));
@@ -440,11 +440,19 @@
     let drawnMaxPlayers = 1 + Math.floor(Math.random() * 6);
     /** @type {string | null} */ let hour = null;
     /** @type {string | null} */ let coverUrl = null;
+    /**
+     * The game whose defaults (kind, player count) were last copied into the row. Defaults are copied only when the
+     * looked-up game changes, so the user's own choices aren't overwritten by every later update().
+     * `undefined` = nothing copied yet (null is a real state: no game found).
+     * @type {GameView | null | undefined}
+     */
+    let appliedGame;
     const lookup = createLookup(panel, () => nameInput.value, () => kindSelect.value, update);
 
-    function maxPlayers() {
+    /** The game's own count: BGG's (or the catalog's) max players, else the drawn one. */
+    function defaultMaxPlayers() {
       const g = lookup.state.game;
-      return g && g.bggId !== null && g.maxPlayers > 0 ? g.maxPlayers : drawnMaxPlayers;
+      return g && g.maxPlayers > 0 ? g.maxPlayers : drawnMaxPlayers;
     }
 
     /** Shows the row's other cells once the name is looked up (Tables.razor DraftDetailsVisible). */
@@ -454,14 +462,17 @@
       for (const cell of draftRow.querySelectorAll('[data-draft-detail]')) cell.toggleAttribute('hidden', !visible);
       bggButton?.toggleAttribute('hidden', nameInput.value.trim() === '');
       cancelButton.toggleAttribute('hidden', nameInput.value.trim() === '');
-      if (g && !lookup.state.loading) kindSelect.value = g.kind;
+      if (!lookup.state.loading && g !== appliedGame) {
+        appliedGame = g;
+        if (g) kindSelect.value = g.kind;
+        maxInput.value = String(defaultMaxPlayers());
+      }
       kindCell.className = `cell kind-${kindSelect.value}`;
       hourCell.classList.toggle('hour-unset', hour === null);
       hourButton.textContent = hour ?? '--:--';
       hourButton.dataset.value = hour ?? '';
-      takenInput.max = String(maxPlayers());
-      maxCell.textContent = String(maxPlayers());
-      maxCell.title = g?.bggId != null ? 'Liczba graczy z BGG' : 'Liczba wylosowana (1–6)';
+      takenInput.max = String(Math.max(0, Number(maxInput.value) - 1));
+      maxInput.title = g?.bggId != null ? `Liczba graczy z BGG: ${g.maxPlayers}` : 'Liczba graczy';
       linkCell.replaceChildren();
       if (g?.bggUrl) {
         const a = document.createElement('a');
@@ -513,6 +524,7 @@
       coverInput.value = '';
       setCoverPreview(null);
       drawnMaxPlayers = 1 + Math.floor(Math.random() * 6);
+      appliedGame = undefined;
       lookup.reset();
       update();
     }
@@ -529,6 +541,7 @@
     bggButton?.addEventListener('click', () => lookup.lookup('bgg'));
     cancelButton.addEventListener('click', reset);
     kindSelect.addEventListener('change', update);
+    maxInput.addEventListener('input', update);
     hourButton.addEventListener('click', e => openHourPicker(hourButton, e, picked => { hour = picked; update(); }));
 
     coverInput.addEventListener('change', () => {
@@ -556,7 +569,7 @@
       form.set('kind', kindSelect.value);
       form.set('hour', hour ?? '');
       form.set('takenSlots', takenInput.value || '0');
-      form.set('maxPlayers', String(maxPlayers()));
+      form.set('maxPlayers', maxInput.value);
       const file = coverInput.files?.[0];
       if (file) form.set('cover', file);
       createButton.disabled = true;
@@ -593,7 +606,6 @@
     const input = document.createElement('input');
     input.id = 'rename-name';
     input.className = 'form-control form-control-sm';
-    input.setAttribute('list', 'catalog-names');
     input.maxLength = 200;
     input.autocomplete = 'off';
     input.value = row.dataset.title ?? '';

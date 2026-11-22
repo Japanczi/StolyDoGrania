@@ -141,20 +141,26 @@ describe('creating a table', () => {
     assert.equal((await anon.postMultipart('/api/tables', form({}))).json().error, 'Zaloguj się, aby utworzyć stół.');
     const b = await s.browser('Owner');
     assert.equal((await b.postMultipart('/api/tables', form({ takenSlots: '4' }))).json().error, 'Przy stole musi zostać co najmniej jedno miejsce dla Ciebie.');
-    assert.equal((await b.postMultipart('/api/tables', form({ maxPlayers: '15' }))).json().error, 'Nieprawidłowa liczba miejsc.');
+    assert.equal((await b.postMultipart('/api/tables', form({ maxPlayers: '0' }))).json().error, 'Nieprawidłowa liczba miejsc.');
+    assert.equal((await b.postMultipart('/api/tables', form({ maxPlayers: '2.5' }))).json().error, 'Nieprawidłowa liczba miejsc.');
+    assert.equal((await b.postMultipart('/api/tables', form({ maxPlayers: '21' }))).json().error, 'Nie można tworzyć stołów dla gier z więcej niż 20 miejscami.');
     assert.equal((await b.postMultipart('/api/tables', form({ hour: '18:20' }))).json().error, 'Nieprawidłowa godzina.');
     assert.equal((await s.db.selectFrom('play_tables').select('id').execute()).length, 0);
   });
 
-  test('a BGG game brings its own seat count, whatever the page sent', async t => {
+  test('the table gets the chosen player count, but the BGG game in the catalog keeps BGG\'s count', async t => {
     const s = await setUp();
     t.after(s.close);
     const b = await s.browser('Owner');
     const lookup = (await b.postJson('/api/lookup', { name: 'Azul', mode: 'auto', kind: 'small' })).json();
     assert.equal(lookup.kind, 'selected');
-    const id = await createTable(b, { name: 'Azul', gameId: String(lookup.game.id), maxPlayers: '2' });
-    const table = await s.db.selectFrom('play_tables').select('max_players').where('id', '=', id).executeTakeFirstOrThrow();
-    assert.equal(table.max_players, 4);
+    assert.equal(lookup.game.maxPlayers, 4);
+    const id = await createTable(b, { name: 'Azul', gameId: String(lookup.game.id), maxPlayers: '2', kind: 'big' });
+    const table = await s.db.selectFrom('play_tables').select(['max_players', 'kind', 'game_id']).where('id', '=', id).executeTakeFirstOrThrow();
+    assert.equal(table.max_players, 2);
+    assert.equal(table.kind, 'big');
+    const game = await s.db.selectFrom('games').select('max_players').where('id', '=', table.game_id).executeTakeFirstOrThrow();
+    assert.equal(game.max_players, 4);
   });
 
   test('a cover can be uploaded for a hand-added game, checked by content and size, and is served from the database', async t => {
