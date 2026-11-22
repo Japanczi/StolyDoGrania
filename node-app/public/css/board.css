@@ -376,10 +376,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* As tall as a row with a cover (100px, less the cell's padding); grows with the player's name, up to 300% of the base width. */
+    /* A fixed square, as tall as a row with a cover (100px, less the cell's padding). Long names wrap (see .slot-name). */
     flex: none;
-    min-width: 92px;
-    max-width: 276px;
+    width: 92px;
     height: 92px;
     padding: 2px 6px;
     overflow: hidden;
@@ -391,11 +390,18 @@
     text-align: center;
 }
 
+/* The name wraps onto at most 2 lines, then ends with "…" (the full name is in the slot's title).
+   line-clamp still needs the -webkit- prefix and display: -webkit-box in every browser. */
 .slot-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* Breaks a single word only when it is wider than the slot on its own. */
+    overflow-wrap: break-word;
 }
 
 button.slot:not(:disabled):not(.slot-inert) {

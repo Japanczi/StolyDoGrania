@@ -1,7 +1,7 @@
 // Reads and writes of the games catalog. Port of the catalog parts of Tables.razor (SaveBggGameAsync,
 // FindInCatalog …) and of Game.ApplyBggData.
 
-import { sql, type Kysely } from 'kysely';
+import { type Kysely } from 'kysely';
 import type { BggCover, BggGameDetails } from '../../integrations/bgg/client.ts';
 import { defaultBggUrl, isMissingCover, uniqueCatalogName } from '../../domain/game.ts';
 import type { TableKind } from '../../domain/play-table.ts';
@@ -66,13 +66,6 @@ export async function findBggGamesByAnyName(db: Executor, name: string): Promise
 export async function findHandAddedGame(db: Executor, name: string): Promise<CatalogGame | null> {
   const row = await db.selectFrom('games').select(columns).where('name', '=', name.trim()).where('bgg_id', 'is', null).executeTakeFirst();
   return row ? toCatalogGame(row) : null;
-}
-
-/** Every catalog name and alternate name, for the game-name field's suggestions (<datalist>). */
-export async function catalogNames(db: Executor): Promise<string[]> {
-  const rows = await sql<{ name: string }>`
-    select name from games union select name from game_alternate_names order by name collate nocase`.execute(db);
-  return rows.rows.map(r => r.name);
 }
 
 export async function getCover(db: Executor, gameId: number): Promise<{ bytes: Buffer; type: string } | null> {

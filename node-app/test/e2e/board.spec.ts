@@ -23,9 +23,17 @@ test('a table created in one browser appears in another, and seats update live b
   await jan.getByLabel('Nazwa gry nowego stołu').fill('Gra na żywo');
   await jan.getByLabel('Nazwa gry nowego stołu').press('Tab');
   await expect(jan.locator('#new-max')).toBeVisible();
+  // The table kind and player count chosen in the new-table row stick (later updates of the row keep them).
+  await jan.locator('#new-kind-cell select').selectOption('big');
+  await jan.locator('#new-max').fill('3');
+  await jan.locator('#new-taken').fill('0');
+  await expect(jan.locator('#new-kind-cell select')).toHaveValue('big');
+  await expect(jan.locator('#new-max')).toHaveValue('3');
   await jan.getByRole('button', { name: 'Utwórz stół' }).click();
   await expect(jan.getByText('Utworzono stół: Gra na żywo.')).toBeVisible();
   await expect(zofia.locator('.table-row', { hasText: 'Gra na żywo' })).toBeVisible();
+  await expect(zofia.locator('.table-row', { hasText: 'Gra na żywo' }).locator('[data-slot]')).toHaveCount(3);
+  await expect(zofia.locator('.table-row', { hasText: 'Gra na żywo' }).locator('.cell.kind-big')).toHaveCount(1);
 
   // Zofia takes the second seat; Jan sees her name appear.
   const zofiasRow = zofia.locator('.table-row', { hasText: 'Gra na żywo' });
