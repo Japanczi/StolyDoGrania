@@ -37,6 +37,10 @@ Layout should follow the screenshot, but with some changes:
 - Player slot size: fixed squares as tall as the row (row height is set by the 100px cover); every slot has the same
   size whatever the name. A name wraps onto at most 2 lines, then is cut with "…"; the full name is in the tooltip
   (decided 2026-11-22). The game name column is kept narrow so that 6 slots fit on one line from about 1360px window width.
+  It was made 33% narrower on 2026-11-22: at least 100px (was 150px) and 2/15 of the flexible space (was 1/5);
+  the slots column gets the rest. E.g. 171px instead of 256px in a 1920px window.
+- New-table row: the "Utwórz stół", "BGG" and "Anuluj" buttons are always stacked vertically, each as wide as the
+  game-name field above them (decided 2026-11-22).
 - Player slots design: squares with round edges, white background = free, dark-pink = taken (with player name in it), salmon = slot marked as taken by owner,
 very dark pink with 2px golden border = table owner's slot (owner automatically assigned the first slot after creating a table)
 - Slots taken set by owner - users unable to take these slots

@@ -69,8 +69,9 @@
 
 .table-row {
     display: grid;
-    grid-template-columns: 62px minmax(150px, 1fr) 64px 84px 96px 60px 52px 76px 108px minmax(280px, 4fr);
-    min-width: 1054px;
+    /* The game column takes 2/15 of the flexible space (was 1/5, then 33% narrower, decided 2026-11-22); the slots get the rest. */
+    grid-template-columns: 62px minmax(100px, 2fr) 64px 84px 96px 60px 52px 76px 108px minmax(280px, 13fr);
+    min-width: 1004px;
     overflow: hidden;
     border-radius: 6px;
     background: #3b3b40;
@@ -294,10 +295,11 @@
     flex: none;
 }
 
+/* The new-table row's buttons: one under another, each as wide as the cell (like the name field above them). */
 .draft-actions {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-direction: column;
+    align-self: stretch;
     gap: 2px;
 }
 
