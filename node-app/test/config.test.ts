@@ -19,8 +19,9 @@ describe('loadConfig', () => {
       feedbackDir: '../Claude_Resources/Feedback',
       designsDir: '../Claude_Resources/Tools/Designs',
       sheetImport: {
-        enabled: false, intervalMinutes: 30,
+        enabled: false, intervalMinutes: 60,
         sourceUrl: 'https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg/gviz/tq?tqx=out:json&headers=1&sheet=Zapisy',
+        linksUrl: 'https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg/htmlview/sheet?headers=true&gid=0',
       },
     });
     assert.ok(config.secret.length >= 32, 'a development secret is filled in');

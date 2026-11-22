@@ -6,11 +6,10 @@
 // the server is inserted, so nothing in a game name can inject markup).
 
 import type { Db } from '../../../db/database.ts';
-import {
-  findBggGamesByAnyName, findGameByBggId, findHandAddedGame, saveBggGame, type CatalogGame,
-} from '../../../db/queries/games.ts';
+import { findBggGamesByAnyName, findHandAddedGame, type CatalogGame } from '../../../db/queries/games.ts';
 import { catalogLabel, difficultyLabel, difficultyStyle } from '../../../domain/game.ts';
 import type { TableKind } from '../../../domain/play-table.ts';
+import { addBggGameToCatalog } from '../../../integrations/bgg/add-to-catalog.ts';
 import { BggUnavailableError, type BggClient } from '../../../integrations/bgg/client.ts';
 
 const maxListedCandidates = 20;
@@ -149,18 +148,8 @@ async function searchBgg(deps: LookupDeps, name: string, pickSingleExactMatch: b
 
 /** Adds a BGG game to the catalog (once), cover included, and selects it. */
 async function importFromBgg(deps: LookupDeps, bggId: number, kind: TableKind): Promise<LookupResult> {
-  const cached = await findGameByBggId(deps.db, bggId);
-  if (cached?.hasCover) {
-    return selected(cached);
-  }
-  const details = await deps.bgg.getGame(bggId);
-  if (!details) {
-    return { kind: 'none', note: 'BoardGameGeek nie zwrócił danych tej gry.', game: null };
-  }
-  const cover = details.thumbnailUrl ? await deps.bgg.downloadCover(details.thumbnailUrl) : null;
-  await saveBggGame(deps.db, details, cover, kind);
-  const imported = await findGameByBggId(deps.db, bggId);
-  return imported ? selected(imported) : { kind: 'none', note: 'Nie udało się zapisać gry w katalogu. Spróbuj ponownie.', game: null };
+  const imported = await addBggGameToCatalog(deps.db, deps.bgg, bggId, kind);
+  return imported ? selected(imported) : { kind: 'none', note: 'BoardGameGeek nie zwrócił danych tej gry.', game: null };
 }
 
 function selected(game: CatalogGame): Extract<LookupResult, { kind: 'selected' }> {

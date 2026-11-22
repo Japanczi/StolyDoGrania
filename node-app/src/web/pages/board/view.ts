@@ -87,7 +87,7 @@ function ownRows(viewer: Viewer, tables: BoardTable[], highlightId: number | nul
 function importedRows(viewer: Viewer, tables: BoardTable[], highlightId: number | null): SafeHtml {
   const imported = tables.filter(t => t.importKey !== null).toSorted((a, b) => (a.importOrder ?? 0) - (b.importOrder ?? 0));
   return html`<div class="table-rows" id="imported-rows">${imported.length > 0 && html`<div class="import-divider" role="separator">
-    <span><span aria-hidden="true">👇👇👇 </span>GRY IMPORTOWANE Z EXCELA CO 30 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
+    <span><span aria-hidden="true">👇👇👇 </span>(TYMCZASOWE) GRY IMPORTOWANE Z EXCELA CO 60 MINUT, KAŻDE ZMIANY PONIŻEJ ZOSTANĄ AUTOMATYCZNIE NADPISANE<span aria-hidden="true"> 👇👇👇</span></span>
 </div>`}
 ${imported.map(t => tableRow(viewer, t, t.id === highlightId))}</div>`;
 }

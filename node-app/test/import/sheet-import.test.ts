@@ -9,8 +9,53 @@ import { editTable, loadBoard } from '../../src/db/queries/board.ts';
 import { freeSlots, tryTakeSlot, type PlayTable } from '../../src/domain/play-table.ts';
 import { applyImport } from '../../src/import/apply-import.ts';
 import { syncSheet } from '../../src/import/board-sync.ts';
+import { clearMatch, findSheetGamesOnBgg, type BggSearchCache } from '../../src/import/sheet-games.ts';
 import { startSheetImport, type SheetImportDeps } from '../../src/import/sheet-import-job.ts';
+import { parseSheetLinks } from '../../src/import/sheet-links.ts';
 import { keysFor, parseSheet, SheetFormatError, type SheetTableRow } from '../../src/import/sheet-parser.ts';
+import { BggUnavailableError, type BggClient, type BggGameDetails } from '../../src/integrations/bgg/client.ts';
+
+// The sheet's HTML view (2026-11-22), cut down: Google's column letters first, then the sheet's own header row,
+// links wrapped in Google's redirect.
+const linksHtml = `<table class="waffle"><thead><tr><th class="row-header freezebar-origin-ltr"></th><th id="0C0">A</th><th id="0C1">B</th><th id="0C5">F</th></tr></thead>
+<tbody><tr style="height: 20px"><th id="0R0">1</th><td class="s0">Tytul</td><td class="s0">Zajęte</td><td class="s0">BGG</td></tr>
+<tr><th id="0R1">2</th><td class="s2">Splendor   marvel</td><td class="s13">3</td><td class="s15"><a target="_blank" rel="noreferrer" href="https://www.google.com/url?q=https://boardgamegeek.com/boardgame/220653&amp;sa=D&amp;source=editors">Link</a></td></tr>
+<tr><th id="0R2">3</th><td class="s2">Grimcoven </td><td class="s13"></td><td class="s15">Link</td></tr>
+<tr><th id="0R3">4</th><td class="s2">Dungeons &amp; Dragons</td><td></td><td><a href="https://www.google.com/url?q=https://boardgamegeek.com/boardgame/12&amp;sa=D">Link</a></td></tr>
+<tr><th id="0R4">5</th><td class="s2">Splendor marvel</td><td></td><td><a href="https://www.google.com/url?q=https://boardgamegeek.com/boardgame/999&amp;sa=D">Link</a></td></tr>
+</tbody></table>`;
+
+const splendorMarvel: BggGameDetails = {
+  id: 220653, name: 'Splendor Marvel', alternateNames: [], year: 2020, maxPlayers: 4, weight: '1.8',
+  thumbnailUrl: 'https://cf.geekdo-images.com/s.png',
+};
+const recallBgg: BggGameDetails = {
+  id: 777, name: 'Recall', alternateNames: [], year: 2024, maxPlayers: 5, weight: '2.25', thumbnailUrl: null,
+};
+
+function fakeBgg(games: BggGameDetails[], opts: { unavailable?: boolean } = {}): BggClient & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    calls,
+    isConfigured: true,
+    async search(query) {
+      calls.push(`search:${query}`);
+      if (opts.unavailable) throw new BggUnavailableError('down');
+      return games.filter(g => g.name.toLowerCase().includes(query.toLowerCase())).map(g => ({ id: g.id, name: g.name, year: g.year }));
+    },
+    async getGame(id) {
+      calls.push(`thing:${id}`);
+      if (opts.unavailable) throw new BggUnavailableError('down');
+      return games.find(g => g.id === id) ?? null;
+    },
+    async downloadCover() {
+      calls.push('cover');
+      return { bytes: Buffer.from('89504e470d0a1a0a', 'hex'), contentType: 'image/png' };
+    },
+  };
+}
+
+const quietLog = { warn: () => {} };
 
 // Shaped like the real feed (2026-11-08), cut down to the columns and rows the tests need.
 const feed = `/*O_o*/
@@ -239,6 +284,82 @@ describe('sheet sync', () => {
   });
 });
 
+describe('BGG links from the sheet\'s HTML view', () => {
+  test('reads the BGG id per title, found by the "Tytul" header', () => {
+    assert.deepEqual([...parseSheetLinks(linksHtml)], [
+      ['splendor marvel', 220653],
+      ['dungeons & dragons', 12],
+    ], 'no link for Grimcoven; the first row of a repeated title wins');
+  });
+
+  test('anything unexpected gives no links instead of an error', () => {
+    assert.equal(parseSheetLinks('<html>Sign in</html>').size, 0);
+    assert.equal(parseSheetLinks('<tr><td>Tytul</td></tr><tr><td>X &#99999999; &#x41;</td><td>boardgamegeek.com/boardgame/5</td></tr>').get('x a'), 5);
+  });
+});
+
+describe('finding the sheet\'s games on BGG', () => {
+  test('a single clear search result only', () => {
+    const r = (id: number, name: string) => ({ id, name, year: null });
+    assert.equal(clearMatch('Azul', [r(1, 'Azul'), r(2, 'Azul: Summer Pavilion')]), 1, 'the one exact title');
+    assert.equal(clearMatch('Azul', [r(2, 'Azul: Summer Pavilion')]), 2, 'the only result');
+    assert.equal(clearMatch('Azul', [r(1, 'Azul'), r(3, 'AZUL')]), null, 'two exact titles');
+    assert.equal(clearMatch('Azul', [r(2, 'Azul: A'), r(4, 'Azul: B')]), null, 'several, none exact');
+    assert.equal(clearMatch('Azul', []), null);
+  });
+
+  test('adds linked and searched games to the catalog; the sync puts the tables on them', async t => {
+    const db = await createDb(t);
+    // A sheet-only game from an earlier import, before BGG matching existed.
+    await syncSheet(db, [row('Recall', 4, 0, null, [1, 'Ela'])]);
+    const bgg = fakeBgg([splendorMarvel, recallBgg]);
+    const cache: BggSearchCache = new Map();
+    const rows = [row('Splendor marvel', 3), row('Recall', 4, 0, null, [1, 'Ela']), row('Nieznana gra', 2)];
+
+    const games = await findSheetGamesOnBgg({ db, bgg, log: quietLog, cache }, rows, new Map([['splendor marvel', 220653]]));
+    assert.deepEqual(bgg.calls, ['thing:220653', 'cover', 'search:Recall', 'thing:777', 'search:Nieznana gra'],
+      'the link saves a search; nothing found for the last title');
+    await syncSheet(db, rows, games);
+
+    const board = await loadBoard(db);
+    const splendor = board.find(b => b.gameTitle === 'Splendor marvel');
+    assert.equal(splendor?.game.bgg_id, 220653);
+    assert.equal(splendor?.maxPlayers, 3, 'the table keeps the sheet\'s seat count');
+    const catalog = await db.selectFrom('games').select(['name', 'bgg_id', 'max_players', 'weight', 'is_from_sheet']).orderBy('name').execute();
+    assert.deepEqual(catalog, [
+      { name: 'Nieznana gra', bgg_id: null, max_players: 2, weight: '2.5', is_from_sheet: 1 },
+      { name: 'Recall', bgg_id: 777, max_players: 5, weight: '2.25', is_from_sheet: 1 },
+      { name: 'Splendor Marvel', bgg_id: 220653, max_players: 4, weight: '1.8', is_from_sheet: 0 },
+    ], 'BGG\'s count and weight in the catalog; the old Recall game became the BGG game');
+    assert.deepEqual(slotsOf(board.find(b => b.gameTitle === 'Recall') ?? { participants: [] }), { 1: 'Ela' });
+
+    // The next import asks BGG nothing: linked and found games are in the catalog, misses are remembered.
+    bgg.calls.length = 0;
+    const again = await findSheetGamesOnBgg({ db, bgg, log: quietLog, cache }, rows, new Map([['splendor marvel', 220653]]));
+    assert.deepEqual(bgg.calls, []);
+    assert.equal((await syncSheet(db, rows, again)).changed, false);
+  });
+
+  test('BGG down: stops asking and the sync matches by name as before', async t => {
+    const db = await createDb(t);
+    const bgg = fakeBgg([], { unavailable: true });
+    const warnings: unknown[] = [];
+    const rows = [row('Splendor marvel'), row('Recall')];
+    const games = await findSheetGamesOnBgg({ db, bgg, log: { warn: (...a: unknown[]) => { warnings.push(a); } }, cache: new Map() }, rows, new Map());
+    assert.equal(games.size, 0);
+    assert.deepEqual(bgg.calls, ['search:Splendor marvel'], 'the second title isn\'t tried');
+    assert.equal(warnings.length, 1);
+    await syncSheet(db, rows, games);
+    assert.equal((await loadBoard(db)).length, 2);
+  });
+
+  test('without a BGG token nothing is asked', async t => {
+    const db = await createDb(t);
+    const bgg = { ...fakeBgg([splendorMarvel]), isConfigured: false };
+    assert.equal((await findSheetGamesOnBgg({ db, bgg, log: quietLog, cache: new Map() }, [row('Splendor marvel')], new Map())).size, 0);
+  });
+});
+
 describe('sheet import job', () => {
   type Deferred = { promise: Promise<Response>; resolve: (r: Response) => void };
   function deferred(): Deferred {
@@ -260,7 +381,7 @@ describe('sheet import job', () => {
     const deps: SheetImportDeps = {
       db, log, fetch: fetchFn,
       hub: { notify: change => { notified.push(change.tableId); } },
-      settings: { enabled: true, sourceUrl: 'https://example.test/gviz', intervalMinutes: 30 },
+      settings: { enabled: true, sourceUrl: 'https://example.test/gviz', linksUrl: '', intervalMinutes: 30 },
     };
     return { db, notified, entries, deps };
   }
@@ -344,6 +465,36 @@ describe('sheet import job', () => {
     assert.equal(pending.length, 2, 'the next tick runs again');
     pending[1]?.resolve(new Response(feed));
     await job.runNow();
+  });
+
+  test('with BGG: uses the sheet\'s links, and still imports when they can\'t be read', async t => {
+    const urls: string[] = [];
+    let linksOk = true;
+    const { db, entries, deps } = await setup(t, input => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes('htmlview')) {
+        return Promise.resolve(linksOk ? new Response(linksHtml) : new Response('nope', { status: 500 }));
+      }
+      return Promise.resolve(new Response(feed));
+    });
+    const bgg = fakeBgg([splendorMarvel]);
+    const withBgg = { ...deps, bgg, settings: { ...deps.settings, linksUrl: 'https://example.test/htmlview' } };
+
+    const job = startSheetImport(withBgg);
+    t.after(() => job.stop());
+    await job.runNow();
+    assert.deepEqual(urls, ['https://example.test/gviz', 'https://example.test/htmlview']);
+    assert.ok(bgg.calls.includes('thing:220653'), 'Splendor found by its link');
+    assert.equal((await loadBoard(db)).find(b => b.gameTitle === 'Splendor marvel')?.game.bgg_id, 220653);
+
+    linksOk = false;
+    const second = startSheetImport(withBgg);
+    t.after(() => second.stop());
+    await second.runNow();
+    assert.equal((await loadBoard(db)).length, 3, 'imported all the same');
+    assert.ok(entries.some(e => e.level === 'warn'));
+    assert.ok(!entries.some(e => e.level === 'error'));
   });
 
   test('is off when disabled', async t => {

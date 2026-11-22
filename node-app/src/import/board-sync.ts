@@ -8,7 +8,7 @@ import type { Db } from '../db/database.ts';
 import type { Database } from '../db/schema.ts';
 import type { PlayTable } from '../domain/play-table.ts';
 import { applyImport } from './apply-import.ts';
-import { keysFor, type SheetTableRow } from './sheet-parser.ts';
+import { keysFor, normalizeTitle, type SheetTableRow } from './sheet-parser.ts';
 
 export type SheetSyncResult = {
   added: number;
@@ -21,7 +21,7 @@ export type SheetSyncResult = {
 };
 
 type Executor = Kysely<Database>;
-type CatalogGame = { id: number; name: string; weight: string; alternateNames: string[] };
+type CatalogGame = { id: number; name: string; weight: string; bggId: number | null; alternateNames: string[] };
 
 const sameText = (a: string, b: string) => a.toUpperCase() === b.toUpperCase();
 
@@ -30,12 +30,15 @@ const snapshot = (t: PlayTable, importOrder: number | null) =>
   JSON.stringify([t.gameId, t.gameTitle, t.kind, t.maxPlayers, t.startHour, t.takenSlots, importOrder,
     t.participants.map(p => [p.slotNumber, p.participantName, p.userId, p.isImported === true])]);
 
-/** Syncs the board with the sheet's rows, in one transaction. */
-export async function syncSheet(db: Db, rows: readonly SheetTableRow[]): Promise<SheetSyncResult> {
-  return db.transaction().execute(trx => syncInTransaction(trx, rows));
+/**
+ * Syncs the board with the sheet's rows, in one transaction. `bggGames` (normalized title → catalog id, from
+ * findSheetGamesOnBgg) says which BGG game a title is; titles without one are matched by name.
+ */
+export async function syncSheet(db: Db, rows: readonly SheetTableRow[], bggGames: ReadonlyMap<string, number> = new Map()): Promise<SheetSyncResult> {
+  return db.transaction().execute(trx => syncInTransaction(trx, rows, bggGames));
 }
 
-async function syncInTransaction(trx: Executor, rows: readonly SheetTableRow[]): Promise<SheetSyncResult> {
+async function syncInTransaction(trx: Executor, rows: readonly SheetTableRow[], bggGames: ReadonlyMap<string, number>): Promise<SheetSyncResult> {
   const tables = await loadImportedTables(trx);
   const catalog = await loadCatalog(trx);
   const newGames = new Map<string, number>();
@@ -55,12 +58,15 @@ async function syncInTransaction(trx: Executor, rows: readonly SheetTableRow[]):
       id: 0, gameId: 0, gameTitle: null, startHour: null, maxPlayers: 1, kind: 'small', ownerUserId: null, takenSlots: 0, participants: [],
     };
 
-    // A catalog game of that name (or alternate name) is reused untouched, apart from filling in a missing weight.
-    const known = catalog.find(g => sameText(g.name, row.title))
+    // The title's BGG game if one was found; otherwise a catalog game of that name (or alternate name). Either is
+    // reused untouched, apart from filling in a missing weight on a game without BGG data (BGG's weight is BGG's).
+    const bggGameId = bggGames.get(normalizeTitle(row.title));
+    const known = (bggGameId !== undefined ? catalog.find(g => g.id === bggGameId) : undefined)
+      ?? catalog.find(g => sameText(g.name, row.title))
       ?? catalog.find(g => g.alternateNames.some(a => sameText(a, row.title)));
     if (known) {
       table.gameId = known.id;
-      if (Number(known.weight) === 0 && Number(row.weight) > 0) {
+      if (known.bggId === null && Number(known.weight) === 0 && Number(row.weight) > 0) {
         await trx.updateTable('games').set({ weight: row.weight }).where('id', '=', known.id).execute();
         known.weight = row.weight;
         changed = true;
@@ -142,9 +148,12 @@ async function loadImportedTables(trx: Executor): Promise<Map<string, { table: P
 
 /** Names only: loading whole games would load every cover. */
 async function loadCatalog(trx: Executor): Promise<CatalogGame[]> {
-  const games = await trx.selectFrom('games').select(['id', 'name', 'weight']).execute();
+  const games = await trx.selectFrom('games').select(['id', 'name', 'weight', 'bgg_id']).execute();
   const alternates = await trx.selectFrom('game_alternate_names').select(['game_id', 'name']).execute();
-  return games.map(g => ({ ...g, alternateNames: alternates.filter(a => a.game_id === g.id).map(a => a.name) }));
+  return games.map(g => ({
+    id: g.id, name: g.name, weight: g.weight, bggId: g.bgg_id,
+    alternateNames: alternates.filter(a => a.game_id === g.id).map(a => a.name),
+  }));
 }
 
 async function saveImportedTable(trx: Executor, table: PlayTable, importOrder: number): Promise<void> {

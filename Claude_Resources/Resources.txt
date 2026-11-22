@@ -4,9 +4,9 @@ Columns as follow from the left (order and placement per the screenshot):
 - Action buttons (far left: delete shown as ❌, rename shown as 🏷️ on dark green, plus 3 placeholder buttons shown as 🛠️ on dark green for owner options coming later; stacked vertically, starting a new column when out of space),
 - Game name (set by table owner),
 - Slots taken (set by table owner),
-- Table type (small, large, whatever; set by table owner),
+- Table type (small, large, whatever; set by table owner; in the new-table row it is prefilled from the looked-up game and the user may change it – the choice is kept until a different game is looked up),
 - Hour of meeting (hour only, no date - users know what day it refers to; set by table owner; picked in 15-minute steps from a popup showing the entire list at once, without scrolling),
-- Number of players (from BGG's max players; randomized 1-6 for games not found on BGG. Games over the limit get an error and no table; the limit is Tables:MaximumSpotsAllowed in appsettings.json, currently 20),
+- Number of players (prefilled from BGG's max players; randomized 1-6 for games not found on BGG. While creating a table (the new-table row) the user may change it with a number field (up/down), 1 up to the limit; nowhere else – existing rows show it as plain text. The chosen count goes to the table only: a BGG game in the catalog keeps BGG's count (decided 2026-11-22). Games over the limit get an error and no table; the limit is Tables:MaximumSpotsAllowed in appsettings.json, currently 20),
 - BGG Link (the game's BGG page; bgg.com for games not found on BGG),
 - Difficulty (BGG's average weight, stored and displayed exactly as BGG gives it, with a dot: 2.0488; comes only from BGG and can't be entered by users, so games not found on BGG show "–"),
 - Game picture (set by BGG API and stored in database; random colored square with game name text on top when there is none.
@@ -34,13 +34,17 @@ Navigation:
 Layout should follow the screenshot, but with some changes:
 - A compact list of games, spanning from top to bottom of the screen, with slight spacing between them.
 - Player slot width: slots grow horizontally with the player's name, up to 300% of their original width; beyond that the name is cut with '...'.
-- Player slot size: squares as tall as the row (row height is set by the 100px cover). The game name column is kept narrow so that 6 slots fit on one line from about 1360px window width.
+- Player slot size: fixed squares as tall as the row (row height is set by the 100px cover); every slot has the same
+  size whatever the name. A name wraps onto at most 2 lines, then is cut with "…"; the full name is in the tooltip
+  (decided 2026-11-22). The game name column is kept narrow so that 6 slots fit on one line from about 1360px window width.
 - Player slots design: squares with round edges, white background = free, dark-pink = taken (with player name in it), salmon = slot marked as taken by owner,
 very dark pink with 2px golden border = table owner's slot (owner automatically assigned the first slot after creating a table)
 - Slots taken set by owner - users unable to take these slots
 - Raising the slots taken counter marks the highest-numbered free slots, passing over seated players, so marks can have gaps between them. The limit is the number of free slots.
 - Table type: the expanded list has black text on a white background.
 - List of game titles suggested when creating a table: ordered vertically, white text and borders.
+- The game-name fields (new-table row, 🏷️ rename) show no drop-down of catalog names while typing (the old <datalist>
+  was removed, decided 2026-11-22); the name is only looked up when the field is left.
 - No hour of meeting set = red background
 - BGG Link should be clickable and open in a new tab
 - Game picture should be displayed as a small thumbnail in its own column, between difficulty and game slots, sizable enough to be recognizable, but not too large to take up too much space (100px square)
@@ -172,18 +176,26 @@ Sign-up sheet import (decided 2026-11-08) – TEMPORARY:
   PlayTable.ApplyImport/ImportKey, TableSlot.IsImported, Game.IsFromSheet, with a migration). Keep it isolated meanwhile:
   no new features should depend on it.
 - The board mirrors the Google sheet "Zapisy" (https://docs.google.com/spreadsheets/d/1dFn45RpsmRBS06RJO6ijlKYSsajHMbb-p3qCwfIqXdg).
-  SheetImportService reads it at startup and every 30 minutes (config section "SheetImport": Enabled, SourceUrl, IntervalMinutes).
+  SheetImportService reads it at startup and every 60 minutes (30 until 2026-11-22) (config section "SheetImport": Enabled, SourceUrl, IntervalMinutes).
 - Source: the public Google Visualization JSON feed, tab picked by name (sheet=Zapisy; the feed ignores gid, so a renamed
   tab needs SourceUrl changed). If the download fails or the tab doesn't look like the sign-up sheet, nothing changes.
 - Columns by header label: Tytul → table title / game, Stół (Mały/Duży/other) → table kind, Start → hour, Max → seats,
   Waga → weight, Slot N → seats: a name = imported player, "Zajęte" = marked as taken (counted), "WOLNE"/empty = free.
-  Column B "Zajęte" is ignored (the slot cells are what the sheet shows). BGG links and covers are NOT imported (user's call).
+  Column B "Zajęte" is ignored (the slot cells are what the sheet shows). The sheet's own covers are NOT imported (user's call).
+- BGG (decided 2026-11-22): every game of the sheet is looked up on BGG and added to the catalog (BGG details + cover)
+  when it isn't there yet. The sheet's BGG link says which game it is; the JSON feed only has the cell text "Link", so
+  the links are read from the tab's public HTML view (SHEET_IMPORT_LINKS_URL, …/htmlview/sheet?headers=true&gid=0).
+  Without a link the title is searched on BGG and used only when there is one clear match (one exact title, or the only
+  result) – the same rule as the new-table row; a title is searched once per server run. Without BGG_TOKEN, when BGG is
+  down or nothing clear is found, the old name matching applies. Tables keep the sheet's seat count; the catalog game
+  keeps BGG's. BGG is asked before the sync, outside its transaction (5 s between requests must not block the database).
 - 1:1: imported tables (PlayTable.ImportKey = normalized title + "#occurrence") and imported seats (TableSlot.IsImported)
   are added, updated and removed to match the sheet. Renaming a row in the sheet replaces its table.
 - App data stays: tables created in the app are never touched; seats taken in the app at an imported table are kept,
   moved to the lowest free seat if the sheet gives theirs to someone else, and dropped (logged) only when no seat is left.
   A table removed from the sheet goes with all its seats.
-- Games: a catalog game with the same name / alternate name is reused unchanged (only a missing weight is filled in);
+- Games: the title's BGG game (see above), else a catalog game with the same name / alternate name, is reused unchanged
+  (only a missing weight is filled in, and only on a game without BGG data);
   otherwise a game is created with Game.IsFromSheet, deleted again once no table uses it. Attaching BGG data clears the flag.
 - Imported tables list in the sheet's row order (PlayTable.ImportOrder, set at every import).
   The "imported from Excel" divider line sits directly after the website's own tables, with about five empty text
@@ -335,8 +347,9 @@ Phase 3 – board (decided 2026-11-10):
   answers are JSON { ok, message | error } shown as the same dismissible alerts as in .NET.
 - The meeting hour is stored as "HH:MM" only. Covers are served from /covers/<game id> (cacheable), not embedded.
 - Uploaded covers are checked by content (magic bytes), max 2 MB enforced while receiving.
-- The seat count of a hand-added game is still drawn at random (1–6) and re-checked on the server; a BGG game always
-  uses BGG's count. New BGG_TOKEN setting (without it, lookups use the catalog and hand-added games only).
+- The seat count in the new-table row is prefilled (BGG's / the catalog's count, else drawn at random 1–6) and can be
+  changed by the user; the server accepts a whole number from 1 to the limit. The catalog game's count is never
+  changed by table creation (a hand-added game is stored with the count of the table that created it). (2026-11-22) New BGG_TOKEN setting (without it, lookups use the catalog and hand-added games only).
 - Deleted accounts: their seats keep the name, their tables lose the owner (owner/user ids set to null).
 - Packages added: fast-xml-parser, @fastify/websocket, @fastify/multipart; dev @types/ws, @playwright/test
   (+ Chromium for Playwright, downloaded to the PC only). npm run test:e2e runs the browser test.
@@ -369,7 +382,7 @@ Phase 4 – the rest (decided 2026-11-10):
     flattened to one line (file name pattern and front matter otherwise unchanged).
   - Normal user mode is still in memory (everyone back to their real role after a restart).
 - Sheet import (TEMPORARY, src/import/): off unless SHEET_IMPORT_ENABLED=true (the live .NET app has it on, so
-  production must set it). SHEET_IMPORT_URL, SHEET_IMPORT_INTERVAL_MINUTES (30). Imported hours are stored as given
+  production must set it). SHEET_IMPORT_URL, SHEET_IMPORT_INTERVAL_MINUTES (60, was 30 until 2026-11-22). Imported hours are stored as given
   (not snapped to quarter-hours). Pages are notified only when the sheet actually changed something.
 - New settings: FEEDBACK_DIR, DESIGNS_DIR (default: the repo's Claude_Resources folders), SHEET_IMPORT_*.
 - Migration script: npm run import-dotnet-db -- <app.db copy> <new db>. Keeps ids; passwords stay Identity v3
