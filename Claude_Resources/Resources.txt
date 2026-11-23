@@ -57,7 +57,8 @@ very dark pink with 2px golden border = table owner's slot (owner automatically 
 Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
 Design/ApplicationDesign.md, "Mobile audit"):
 - On phones the board is a list with one line per table: hour (red "--:--" when not set), game name, taken/total
-  seats ("2/4") and a dot in the table-kind colour. No sideways scrolling.
+  seats ("2/4") and a 5px bar in the table-kind colour, the full height of the line, where a dot used to be – on its
+  own, not on the line's right edge (feedback 20261123-171143 + the user, 2026-11-23). No sideways scrolling.
 - Tapping a line opens a bottom sheet with the whole table: cover, name, kind, hour, players, difficulty, BGG link and
   the seat grid (same seat colours and rules as on the desktop board). Taking/freeing a seat happens in the sheet.
 - Admin row actions (❌ 🏷️ 🛠️) are one "⋯" menu on phones instead of a stack of small icons.
@@ -92,6 +93,9 @@ Design/ApplicationDesign.md, "Mobile audit"):
   layer over the box"): "❌ Usuń stół" (two taps; "Kliknij ponownie, aby usunąć stół" while armed) and "🏷️ Zmień
   grę". A tap outside the menu or Escape closes it. The disabled 🛠️ placeholders are not shown on phones. Desktop
   unchanged.
+- After a successful "Zmień grę" in the phone sheet, everything closes – the popup, the ⋯ menu and the sheet – back to
+  the board with the message (feedback 20261123-170907: "when game is changed through the rename button, close all
+  boxes"). On an error nothing closes.
 - Next: the smaller audit fixes (admin dock toolbox width, /admin/users sideways
   scroll, Login label overlapping its placeholder, floating buttons covering content, drawer link height).
 

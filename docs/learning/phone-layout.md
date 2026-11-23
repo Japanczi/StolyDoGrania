@@ -27,7 +27,7 @@ same under Blazor. Four pieces:
 ## One page, two layouts: media queries
 
 There is still **one** HTML page with the same URL. Each table row now also contains a summary button
-(`rowSummary()` in `view.ts`): hour, name, "2/4", a dot in the table-kind colour. CSS decides what is shown:
+(`rowSummary()` in `view.ts`): hour, name, "2/4", a bar in the table-kind colour (a dot until the first feedback). CSS decides what is shown:
 
 ```css
 .row-summary { display: none; }                       /* desktop: the line is hidden */

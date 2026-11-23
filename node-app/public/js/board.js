@@ -236,6 +236,8 @@
 
   /** Set between our own history.back() and the popstate event it causes. */
   let backPending = false;
+  // A reload while a sheet was open keeps that entry's state; the page starts with no sheet open, so forget it.
+  if (history.state?.sheet) history.replaceState(null, '');
 
   /** After a refresh: patch the copy to match its row, or close the sheet if the table is gone. */
   function syncSheet() {
@@ -1007,6 +1009,10 @@
       // An error is shown in the popup, next to the name it's about.
       if (!result.ok) { lookup.fail(result.error); return; }
       closePopups();
+      // Done: on a phone the ⋯ menu and the sheet close too, back to the board with the message (feedback
+      // 20261123-170907 "when game is changed through the rename button, close all boxes"). Closing the sheet
+      // also closes its menu and removes its history entry.
+      if (sheet.open) sheet.close();
       showAlert(result.message, 'success');
       await refreshTable(tableId);
     });

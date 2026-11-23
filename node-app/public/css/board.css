@@ -794,11 +794,14 @@ button.confirm-button.armed {
         font-variant-numeric: tabular-nums;
     }
 
+    /* The table kind: a 5px bar in the kind's colour where the dot used to be – the full height of the line (the
+       negative margins undo the line's vertical padding), but standing on its own, not on the right edge
+       (feedback 20261123-171143 and the user's follow-up, 2026-11-23). */
     .summary-kind {
         flex: none;
-        width: .75rem;
-        height: .75rem;
-        border-radius: 50%;
+        align-self: stretch;
+        width: 5px;
+        margin-block: -.5rem;
     }
 
     /* The sheet: a native <dialog> opened with showModal(), so the browser handles the backdrop, focus and Escape.

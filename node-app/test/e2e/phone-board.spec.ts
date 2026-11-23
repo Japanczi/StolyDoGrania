@@ -34,6 +34,13 @@ test('phone: tables are one line each, the sheet takes a seat and follows live c
   const line = row.locator('.row-summary');
   await expect(line).toBeVisible();
   await expect(line).toContainText('1/4');
+  // The table kind: a 5px bar the full height of the line, in from the right edge (feedback 2026-11-23).
+  const kindBar = await line.locator('.summary-kind').boundingBox();
+  const lineBox = await line.boundingBox();
+  if (!kindBar || !lineBox) throw new Error('kind bar or line has no box');
+  expect(Math.round(kindBar.width)).toBe(5);
+  expect(Math.round(kindBar.height)).toBe(Math.round(lineBox.height));
+  expect(lineBox.x + lineBox.width - (kindBar.x + kindBar.width)).toBeGreaterThan(4);
   // The wide columns are hidden on a phone, and nothing makes the page scroll sideways.
   await expect(row.locator('.cell-slots')).toBeHidden();
   // (Test files are type-checked without the browser's types, hence the cast.)
@@ -139,10 +146,25 @@ test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating clo
   expect(p.y + p.height).toBeLessThanOrEqual(phone.viewport.height);
   await popup.getByRole('button', { name: 'Anuluj' }).tap();
   await expect(popup).toHaveCount(0);
+
+  // A real rename closes everything – the popup, the ⋯ menu and the sheet (feedback 2026-11-23: "close all boxes").
+  await renameButton.tap();
+  const newName = popup.getByLabel('Nazwa gry');
+  await newName.fill('Stół po zmianie');
+  await newName.press('Enter');
+  await popup.getByRole('button', { name: 'Zapisz' }).tap();
+  await expect(sheet).toBeHidden();
+  await expect(malgorzata.getByText('Zmieniono grę stołu: Stół z telefonu → Stół po zmianie.')).toBeVisible();
+  const renamedLine = malgorzata.locator('#table-rows .table-row', { hasText: 'Stół po zmianie' }).locator('.row-summary');
+  await expect(renamedLine).toBeVisible();
+
+  // Back in: delete it through the menu.
+  await renamedLine.tap();
+  await menu.tap();
   await deleteButton.tap();
   await expect(deleteButton).toHaveClass(/armed/);
   await deleteButton.tap();
   await expect(sheet).toBeHidden();
-  await expect(malgorzata.locator('#table-rows .table-row', { hasText: 'Stół z telefonu' })).toHaveCount(0);
+  await expect(malgorzata.locator('#table-rows .table-row', { hasText: 'Stół po zmianie' })).toHaveCount(0);
   expect(await stillSamePage(malgorzata)).toBe(true);
 });
