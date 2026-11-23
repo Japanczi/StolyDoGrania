@@ -1,6 +1,6 @@
 # A phone layout: media queries, `<dialog>` and the History API
 
-*Added 2026-11-23 (the board's phone layout, step 1: the list and the sheet; step 2: the new-table form). Files:
+*Added 2026-11-23 (the board's phone layout, step 1: the list and the sheet; step 2: the new-table form; step 3: the "⋯" menu). Files:
 [`node-app/public/css/board.css`](../../node-app/public/css/board.css) (section "Phones and portrait tablets"),
 [`node-app/public/js/board.js`](../../node-app/public/js/board.js) (section "the phone sheet"),
 [`node-app/src/web/pages/board/view.ts`](../../node-app/src/web/pages/board/view.ts) (`rowSummary`, the `<dialog>`),
@@ -118,6 +118,32 @@ Inside the sheet, CSS rearranges the form with `display: contents`: the row's ow
 disappear, and their children become items of the sheet's grid, so `order` can put the name field first, the
 lookup messages under it, the details in two columns and the buttons last – without changing the HTML.
 
+### The "⋯" menu: showing existing buttons, not building new ones (step 3)
+
+On the desktop the owner's and admin's actions are tiny emoji buttons in the row's first column (❌ 🏷️, plus three
+disabled 🛠️ placeholders). In the sheet they are now behind a "⋯" button in its top-left corner. The menu builds
+nothing: it toggles a class (`menu-open`) on the sheet's body, and CSS shows the row's own actions cell as a
+floating list of labelled buttons, hiding the placeholders. So the buttons are exactly the server-rendered ones,
+with the same listeners – including the two-click delete.
+
+It floats *over* the sheet (`position: absolute` against `.sheet-inner`, which is `position: relative`), so the sheet
+keeps its size. The first version showed the list inside the sheet's flow and pushed everything down; the user asked
+for a layer over it instead. A press outside the menu closes it (a capture-phase `pointerdown` listener, like the
+armed ❌), and Escape closes it before closing the sheet.
+
+Each button gets its label from its own `title` attribute:
+
+```css
+.table-sheet .action-button::after { content: attr(title); }
+```
+
+`attr()` reads an attribute into generated content, and it follows changes: when the ❌ is armed, board.js sets its
+title to "Kliknij ponownie, aby usunąć stół", and the label in the menu changes with it – no extra code.
+
+The ⋯ button appears only when the copied row has an enabled action button – which the server renders only for the
+table's owner or an admin. The client never decides who may do what; it only reacts to what the server sent
+(the rights are re-checked on the server for every action anyway).
+
 ## The Back button: the History API
 
 On a phone, Back is how people close things. Without help, Back would leave the board. So opening the sheet adds a
@@ -163,8 +189,13 @@ event instead.
 4. **Popups outside a modal are dead.** `showModal()` makes the rest of the page inert – including the hour picker,
    which `board.js` used to append to `<body>`. Popups now go into the open sheet (`popupHost()`). Positions meant
    for the desktop didn't fit either: the rename popup (360px, placed beside its 🏷️ button) ran past the right edge
-   and below the screen – found while testing. In the sheet it now spans the width at the top of the screen, where
-   the on-screen keyboard can't cover it.
+   and below the screen – found while testing. First fix: spanning the width at the top of the screen. The user
+   wanted it as a layer attached to its button instead, so now `followButton()` in board.js places it right above
+   the "Zmień grę" button (below it if the button is in the upper half of the screen) and limits its height to the
+   room there. Above, because the on-screen keyboard comes up from the bottom. It is placed again once the sheet's
+   slide-in animation has finished (`sheet.getAnimations()` → `.finished`), and whenever the sheet scrolls or the
+   screen changes size (`resize`, and `visualViewport`'s `resize`, which fires when a keyboard opens). Focusing its
+   field uses `focus({ preventScroll: true })`, so the browser doesn't scroll the sheet to the field first.
 5. **Escape closed two things at once.** The first Escape should close the hour picker, not the whole sheet. The
    board's Escape handler calls `preventDefault()` when it closed a popup, which stops the dialog's own `cancel`.
 

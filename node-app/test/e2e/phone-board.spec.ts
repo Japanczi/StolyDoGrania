@@ -47,6 +47,8 @@ test('phone: tables are one line each, the sheet takes a seat and follows live c
   const sheet = jan.locator('#table-sheet');
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.game-name')).toHaveText('Stół na telefon');
+  // Not Jan's table: no "⋯" actions menu for him.
+  await expect(sheet.getByRole('button', { name: 'Opcje stołu' })).toBeHidden();
 
   // A seat taken in the sheet: the sheet and the line both show it, and the line gets the "my seat" edge.
   await sheet.getByRole('button', { name: 'Wolne' }).first().tap();
@@ -99,5 +101,48 @@ test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating clo
   await expect(line).toContainText('1/3');
   await expect(malgorzata.getByText('Utworzono stół: Stół z telefonu.')).toBeVisible();
   expect(new URL(malgorzata.url()).pathname).toBe('/');
+  expect(await stillSamePage(malgorzata)).toBe(true);
+
+  // Her own table: the "⋯" menu lists the actions with labels; the two-tap delete works from there.
+  await line.tap();
+  const menu = sheet.getByRole('button', { name: 'Opcje stołu' });
+  await expect(menu).toBeVisible();
+  const deleteButton = sheet.locator('[data-action="delete"]');
+  await expect(deleteButton).toBeHidden();
+  // The menu floats over the sheet: opening it doesn't change the sheet's size (asked 2026-11-23).
+  const heightBefore = (await sheet.boundingBox())?.height;
+  await menu.tap();
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await expect(deleteButton).toBeVisible();
+  // (Within a pixel: layout sizes are floats, e.g. 397.5 vs 397.50006.)
+  expect((await sheet.boundingBox())?.height).toBeCloseTo(heightBefore ?? 0, 0);
+  // A tap outside the menu closes it; ⋯ opens it again.
+  await sheet.locator('.cell-slots').tap();
+  await expect(deleteButton).toBeHidden();
+  await menu.tap();
+  await expect(deleteButton).toBeVisible();
+  await expect(sheet.locator('[data-action="rename"]')).toBeVisible();
+  await expect(sheet.locator('.action-placeholder').first()).toBeHidden();
+
+  // "Zmień grę" opens the rename popup as a layer attached to that button (just above or below it), on screen.
+  const renameButton = sheet.locator('[data-action="rename"]');
+  await renameButton.tap();
+  const popup = sheet.locator('.action-popup');
+  await expect(popup).toBeVisible();
+  await expect(popup.getByLabel('Nazwa gry')).toBeFocused();
+  const b = await renameButton.boundingBox();
+  const p = await popup.boundingBox();
+  if (!b || !p) throw new Error('rename button or popup has no box');
+  const attached = Math.abs(b.y - (p.y + p.height) - 4) <= 2 || Math.abs(p.y - (b.y + b.height) - 4) <= 2;
+  expect(attached).toBe(true);
+  expect(p.y).toBeGreaterThanOrEqual(0);
+  expect(p.y + p.height).toBeLessThanOrEqual(phone.viewport.height);
+  await popup.getByRole('button', { name: 'Anuluj' }).tap();
+  await expect(popup).toHaveCount(0);
+  await deleteButton.tap();
+  await expect(deleteButton).toHaveClass(/armed/);
+  await deleteButton.tap();
+  await expect(sheet).toBeHidden();
+  await expect(malgorzata.locator('#table-rows .table-row', { hasText: 'Stół z telefonu' })).toHaveCount(0);
   expect(await stillSamePage(malgorzata)).toBe(true);
 });

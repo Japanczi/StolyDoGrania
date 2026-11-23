@@ -130,6 +130,10 @@ for us automatically. The `ws`-based code itself is JavaScript.
      double click from sending "take this seat" twice, a keyed action (`actOnce()`: take, free, delete) is ignored
      while the same one is already waiting – until the page shows its result, because until then the button still
      offers the old action.
+     A trap that came with the queue: an action must capture its input **when it is queued**, not when it runs.
+     The kind select's handler read `input.value` inside the queued function; a refresh that arrived in between
+     reset the select to the server's old value, so the old kind was sent (an e2e test failed 1 run in 10).
+     In C# terms: a lambda captures the *variable*, not its value at the time – same as here.
   3. Refreshes ran side by side and could finish out of order. Fix: the queue above.
   Lesson: a test that fails "sometimes" when more happens at once is usually showing a race a real user can hit.
   `--repeat-each` didn't help here (every repeat shares one database); plain repeated runs did.

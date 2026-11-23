@@ -370,3 +370,26 @@ be built – here a promise chain, the JS cousin of awaiting each `Task` in turn
 
 **Lesson.** "Flaky" tests deserve a root cause; this one would have been a user saying "I clicked delete and nothing
 happened".
+
+---
+
+## The board on phones, step 3: the "⋯" menu (2026-11-23)
+
+**What happened.** In the phone sheet, the owner's/admin's tiny emoji buttons became a "⋯" menu: tapping it shows
+"❌ Usuń stół" and "🏷️ Zmień grę" as full-width, labelled buttons; the disabled placeholders are hidden. It is pure
+CSS over the row's existing buttons (a class toggled by board.js), with labels from each button's `title` via
+`content: attr(title)` – so the armed delete's "Kliknij ponownie…" shows up in the menu by itself.
+
+**Different from .NET.** In Blazor this would have been a menu component with its own `@onclick` handlers calling
+the same methods as the row buttons. Here the cheapest correct option was to *reuse the very same elements* and
+change only how they look – one set of buttons, one set of listeners, one place where rights are decided (the server
+rendering the row).
+
+**Lesson.** Before writing a new UI piece, check whether an existing element can be restyled into it.
+Follow-up the same day: the user asked for the menu to float *over* the sheet instead of pushing its content down;
+now it's an absolutely positioned layer under ⋯ that closes on a tap outside or Escape. Re-running the suite also
+caught a bug the action queue had introduced: the kind select's queued action read the select's value when it ran,
+after a refresh had reset it – now values are captured at the moment of the change.
+Second follow-up: the rename popup is now a layer attached to the "Zmień grę" button (above it, away from the
+on-screen keyboard), re-placed after the sheet's slide-in animation and on scroll/resize. A test measuring the
+sheet's height compared floats exactly and failed once on 397.5 vs 397.50006 – layout sizes need "close to".

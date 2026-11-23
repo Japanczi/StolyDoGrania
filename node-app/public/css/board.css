@@ -787,15 +787,37 @@ button.confirm-button.armed {
     }
 
     .sheet-inner {
+        position: relative;
         padding: .5rem .75rem 1rem;
     }
 
     .sheet-head {
         position: relative;
         display: flex;
-        justify-content: flex-end;
+        align-items: center;
         min-height: 2rem;
     }
+
+    /* Keeps the ✕ on the right, with or without the ⋯ button on the left. */
+    .sheet-head .btn-close {
+        margin-left: auto;
+    }
+
+    .sheet-menu-button {
+        min-width: 44px;
+        min-height: 36px;
+        padding: 0 .5rem;
+        border: 1px solid #55555c;
+        border-radius: 6px;
+        background: #3b3b40;
+        color: #fff;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+        .sheet-menu-button[aria-expanded="true"] {
+            background: #55555c;
+        }
 
     .sheet-grip {
         position: absolute;
@@ -846,30 +868,61 @@ button.confirm-button.armed {
             background: none;
         }
 
-        /* Only when there is something to manage; then the buttons sit in a row. */
+        /* The row's actions, behind the sheet's "⋯" button (board.js toggles .menu-open): a floating menu just
+           under the button, on a layer *over* the sheet – the sheet itself keeps its size (asked 2026-11-23).
+           Each button is labelled with its own title ("Usuń stół", "Zmień grę" – and "Kliknij ponownie…" while the
+           delete is armed). The disabled placeholders (🛠️) are left out. Positioned against .sheet-inner. */
         .table-sheet .table-row > .cell-actions {
-            grid-column: 1 / -1;
-            order: 1;
-            min-height: 0;
-            background: none;
+            display: none;
         }
 
-            .table-sheet .table-row > .cell-actions:not(:has(button)) {
-                display: none;
+            .table-sheet .menu-open .table-row > .cell-actions {
+                position: absolute;
+                top: 2.75rem;
+                left: .75rem;
+                z-index: 5;
+                display: block;
+                width: min(16rem, calc(100% - 1.5rem));
+                min-height: 0;
+                padding: 4px;
+                border: 1px solid #55555c;
+                border-radius: 8px;
+                background: #1f1f22;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, .6);
             }
 
         .table-sheet .actions {
             position: static;
-            flex-direction: row;
-            gap: .5rem;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: 4px;
+        }
+
+        .table-sheet .action-anchor {
+            display: block;
+        }
+
+        .table-sheet .action-placeholder {
+            display: none;
         }
 
         .table-sheet .action-button,
         .table-sheet .action-anchor .confirm-delete {
-            width: 44px;
-            height: 36px;
+            justify-content: flex-start;
+            gap: .6rem;
+            width: 100%;
+            height: 44px;
+            padding: 0 .75rem;
+            border-radius: 6px;
             font-size: 1rem;
         }
+
+            .table-sheet .action-button::after,
+            .table-sheet .action-anchor .confirm-delete::after {
+                content: attr(title);
+                font-size: .9375rem;
+            }
 
         /* The seats: full width, four per line, each a big square. */
         .table-sheet .table-row > .cell-slots {
@@ -904,13 +957,10 @@ button.confirm-button.armed {
             }
 
         /* The rename popup (🏷️): on the desktop it sits beside its button, which on a phone puts it off-screen.
-           In the sheet it spans the screen's width at the top, where the on-screen keyboard doesn't cover it. */
+           In the sheet it is a layer attached to its "Zmień grę" button: board.js (anchorToButton) places it just
+           above or below the button and limits its height to the room there; it scrolls inside if it needs more. */
         .table-sheet .action-popup {
-            top: .5rem;
-            right: .5rem;
-            left: .5rem;
-            width: auto;
-            max-height: calc(100dvh - 1rem);
+            width: min(22rem, calc(100vw - 1rem));
             margin-left: 0;
             overflow-y: auto;
         }

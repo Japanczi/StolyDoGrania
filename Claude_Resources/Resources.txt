@@ -69,8 +69,10 @@ Design/ApplicationDesign.md, "Mobile audit"):
   the phone's Back button. Owner/admin controls work in the sheet; the hour picker there spans the screen's width.
   A "+ Nowy stół" button on phones will open the new-table form in the sheet (later step; until then the new-table
   row wraps). Without JavaScript the wide table is shown. Order as on desktop (own tables, divider, imported).
-- Step 1 done 2026-11-23 (list + sheet, branch feature/mobile-board-list). In the sheet the rename (🏷️) popup spans
-  the screen's width at the top (where the on-screen keyboard doesn't cover it).
+- Step 1 done 2026-11-23 (list + sheet, branch feature/mobile-board-list). In the sheet the rename (🏷️) popup is a
+  layer attached to the "Zmień grę" button that opened it (user, 2026-11-23: "Rename box should also be viewed in
+  another layer and anchored to the button triggering it"): just above the button (below it when the button is in
+  the upper half of the screen), on screen, following it when the sheet scrolls or the screen size changes.
 - Step 2 done 2026-11-23: on phones the new-table row is hidden in the list; a full-width "+ Nowy stół" button (only
   for logged-in users) opens it in the sheet: name first, lookup messages, details in two labelled columns, then
   "Utwórz stół" / BGG / Anuluj. Closing keeps what was typed; "Anuluj" empties the form and closes the sheet; creating
@@ -84,7 +86,13 @@ Design/ApplicationDesign.md, "Mobile audit"):
   earlier request is on its way; a repeated click on the same seat/delete while it's still waiting is sent once.
   With ❌ armed, a click anywhere else disarms it AND does what it was for (no invisible backdrop swallowing it any
   more; the .NET ConfirmButton swallowed it). Baza gier's delete (games.js) still uses the old swallowing backdrop.
-- Next: "⋯" menu for admin actions, then the smaller audit fixes (admin dock toolbox width, /admin/users sideways
+- Step 3 done 2026-11-23: in the phone sheet a "⋯" button (top left, "Opcje stołu"; only when the viewer has actions
+  for that table, i.e. owner or admin) shows the row's actions as labelled buttons in a menu floating over the sheet,
+  just under ⋯ – the sheet keeps its size (user, 2026-11-23: "Do not resize the box … pop these options in another
+  layer over the box"): "❌ Usuń stół" (two taps; "Kliknij ponownie, aby usunąć stół" while armed) and "🏷️ Zmień
+  grę". A tap outside the menu or Escape closes it. The disabled 🛠️ placeholders are not shown on phones. Desktop
+  unchanged.
+- Next: the smaller audit fixes (admin dock toolbox width, /admin/users sideways
   scroll, Login label overlapping its placeholder, floating buttons covering content, drawer link height).
 
 Game lookup (adding a table):

@@ -227,6 +227,7 @@
     sheetKey = key;
     sheetBody.classList.toggle('sheet-draft', key === 'new');
     sheet.setAttribute('aria-label', label);
+    setSheetMenu(false);
     sheet.showModal();
     // The phone's Back button should close the sheet, not leave the page: give it a history entry to go back from.
     // If the previous sheet's entry is still being removed (history.back() is asynchronous), add it once that's done.
@@ -243,6 +244,32 @@
     const current = sheetBody.firstElementChild;
     if (!copy) { sheet.close(); return; }
     if (current) window.morph.morphElement(current, copy); else sheetBody.replaceChildren(copy);
+    setSheetMenu(sheetBody.classList.contains('menu-open'));
+  }
+
+  // ---------- the "⋯" menu in the sheet: the row's action buttons as a labelled list (phones) ----------
+  // No menu of its own: the row's actions cell is shown or hidden (CSS, .menu-open), so the buttons are the very
+  // same ones as on the desktop and work through the same listeners. The menu button shows only when the row
+  // offers this viewer an action – rendered by the server with the viewer's rights, so it follows them.
+
+  const sheetMenuButton = /** @type {HTMLButtonElement} */ (document.getElementById('sheet-menu'));
+
+  // The menu floats over the sheet; a press anywhere outside it (and outside ⋯) closes it, like any dropdown.
+  // The rename popup lives inside its menu item, so pressing in it doesn't count as outside.
+  document.addEventListener('pointerdown', e => {
+    if (!sheetBody.classList.contains('menu-open')) return;
+    const target = /** @type {Element} */ (e.target);
+    if (target.closest('.table-sheet .cell-actions') || target.closest('[data-sheet-menu]')) return;
+    setSheetMenu(false);
+  }, true);
+
+  /** @param {boolean} open */
+  function setSheetMenu(open) {
+    const hasActions = typeof sheetKey === 'number' && sheetBody.querySelector('.cell-actions button:not([disabled])') !== null;
+    sheetMenuButton.hidden = !hasActions;
+    const show = open && hasActions;
+    sheetBody.classList.toggle('menu-open', show);
+    sheetMenuButton.setAttribute('aria-expanded', String(show));
   }
 
   // However it was closed (✕, a tap outside, Escape, Back), drop the history entry and the copy. The new-table row
@@ -282,6 +309,7 @@
     const target = /** @type {HTMLElement} */ (e.target);
     // A click on the dialog element itself (not its content) is a click on the backdrop around it.
     if (target === sheet || target.closest('[data-sheet-close]')) sheet.close();
+    if (target.closest('[data-sheet-menu]')) setSheetMenu(!sheetBody.classList.contains('menu-open'));
   });
 
   /** Popups go inside the open sheet: showModal() makes everything outside it unclickable. */
@@ -318,8 +346,11 @@
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (!inRows(input)) return;
     const id = tableIdOf(input);
-    if (input.dataset.action === 'taken') void act(() => post(`/api/tables/${id}/taken`, { count: input.value }), id);
-    if (input.dataset.action === 'kind') void act(() => post(`/api/tables/${id}/kind`, { kind: input.value }), id);
+    // The value is read now, not when the queued action runs: a refresh in between may have reset the field to the
+    // server's old value (found by the e2e tests, 2026-11-23).
+    const value = input.value;
+    if (input.dataset.action === 'taken') void act(() => post(`/api/tables/${id}/taken`, { count: value }), id);
+    if (input.dataset.action === 'kind') void act(() => post(`/api/tables/${id}/kind`, { kind: value }), id);
   });
 
   // Right-click on a seat: the owner's "add player" / the admin's "choose owner" popup.
@@ -376,10 +407,15 @@
 
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    // Escape closes the innermost thing only: a popup or an armed button first, the sheet the next time.
-    if (armed || closeCurrentPopup) e.preventDefault();
-    disarm();
-    closePopups();
+    // Escape closes the innermost thing only: a popup or an armed button first, then the sheet's ⋯ menu, the sheet
+    // the next time.
+    if (armed || closeCurrentPopup) {
+      e.preventDefault();
+      disarm();
+      closePopups();
+      return;
+    }
+    if (sheetBody.classList.contains('menu-open')) { e.preventDefault(); setSheetMenu(false); }
   });
 
   // ---------- popups (hour picker, add player, rename) ----------
@@ -836,9 +872,55 @@
       await refreshTable(tableId);
     });
 
-    showPopup(popup, anchor, 'popup-backdrop');
-    input.focus();
+    /** @type {(() => void) | null} */
+    let stopFollowing = null;
+    showPopup(popup, anchor, 'popup-backdrop', () => stopFollowing?.());
+    // In the phone sheet: a layer attached to the button (on the desktop the CSS already places it beside it).
+    if (sheet.contains(anchor)) stopFollowing = followButton(popup, button);
+    input.focus({ preventScroll: true });
     input.select();
+  }
+
+  /**
+   * Keeps a popup attached to its button while it's open: placed now, again once the sheet's slide-in animation has
+   * finished, and whenever the sheet scrolls or the screen changes size (e.g. the on-screen keyboard opens).
+   * Returns the function that stops following. @param {HTMLElement} popup @param {HTMLElement} button
+   */
+  function followButton(popup, button) {
+    const place = () => anchorToButton(popup, button);
+    place();
+    void Promise.all(sheet.getAnimations().map(a => a.finished)).then(place, () => {});
+    sheet.addEventListener('scroll', place);
+    window.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('resize', place);
+    return () => {
+      sheet.removeEventListener('scroll', place);
+      window.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('resize', place);
+    };
+  }
+
+  /**
+   * Places a fixed popup next to `button`, inside the screen: above it when the button is in the lower half (the
+   * on-screen keyboard comes up from the bottom, and the popup then grows upwards, away from it), else below it.
+   * Its height is limited to the room on that side; it scrolls inside if the lookup list needs more.
+   * @param {HTMLElement} popup @param {HTMLElement} button
+   */
+  function anchorToButton(popup, button) {
+    const gap = 4;
+    const margin = 8;
+    const r = button.getBoundingClientRect();
+    const left = Math.max(margin, Math.min(r.left, window.innerWidth - popup.offsetWidth - margin));
+    popup.style.left = `${left}px`;
+    if (r.top + r.height / 2 > window.innerHeight / 2) {
+      popup.style.top = 'auto';
+      popup.style.bottom = `${window.innerHeight - r.top + gap}px`;
+      popup.style.maxHeight = `${r.top - gap - margin}px`;
+    } else {
+      popup.style.bottom = 'auto';
+      popup.style.top = `${r.bottom + gap}px`;
+      popup.style.maxHeight = `${window.innerHeight - r.bottom - gap - margin}px`;
+    }
   }
 
   // ---------- "Tryb zwykłego użytkownika" (admins, and admins already in the mode) ----------

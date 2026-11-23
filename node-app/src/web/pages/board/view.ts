@@ -70,6 +70,10 @@ export function boardPage(m: BoardPageModel): SafeHtml {
     <dialog class="table-sheet" id="table-sheet" aria-label="Szczegóły stołu">
         <div class="sheet-inner">
             <div class="sheet-head">
+                <!-- The table's actions (Usuń stół, Zmień grę) as a labelled list; board.js shows the button only
+                     when the row has actions for this viewer. -->
+                <button type="button" class="sheet-menu-button" id="sheet-menu" data-sheet-menu aria-label="Opcje stołu"
+                        aria-expanded="false" aria-controls="sheet-body" hidden>⋯</button>
                 <span class="sheet-grip" aria-hidden="true"></span>
                 <button type="button" class="btn-close" data-sheet-close aria-label="Zamknij"></button>
             </div>
