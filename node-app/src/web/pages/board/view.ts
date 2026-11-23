@@ -48,17 +48,18 @@ export function boardPage(m: BoardPageModel): SafeHtml {
     <div class="alert alert-info py-2" id="board-empty"${m.tables.length > 0 || loggedIn ? html` hidden` : ''}>Nie ma jeszcze żadnych stołów.</div>
     <div class="table-list" id="table-list"${m.tables.length === 0 && !loggedIn ? html` hidden` : ''}>
         <div class="table-row table-head">
-            <div class="cell"></div>
+            <div class="cell cell-cover"></div>
             <div class="cell cell-game">Gra</div>
-            <div class="cell">Zajęte</div>
-            <div class="cell">Stół</div>
-            <div class="cell">Godzina</div>
-            <div class="cell">Graczy</div>
-            <div class="cell">BGG</div>
-            <div class="cell">Trudność</div>
-            <div class="cell">Okładka</div>
+            <div class="cell cell-taken">Zajęte</div>
+            <div class="cell cell-kind">Stół</div>
+            <div class="cell cell-hour">Godzina</div>
+            <div class="cell cell-max">Graczy</div>
+            <div class="cell cell-bgg">BGG</div>
+            <div class="cell cell-difficulty">Trudność</div>
             <div class="cell cell-slots">Miejsca</div>
+            <div class="cell cell-actions"></div>
         </div>
+        <div class="section-heading" id="own-heading"><span>Stoły w aplikacji</span></div>
         ${ownRows(m.viewer, m.tables, m.highlightId)}
         <!-- Phones only (CSS): opens the new-table row below in the sheet. -->
         ${loggedIn && html`<button type="button" class="btn btn-success new-table-open" id="new-table-open" aria-haspopup="dialog">+ Nowy stół</button>`}
@@ -153,7 +154,38 @@ export function tableRow(viewer: Viewer, t: BoardTable, highlight = false): Safe
   return html`<div class="table-row${highlight ? ' table-new' : ''}${hasSeat ? ' has-my-seat' : ''}" id="table-${t.id}" data-table-id="${t.id}" data-title="${title}"
          data-max-players="${t.maxPlayers}" data-kind="${t.kind}" data-has-players="${t.takenSlots > 0 || t.participants.some(p => !(p.slotNumber === ownerSlot && isOwner(t, p.userId))) ? 'true' : 'false'}"${highlight ? html` tabindex="-1"` : ''}>
     ${rowSummary(t, title, hasSeat)}
+    <div class="cell cell-cover">${cover(t.game.id, t.game.cover_type, title)}</div>
+
+    <div class="cell cell-game"><span class="game-name">${title}</span></div>
+
+    <div class="cell cell-taken">
+        ${canManage
+          ? html`<input type="number" class="cell-input" data-action="taken" min="0" max="${maxTakenSlots(t)}" value="${t.takenSlots}" aria-label="Liczba miejsc oznaczonych jako zajęte: ${title}" />`
+          : t.takenSlots > 0 && t.takenSlots}
+    </div>
+
+    <div class="cell cell-kind ${kindClass(t.kind)}">
+        ${canManage ? kindSelect(t.kind, `Rodzaj stołu: ${title}`, 'kind') : html`<span class="kind-chip">${kindLabel(t.kind)}</span>`}
+    </div>
+
+    <div class="cell cell-hour${t.startHour === null ? ' hour-unset' : ''}"${t.startHour === null ? html` title="Godzina nie została ustalona"` : ''}>
+        ${canManage
+          ? hourButton(t.startHour, `Godzina spotkania: ${title}`)
+          : html`<span class="hour-chip">${t.startHour ?? '—'}</span>`}
+    </div>
+
+    <div class="cell cell-max">${t.maxPlayers}</div>
+
+    <div class="cell cell-bgg"><a href="${t.game.bgg_url ?? defaultBggUrl}" target="_blank" rel="noopener noreferrer">Link</a></div>
+
+    <div class="cell cell-difficulty"${difficultyStyle(t.game.weight) ? html` style="${difficultyStyle(t.game.weight)}"` : ''}>${difficultyLabel(t.game.weight)}</div>
+
+    <div class="cell cell-slots">${slots(viewer, t, owner, canManage, hasSeat)}</div>
+
+    <!-- The table's actions behind "⋯" (decided 2026-11-23, design B layout): board.js opens the list as a small menu.
+         On phones the sheet has its own ⋯ button and shows this same list. -->
     <div class="cell cell-actions">
+        ${canManage && html`<button type="button" class="row-menu-button" data-row-menu aria-label="Opcje stołu: ${title}" aria-haspopup="true" aria-expanded="false">⋯</button>`}
         <div class="actions">
             ${canManage && html`<div class="action-anchor">
                 <button type="button" class="confirm-button confirm-delete" data-action="delete"
@@ -166,34 +198,6 @@ export function tableRow(viewer: Viewer, t: BoardTable, highlight = false): Safe
             ${[1, 2, 3].map(() => html`<button type="button" class="action-button action-placeholder" disabled title="Opcja dostępna wkrótce" aria-label="Opcja dostępna wkrótce">🛠️</button>`)}`}
         </div>
     </div>
-
-    <div class="cell cell-game"><span class="game-name">${title}</span></div>
-
-    <div class="cell">
-        ${canManage
-          ? html`<input type="number" class="cell-input" data-action="taken" min="0" max="${maxTakenSlots(t)}" value="${t.takenSlots}" aria-label="Liczba miejsc oznaczonych jako zajęte: ${title}" />`
-          : t.takenSlots > 0 && t.takenSlots}
-    </div>
-
-    <div class="cell ${kindClass(t.kind)}">
-        ${canManage ? kindSelect(t.kind, `Rodzaj stołu: ${title}`, 'kind') : kindLabel(t.kind)}
-    </div>
-
-    <div class="cell${t.startHour === null ? ' hour-unset' : ''}"${t.startHour === null ? html` title="Godzina nie została ustalona"` : ''}>
-        ${canManage
-          ? hourButton(t.startHour, `Godzina spotkania: ${title}`)
-          : (t.startHour ?? '—')}
-    </div>
-
-    <div class="cell">${t.maxPlayers}</div>
-
-    <div class="cell"><a href="${t.game.bgg_url ?? defaultBggUrl}" target="_blank" rel="noopener noreferrer">Link</a></div>
-
-    <div class="cell cell-difficulty"${difficultyStyle(t.game.weight) ? html` style="${difficultyStyle(t.game.weight)}"` : ''}>${difficultyLabel(t.game.weight)}</div>
-
-    <div class="cell cell-cover">${cover(t.game.id, t.game.cover_type, title)}</div>
-
-    <div class="cell cell-slots">${slots(viewer, t, owner, canManage, hasSeat)}</div>
 </div>`;
 }
 
@@ -279,22 +283,6 @@ function placeholder(title: string): SafeHtml {
  */
 function draftRow(bggConfigured: boolean): SafeHtml {
   return html`<div class="table-row table-draft" id="draft">
-    <div class="cell"></div>
-    <div class="cell cell-game">
-        <input id="new-name" class="form-control form-control-sm" maxlength="200" autocomplete="off"
-               placeholder="Nazwa gry" aria-label="Nazwa gry nowego stołu" />
-        <div class="draft-actions">
-            <button type="button" class="btn btn-success btn-sm" id="draft-create">Utwórz stół</button>
-            ${bggConfigured && html`<button type="button" class="btn btn-outline-light btn-sm" id="draft-bgg" hidden title="Szukaj tej gry na BoardGameGeek, np. innego wydania">BGG</button>`}
-            <button type="button" class="btn btn-outline-light btn-sm" id="draft-cancel" hidden>Anuluj</button>
-        </div>
-    </div>
-    <div class="cell" data-draft-detail hidden><input id="new-taken" type="number" class="cell-input" min="0" value="0" aria-label="Liczba miejsc oznaczonych jako zajęte" /></div>
-    <div class="cell kind-small" data-draft-detail id="new-kind-cell" hidden>${kindSelect('small', 'Rodzaj stołu', null)}</div>
-    <div class="cell hour-unset" data-draft-detail id="new-hour-cell" hidden>${hourButton(null, 'Godzina spotkania')}</div>
-    <div class="cell" data-draft-detail id="new-max-cell" hidden><input id="new-max" type="number" class="cell-input" min="1" max="${maximumSpotsAllowed}" value="1" aria-label="Liczba graczy" /></div>
-    <div class="cell" data-draft-detail id="new-link" hidden></div>
-    <div class="cell cell-difficulty" data-draft-detail id="new-difficulty" hidden></div>
     <div class="cell cell-cover" data-draft-detail hidden>
         <div class="draft-cover">
             <div id="new-cover-preview"></div>
@@ -304,6 +292,21 @@ function draftRow(bggConfigured: boolean): SafeHtml {
             </label>
         </div>
     </div>
+    <div class="cell cell-game">
+        <input id="new-name" class="form-control form-control-sm" maxlength="200" autocomplete="off"
+               placeholder="Nazwa gry" aria-label="Nazwa gry nowego stołu" />
+        <div class="draft-actions">
+            <button type="button" class="btn btn-success btn-sm" id="draft-create">Utwórz stół</button>
+            ${bggConfigured && html`<button type="button" class="btn btn-outline-light btn-sm" id="draft-bgg" hidden title="Szukaj tej gry na BoardGameGeek, np. innego wydania">BGG</button>`}
+            <button type="button" class="btn btn-outline-light btn-sm" id="draft-cancel" hidden>Anuluj</button>
+        </div>
+    </div>
+    <div class="cell cell-taken" data-draft-detail hidden><input id="new-taken" type="number" class="cell-input" min="0" value="0" aria-label="Liczba miejsc oznaczonych jako zajęte" /></div>
+    <div class="cell cell-kind kind-small" data-draft-detail id="new-kind-cell" hidden>${kindSelect('small', 'Rodzaj stołu', null)}</div>
+    <div class="cell cell-hour hour-unset" data-draft-detail id="new-hour-cell" hidden>${hourButton(null, 'Godzina spotkania')}</div>
+    <div class="cell cell-max" data-draft-detail id="new-max-cell" hidden><input id="new-max" type="number" class="cell-input" min="1" max="${maximumSpotsAllowed}" value="1" aria-label="Liczba graczy" /></div>
+    <div class="cell cell-bgg" data-draft-detail id="new-link" hidden></div>
+    <div class="cell cell-difficulty" data-draft-detail id="new-difficulty" hidden></div>
 </div>`;
 }
 

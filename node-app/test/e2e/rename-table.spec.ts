@@ -23,6 +23,7 @@ test('renaming a table sets its details too, from the same fields as a new table
   const row = page.locator('#table-rows .table-row', { hasText: 'Przed zmianą' });
   await expect(row).toBeVisible();
 
+  await row.getByRole('button', { name: 'Opcje stołu: Przed zmianą' }).click();
   await row.getByRole('button', { name: 'Zmień grę: Przed zmianą' }).click();
   const popup = page.getByRole('dialog', { name: 'Zmień grę' });
   await expect(popup).toBeVisible();

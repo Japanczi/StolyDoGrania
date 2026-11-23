@@ -6,6 +6,7 @@ import { shortName } from '../domain/user-name.ts';
 import type { SafeHtml } from './html.ts';
 import { feedbackBox } from '../features/feedback.ts';
 import { layout } from './layout.ts';
+import { themeCookie, themeFromCookie } from './theme.ts';
 
 // Declaration merging: app.ts sets this once (Development only tools are decided on the server).
 declare module 'fastify' {
@@ -26,6 +27,7 @@ export function sendPage(
     title: page.title,
     currentPath: pathOf(request.url),
     user: user && { shortName: shortName(user.userName), isAdmin: user.role !== 'user' },
+    theme: themeFromCookie(request.cookies[themeCookie]),
     csrfToken: request.csrfToken,
     body: page.body,
     ...(page.head ? { head: page.head } : {}),

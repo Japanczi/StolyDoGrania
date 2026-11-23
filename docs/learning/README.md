@@ -35,6 +35,7 @@ by links to the real files when they exist.
 | 13 | [Updating pages without flashing: fetch + morphing](no-flash.md) | 4+ | Why pages flashed, morphing vs Blazor's DOM diffing, links and forms via fetch, proving it with Playwright |
 | 14 | [Building and deploying to Mikrus vs `dotnet publish`](deploying.md) | 5 | What gets copied, Node on the server, the cutover and switching back, deployment pitfalls |
 | 15 | [A phone layout: media queries, `<dialog>` and the History API](phone-layout.md) | after 5 | One page, two layouts; the `js` class; a native modal sheet kept in step with morph; Back closing it; specificity with `:where()` |
+| 16 | [Colour themes: CSS custom properties and a cookie](themes.md) | after 5 | Design tokens, recolouring a page by one attribute, why a cookie and not `localStorage`; the design B layout: named grid columns, a fixed menu that escapes a scrolling box |
 | – | [Comparison journal](journal.md) | every phase | What was easier, harder or different than in .NET |
 
 ## How to run the Node app (from `node-app/`)

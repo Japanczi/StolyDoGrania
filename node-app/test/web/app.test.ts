@@ -6,6 +6,7 @@ import { describe, test } from 'node:test';
 import { createTestApp } from '../helpers.ts';
 import { layout } from '../../src/web/layout.ts';
 import { html } from '../../src/web/html.ts';
+import { defaultTheme, themeFromCookie } from '../../src/web/theme.ts';
 
 describe('pages', () => {
   for (const url of ['/', '/stoly']) {
@@ -16,7 +17,7 @@ describe('pages', () => {
       const res = await app.inject({ method: 'GET', url });
       assert.equal(res.statusCode, 200);
       assert.match(res.headers['content-type'] ?? '', /^text\/html; charset=utf-8/);
-      assert.match(res.body, /^<!DOCTYPE html>\n<html lang="pl">/);
+      assert.match(res.body, /^<!DOCTYPE html>\n<html lang="pl" data-theme="[a-z]+">/);
       assert.match(res.body, /<title>Zapisy na gry<\/title>/);
       assert.match(res.body, /<h1>Zapisy na gry<\/h1>/);
       // Logged out: ribbon login button, drawer register/login links, BGG credit.
@@ -35,7 +36,7 @@ describe('pages', () => {
     const res = await app.inject({ method: 'GET', url: '/nie-ma-takiej-strony' });
     assert.equal(res.statusCode, 404);
     assert.match(res.body, /Nie znaleziono strony/);
-    assert.match(res.body, /<html lang="pl">/);
+    assert.match(res.body, /<html lang="pl" data-theme="[a-z]+">/);
   });
 
   test('every response carries the protective headers', async t => {
@@ -113,7 +114,7 @@ describe('health', () => {
 describe('layout', () => {
   test('a signed-in user sees the profile button and logout; never more than the short name', () => {
     const page = layout({
-      title: 'T', currentPath: '/', user: { shortName: 'jan', isAdmin: false }, csrfToken: 'tok', body: html`<p>x</p>`,
+      title: 'T', currentPath: '/', user: { shortName: 'jan', isAdmin: false }, theme: 'szczecin', csrfToken: 'tok', body: html`<p>x</p>`,
     }).value;
     assert.match(page, /class="btn btn-outline-light btn-sm app-user" href="\/Account\/Manage" title="Profil">jan</);
     assert.match(page, /Wyloguj/);
@@ -123,7 +124,7 @@ describe('layout', () => {
 
   test('admins see the admin entries in the drawer', () => {
     const page = layout({
-      title: 'T', currentPath: '/admin/logs', user: { shortName: 'ola', isAdmin: true }, csrfToken: 'tok', body: html``,
+      title: 'T', currentPath: '/admin/logs', user: { shortName: 'ola', isAdmin: true }, theme: 'szczecin', csrfToken: 'tok', body: html``,
     }).value;
     assert.match(page, /href="\/admin\/users"/);
     assert.match(page, /class="drawer-link active" href="\/admin\/logs"/);
@@ -131,9 +132,45 @@ describe('layout', () => {
 
   test('the page title and user name are escaped', () => {
     const page = layout({
-      title: '<x>', currentPath: '/', user: { shortName: '<img>', isAdmin: false }, csrfToken: 'tok', body: html``,
+      title: '<x>', currentPath: '/', user: { shortName: '<img>', isAdmin: false }, theme: 'szczecin', csrfToken: 'tok', body: html``,
     }).value;
     assert.match(page, /<title>&lt;x&gt;<\/title>/);
     assert.doesNotMatch(page, /<img>/);
+  });
+});
+
+describe('themes', () => {
+  test('an unknown or missing cookie falls back to the default theme', () => {
+    assert.equal(themeFromCookie(undefined), defaultTheme);
+    assert.equal(themeFromCookie('purple'), defaultTheme);
+    assert.equal(themeFromCookie('green'), 'green');
+  });
+
+  test('the page is rendered in the theme from the cookie, and the picker marks it', async t => {
+    const { app, close } = await createTestApp();
+    t.after(close);
+
+    const res = await app.inject({ method: 'GET', url: '/', cookies: { theme: 'amber' } });
+    assert.equal(res.statusCode, 200);
+    assert.match(res.body, /<html lang="pl" data-theme="amber">/);
+    assert.match(res.body, /value="amber" checked/);
+    assert.doesNotMatch(res.body, /value="szczecin" checked/);
+  });
+
+  test('without a cookie the page uses the default theme', async t => {
+    const { app, close } = await createTestApp();
+    t.after(close);
+
+    const res = await app.inject({ method: 'GET', url: '/' });
+    assert.match(res.body, new RegExp(`data-theme="${defaultTheme}"`));
+  });
+
+  test('a cookie value is never written into the page as is', async t => {
+    const { app, close } = await createTestApp();
+    t.after(close);
+
+    const res = await app.inject({ method: 'GET', url: '/', cookies: { theme: '"><script>x</script>' } });
+    assert.doesNotMatch(res.body, /<script>x<\/script>/);
+    assert.match(res.body, new RegExp(`data-theme="${defaultTheme}"`));
   });
 });

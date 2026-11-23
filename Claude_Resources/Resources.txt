@@ -1,14 +1,20 @@
 I made a screenshot of currently in-excel platform for people creating and managing board game tables.
 Terminology: table owner = the user who created the table, or whoever took it over later.
-Columns as follow from the left (order and placement per the screenshot):
-- Action buttons (far left: delete shown as ❌, rename shown as 🏷️ on dark green, plus 3 placeholder buttons shown as 🛠️ on dark green for owner options coming later; stacked vertically, starting a new column when out of space),
+Columns as follow from the left. Since 2026-11-23 the order follows the design B mockup ("Design B layout" below):
+cover, game name, slots taken, table type, hour, number of players, BGG link, difficulty, game slots, "⋯" (actions).
+(Was the screenshot's order: actions far left, the cover between difficulty and the slots.) What each column holds:
+- Action buttons (delete ❌ "Usuń stół", rename 🏷️ "Zmień grę", 3 placeholders 🛠️ for owner options coming later –
+  hidden until available): since 2026-11-23 behind a "⋯" button at the right end of the row, opening a small labelled
+  menu (on phones, the sheet's own ⋯ button opens the same list),
 - Game name (set by table owner),
 - Slots taken (set by table owner),
 - Table type (small, large, whatever; set by table owner; in the new-table row it is prefilled from the looked-up game and the user may change it – the choice is kept until a different game is looked up),
 - Hour of meeting (hour only, no date - users know what day it refers to; set by table owner; picked in 15-minute steps from a popup showing the entire list at once, without scrolling),
 - Number of players (prefilled from BGG's max players; randomized 1-6 for games not found on BGG. While creating a table (the new-table row) the user may change it with a number field (up/down), 1 up to the limit; nowhere else – existing rows show it as plain text. The chosen count goes to the table only: a BGG game in the catalog keeps BGG's count (decided 2026-11-22). Games over the limit get an error and no table; the limit is Tables:MaximumSpotsAllowed in appsettings.json, currently 20),
 - BGG Link (the game's BGG page; bgg.com for games not found on BGG),
-- Difficulty (BGG's average weight, stored and displayed exactly as BGG gives it, with a dot: 2.0488; comes only from BGG and can't be entered by users, so games not found on BGG show "–"),
+- Difficulty (BGG's average weight, stored and displayed exactly as BGG gives it, with a dot: 2.0488; comes only from BGG and can't be entered by users, so games not found on BGG show "–").
+  Shown with a slim bar the full height of its cell, filling from the bottom (0–5 → empty–full), on a heat scale from
+  green (easiest) to red (hardest) – decided 2026-11-23, replaces the coloured cell; on the board and in Baza gier,
 - Game picture (set by BGG API and stored in database; random colored square with game name text on top when there is none.
 Users can upload a cover only for a game not found on BGG: the box shows the 🗁 button on a light-gray background, covering 1/4 of it. Users can't replace an existing cover;
 BGG images must never be hot-linked: download once, resize as needed and serve a copy from our server, per a BGG admin's forum post.
@@ -34,25 +40,57 @@ Navigation:
 Layout should follow the screenshot, but with some changes:
 - A compact list of games, spanning from top to bottom of the screen, with slight spacing between them.
 - Player slot width: slots grow horizontally with the player's name, up to 300% of their original width; beyond that the name is cut with '...'.
-- Player slot size: fixed squares as tall as the row (row height is set by the 100px cover); every slot has the same
-  size whatever the name. A name wraps onto at most 2 lines, then is cut with "…"; the full name is in the tooltip
-  (decided 2026-11-22). The game name column is kept narrow so that 6 slots fit on one line from about 1360px window width.
-  It was made 33% narrower on 2026-11-22: at least 100px (was 150px) and 2/15 of the flexible space (was 1/5);
-  the slots column gets the rest. E.g. 171px instead of 256px in a 1920px window.
+- Player slot size: fixed 72px squares (design B layout, 2026-11-23; were 92px, as tall as a 100px-cover row); every
+  slot has the same size whatever the name; when a table has more seats than fit, they wrap to a second line (the row
+  grows). A name wraps onto at most 2 lines, then is cut with "…"; the full name is in the tooltip (decided 2026-11-22).
+- Design B layout (decided 2026-11-23, from the "Planszówkarz palette" canvas mockup): compact rows with rounded
+  corners and 6px gaps; a 56px cover first; columns 72px cover | game (at least 110px, 1.6 parts) | six equal 84px
+  detail columns (taken, kind, hour, players, BGG, difficulty – equal so the header's dividers are evenly spaced,
+  2026-11-23) | seats (at least 240px, 3.4 parts) | 48px ⋯.
+  Header labels: 12px, semi-bold (600), uppercase, letter spacing .05em, all the same weight (was 11px / 800, too
+  sharp). The new-table row's dashed outline uses the theme's line colour (darker than before).
+  Table kind and hour are small chips inside their cells (the kind by lightness; "no hour" a chip in the alarm
+  colour) instead of whole coloured cells. A "Stoły w aplikacji" heading (label + line) sits over the app's own
+  tables; the sheet divider uses the same label + line style. Same layout in all three colour themes.
+  (Replaces the 2026-11-22 column widths: game 2/15 of the flexible space, cover column 108px.)
 - New-table row: the "Utwórz stół", "BGG" and "Anuluj" buttons are always stacked vertically, each as wide as the
   game-name field above them (decided 2026-11-22).
-- Player slots design: squares with round edges, white background = free, dark-pink = taken (with player name in it), salmon = slot marked as taken by owner,
-very dark pink with 2px golden border = table owner's slot (owner automatically assigned the first slot after creating a table)
+- Player slots design: squares with round edges. Colours per theme since 2026-11-23 (see "Colour themes" below); the
+  shapes are fixed: free = dashed outline, taken = solid tile with the player's name, marked as taken by the owner =
+  striped tile, table owner's slot = solid tile in the theme's host colour (owner automatically assigned the first
+  slot after creating a table). (Was: white free, dark-pink taken, salmon owner-marked, very dark pink + gold border owner.)
 - Slots taken set by owner - users unable to take these slots
 - Raising the slots taken counter marks the highest-numbered free slots, passing over seated players, so marks can have gaps between them. The limit is the number of free slots.
 - Table type: the expanded list has black text on a white background.
 - List of game titles suggested when creating a table: ordered vertically, white text and borders.
 - The game-name fields (new-table row, 🏷️ rename) show no drop-down of catalog names while typing (the old <datalist>
   was removed, decided 2026-11-22); the name is only looked up when the field is left.
-- No hour of meeting set = red background
+- No hour of meeting set = the theme's alarm colour as background (red in all three themes)
 - BGG Link should be clickable and open in a new tab
-- Game picture should be displayed as a small thumbnail in its own column, between difficulty and game slots, sizable enough to be recognizable, but not too large to take up too much space (100px square)
-- Background of entire subpage - dark gray, with a subtle pattern or texture to add visual interest without being distracting
+- Game picture: a small thumbnail in its own column, the first one (left of the game name), 56px square with rounded
+  corners (design B layout, 2026-11-23; was 100px, between difficulty and game slots)
+- Background of entire subpage: the theme's plain dark background (the subtle weave pattern was dropped with the
+  themes on 2026-11-23: "minimal noise").
+
+Colour themes (decided 2026-11-23, designed on the "Planszówkarz palette" canvas):
+- Goals: big contrast between elements, few colours (about 5), elegant, practical, modern, minimal noise; the table
+  header, the host's seat and the table sections must stand out. All themes are dark (a light one was dropped).
+- Three themes, picked under "Motyw" at the bottom of the menu drawer; the pick applies at once (no reload) and is
+  remembered per browser in the "theme" cookie (not per account), so guests can choose too. Default: Barwy Szczecina.
+  - Barwy Szczecina (szczecin, default): from the city's coat of arms. Warm near-black page #110F10, blue header bar
+    and buttons #1D4F91, dark griffin-red table rows #2A1217 (sheet-imported rows greyer #241B1D), taken seats rose
+    #6B3540, crown gold #E7B53C for the hour button (outline), free seats (dashed) and the host, red #C41E3A only for
+    "no hour", text #F3EEEF / grey #A8A3A5, underlined links in the text colour.
+  - Grafit i bursztyn (amber): neutral graphite #111113 / rows #1C1D21, one amber accent #F2B33D for the header
+    underline, buttons, the section divider and the host; taken seats near-white; alarm #FF5A4E.
+  - Grafit i zieleń (green): card-table green #17703F header bar and buttons, brass #E0B243 host, light green
+    #4CC37A free seats and links, alarm #FF6B5A.
+- Header bar: solid, in the theme's header colour, with a short divider before each column but the first – 1px wide,
+  60% of the bar's height, black at 35% opacity (so it is a darker shade of the bar's colour).
+- Table kinds differ by lightness, not by hue: Duży solid light, Mały outlined, Inny muted.
+- Not done yet (designed but not built): the phone's gold "you have a seat here" dot (the phone keeps its left edge,
+  now in the theme's colour), and the mockup's "+ Nowy stół" button in the toolbar (the board keeps its inline
+  new-table row). The "Stoły w aplikacji" heading was built with the design B layout (2026-11-23).
 
 Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
 Design/ApplicationDesign.md, "Mobile audit"):

@@ -1,0 +1,276 @@
+/*
+    Colour themes (decided 2026-11-23, designed on the "Planszówkarz palette" canvas).
+    Each theme is a set of CSS custom properties ("design tokens") on the root <html> element, chosen by its
+    data-theme attribute. The rest of the CSS only uses var(--…), so switching the attribute recolours the
+    whole page at once – no page reload, no extra stylesheet.
+    On <html>, not on .app: custom properties are only inherited by descendants, and popups that board.js adds
+    straight to <body> (the seat menu, the hour picker) are outside .app – there every var() was undefined and the
+    popups came out transparent (found 2026-11-23).
+
+    The server writes data-theme from the "theme" cookie (src/web/theme.ts), so the first paint already
+    has the right colours; public/js/theme.js changes the attribute and the cookie when the user picks another.
+
+    Token roles:
+      --bg / --surface / --surface-2 / --popup-bg  page, table rows, things inside rows, popups and drawer
+      --line / --text / --muted                    borders, main and secondary text
+      --head-*                                     the column header bar and its dividers
+      --accent / --accent-text                     main buttons ("+ Nowy stół"), selected options
+      --section-own-*                              the "Stoły w aplikacji" heading
+      --section-*                                  the "Z arkusza Google" divider
+      --slot-*                                     seats: free, taken, blocked (by the owner), host
+      --kind-*                                     table kind cells (Duży / Mały / Inny)
+      --alarm-*                                    "no hour yet"
+      --hour-*                                     the hour button when an hour is set
+      --mine                                       "you have a seat here" mark
+*/
+
+/* A · Grafit i bursztyn: neutral graphite, one warm accent for everything important. */
+:root[data-theme="amber"] {
+    --bg: #111113;
+    --surface: #1c1d21;
+    --surface-imported: #1c1d21;
+    --surface-2: #2a2c31;
+    --popup-bg: #1c1d21;
+    --line: #3a3c42;
+    --text: #f4f3ef;
+    --muted: #a1a1a8;
+    --link: #f2b33d;
+    --focus: #f2b33d;
+
+    --head-bg: #2a2c31;
+    --head-text: #f4f3ef;
+    --head-divider: rgba(0, 0, 0, .35);
+    --head-underline: #f2b33d;
+
+    --accent: #f2b33d;
+    --accent-text: #111113;
+
+    --section-own-text: #f2b33d;
+    --section-own-line: #3a3c42;
+    --section-text: #f2b33d;
+    --section-line: #3a3c42;
+
+    --slot-free-bg: transparent;
+    --slot-free-border: #4a4c52;
+    --slot-free-text: #a1a1a8;
+    --slot-taken-bg: #f4f3ef;
+    --slot-taken-border: #f4f3ef;
+    --slot-taken-text: #111113;
+    --slot-blocked-bg: #2a2c31;
+    --slot-blocked-stripe: #1c1d21;
+    --slot-blocked-text: #a1a1a8;
+    --slot-host-bg: #f2b33d;
+    --slot-host-text: #111113;
+
+    --kind-big-bg: #f4f3ef;
+    --kind-big-text: #111113;
+    --kind-small-bg: transparent;
+    --kind-small-border: #a1a1a8;
+    --kind-small-text: #f4f3ef;
+    --kind-other-bg: #2a2c31;
+    --kind-other-text: #a1a1a8;
+
+    --alarm-bg: #ff5a4e;
+    --alarm-text: #111113;
+    --hour-border: transparent;
+    --hour-text: inherit;
+    --mine: #f2b33d;
+}
+
+/* B · Grafit i butelkowa zieleń: card-table green for structure, brass for people, red only for alarms. */
+:root[data-theme="green"] {
+    --bg: #0f1211;
+    --surface: #181d1b;
+    --surface-imported: #181d1b;
+    --surface-2: #252d29;
+    --popup-bg: #181d1b;
+    --line: #33403a;
+    --text: #edf1ee;
+    --muted: #9da9a2;
+    --link: #4cc37a;
+    --focus: #4cc37a;
+
+    --head-bg: #17703f;
+    --head-text: #ffffff;
+    --head-divider: rgba(0, 0, 0, .35);
+    --head-underline: transparent;
+
+    --accent: #17703f;
+    --accent-text: #ffffff;
+
+    --section-own-text: #4cc37a;
+    --section-own-line: #4cc37a;
+    --section-text: #edf1ee;
+    --section-line: #33403a;
+
+    --slot-free-bg: transparent;
+    --slot-free-border: #4cc37a;
+    --slot-free-text: #4cc37a;
+    --slot-taken-bg: #2c3631;
+    --slot-taken-border: #3f4c45;
+    --slot-taken-text: #edf1ee;
+    --slot-blocked-bg: #252d29;
+    --slot-blocked-stripe: #181d1b;
+    --slot-blocked-text: #9da9a2;
+    --slot-host-bg: #e0b243;
+    --slot-host-text: #1a1404;
+
+    --kind-big-bg: #edf1ee;
+    --kind-big-text: #0f1211;
+    --kind-small-bg: transparent;
+    --kind-small-border: #9da9a2;
+    --kind-small-text: #edf1ee;
+    --kind-other-bg: #252d29;
+    --kind-other-text: #9da9a2;
+
+    --alarm-bg: #ff6b5a;
+    --alarm-text: #1a0705;
+    --hour-border: transparent;
+    --hour-text: inherit;
+    --mine: #e0b243;
+}
+
+/* C · Barwy Szczecina (the default): the city's coat of arms laid out on the board – blue header and buttons,
+   griffin-red tables, crown gold for the hour and the host. */
+:root[data-theme="szczecin"] {
+    --bg: #110f10;
+    --surface: #2a1217;
+    --surface-imported: #241b1d;
+    --surface-2: #3b1a21;
+    --popup-bg: #2a1217;
+    --line: #4a2a31;
+    --text: #f3eeef;
+    --muted: #a8a3a5;
+    --link: #f3eeef;
+    --focus: #e7b53c;
+
+    --head-bg: #1d4f91;
+    --head-text: #ffffff;
+    --head-divider: rgba(0, 0, 0, .35);
+    --head-underline: transparent;
+
+    --accent: #1d4f91;
+    --accent-text: #ffffff;
+
+    --section-own-text: #f3eeef;
+    --section-own-line: rgba(243, 238, 239, .4);
+    --section-text: #f3eeef;
+    --section-line: #2e2a2c;
+
+    --slot-free-bg: transparent;
+    --slot-free-border: #e7b53c;
+    --slot-free-text: #e7b53c;
+    --slot-taken-bg: #6b3540;
+    --slot-taken-border: #7e4450;
+    --slot-taken-text: #f3eeef;
+    --slot-blocked-bg: #3b1a21;
+    --slot-blocked-stripe: #2a1217;
+    --slot-blocked-text: #a8a3a5;
+    --slot-host-bg: #e7b53c;
+    --slot-host-text: #1a1404;
+
+    --kind-big-bg: #f3eeef;
+    --kind-big-text: #1a0b0e;
+    --kind-small-bg: transparent;
+    --kind-small-border: #a8a3a5;
+    --kind-small-text: #f3eeef;
+    --kind-other-bg: #3b1a21;
+    --kind-other-text: #a8a3a5;
+
+    --alarm-bg: #c41e3a;
+    --alarm-text: #ffffff;
+    --hour-border: #e7b53c;
+    --hour-text: #e7b53c;
+    --mine: #e7b53c;
+}
+
+/* Text in popups added straight to <body>, outside .app (Bootstrap's default text colour is dark). */
+:root[data-theme] body {
+    color: var(--text);
+}
+
+/* What every theme shares: the page and Bootstrap read the tokens. */
+:root[data-theme] .app {
+    color: var(--text);
+    background: var(--bg);
+    /* Bootstrap reads these for links, .btn-link, form controls and secondary text. */
+    --bs-link-color: var(--link);
+    --bs-link-hover-color: var(--text);
+    --bs-body-color: var(--text);
+    --bs-body-bg: var(--surface);
+    --bs-secondary-color: var(--muted);
+    --bs-border-color: var(--line);
+    --board-border: var(--line);
+}
+
+/* Links are text-coloured in Szczecin, so they need the underline to read as links. */
+:root[data-theme="szczecin"] a:not(.btn, .drawer-link, .app-brand) {
+    text-decoration: underline;
+}
+
+:root[data-theme] .btn-primary,
+:root[data-theme] .btn-success {
+    --bs-btn-bg: var(--accent);
+    --bs-btn-border-color: var(--accent);
+    --bs-btn-color: var(--accent-text);
+    --bs-btn-hover-bg: var(--accent);
+    --bs-btn-hover-border-color: var(--accent);
+    --bs-btn-hover-color: var(--accent-text);
+    --bs-btn-active-bg: var(--accent);
+    --bs-btn-active-border-color: var(--accent);
+    --bs-btn-active-color: var(--accent-text);
+    --bs-btn-disabled-bg: var(--accent);
+    --bs-btn-disabled-border-color: var(--accent);
+    --bs-btn-disabled-color: var(--accent-text);
+    /* app.css sets .btn-primary's colours directly (not through Bootstrap's variables), so those need overriding too. */
+    border-color: var(--accent);
+    background-color: var(--accent);
+    color: var(--accent-text);
+}
+
+/* The theme picker in the menu drawer. It needs JavaScript (public/js/theme.js), so it is hidden without it. */
+html:not(.js) .theme-picker {
+    display: none;
+}
+
+.theme-picker {
+    margin: 0;
+    padding: .25rem .5rem .5rem;
+    border: 0;
+}
+
+    .theme-picker legend {
+        margin-bottom: .25rem;
+        color: var(--muted);
+        font-size: .75rem;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+.theme-option {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-height: 2rem;
+    padding: 0 .25rem;
+    border-radius: 4px;
+    font-size: .875rem;
+    cursor: pointer;
+}
+
+    .theme-option:hover {
+        background-color: rgba(255, 255, 255, .08);
+    }
+
+/* Three dots preview each theme's main colours, so the choice is visible before picking it. */
+.theme-swatch {
+    display: inline-flex;
+    gap: 2px;
+}
+
+    .theme-swatch i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }

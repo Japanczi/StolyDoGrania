@@ -132,3 +132,20 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+/* Difficulty as a slim bar the full height of its cell, filling from the bottom (decided 2026-11-23): 0–5 → 0–100%,
+   green (easy) to red (hard). The cell's inline style sets --difficulty-fill and --difficulty-color
+   (domain/game.ts, difficultyStyle). Without them the gradient is invalid, so nothing is drawn (e.g. "–"). */
+.cell-difficulty {
+    position: relative;
+}
+
+    .cell-difficulty::before {
+        content: "";
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        left: 6px;
+        width: 5px;
+        border-radius: 3px;
+        background: linear-gradient(to top, var(--difficulty-color) var(--difficulty-fill), var(--surface-2, rgba(255, 255, 255, .12)) var(--difficulty-fill));
+    }

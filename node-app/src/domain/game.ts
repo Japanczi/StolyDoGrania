@@ -59,10 +59,18 @@ export function difficultyLabel(weight: string): string {
   return String(Number(value.toFixed(4)));
 }
 
-/** Heat scale over 0–5: green (easy) through yellow and orange to red (hard). */
+/**
+ * The difficulty bar (decided 2026-11-23): how full it is (0–5 → 0–100%) and its colour on a heat scale, green (easy)
+ * through yellow and orange to red (hard). Only two CSS custom properties: the bar itself is drawn by the CSS
+ * (.cell-difficulty::before in app.css), so the board, the new-table row and Baza gier all share one look.
+ */
 export function difficultyStyle(weight: string): string | null {
   const value = Number(weight);
-  return value > 0 ? `background-color:hsl(${Math.trunc(120 - value * 24)}, 85%, 68%);color:#222;` : null;
+  if (!(value > 0)) {
+    return null;
+  }
+  const fill = Math.min(100, Math.round((value / 5) * 100));
+  return `--difficulty-fill:${fill}%;--difficulty-color:hsl(${Math.trunc(120 - Math.min(value, 5) * 24)}, 75%, 50%);`;
 }
 
 /** Derived from the name, so a game keeps its colour across restarts. Same formula as C# (sum of UTF-16 codes). */
