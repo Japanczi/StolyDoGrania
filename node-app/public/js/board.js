@@ -255,9 +255,11 @@
   const sheetMenuButton = /** @type {HTMLButtonElement} */ (document.getElementById('sheet-menu'));
 
   // The menu floats over the sheet; a press anywhere outside it (and outside ⋯) closes it, like any dropdown.
-  // The rename popup lives inside its menu item, so pressing in it doesn't count as outside.
+  // The rename popup lives inside its menu item, so pressing in it doesn't count as outside. While any popup is open
+  // (e.g. the hour picker opened from the rename popup, which sits outside the menu) the menu stays: closing it would
+  // hide the rename popup inside it.
   document.addEventListener('pointerdown', e => {
-    if (!sheetBody.classList.contains('menu-open')) return;
+    if (!sheetBody.classList.contains('menu-open') || openPopups.length > 0) return;
     const target = /** @type {Element} */ (e.target);
     if (target.closest('.table-sheet .cell-actions') || target.closest('[data-sheet-menu]')) return;
     setSheetMenu(false);
@@ -405,41 +407,72 @@
     delete button.dataset.morphSkip;
   }
 
+  // Escape closes the innermost thing only: an armed button or the top popup first (e.g. the hour picker opened from
+  // the rename popup, which stays), then the phone sheet's ⋯ menu, and the sheet itself the next time.
+  // preventDefault() stops the sheet's <dialog> from also closing on that same Escape.
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    // Escape closes the innermost thing only: a popup or an armed button first, then the sheet's ⋯ menu, the sheet
-    // the next time.
-    if (armed || closeCurrentPopup) {
+    if (armed || openPopups.length > 0) {
       e.preventDefault();
       disarm();
-      closePopups();
+      closeTopPopup();
       return;
     }
     if (sheetBody.classList.contains('menu-open')) { e.preventDefault(); setSheetMenu(false); }
   });
 
   // ---------- popups (hour picker, add player, rename) ----------
+  // A stack: a popup can open another one on top (the rename popup's hour picker). Since 2026-11-23; before, opening
+  // a popup always closed the open one – which would have closed the rename popup when its hour was picked.
 
-  /** @type {(() => void) | null} */
-  let closeCurrentPopup = null;
+  /** @type {(() => void)[]} One close function per open popup, innermost last. */
+  const openPopups = [];
 
+  /** Closes every open popup. */
   function closePopups() {
-    if (closeCurrentPopup) { const close = closeCurrentPopup; closeCurrentPopup = null; close(); }
+    while (openPopups.length > 0) closeTopPopup();
+  }
+
+  function closeTopPopup() {
+    openPopups.pop()?.();
+    if (openPopups.length === 0) popupClosed();
   }
 
   /**
-   * Shows a popup with a backdrop; clicking the backdrop or Escape closes it.
+   * Shows a popup with a backdrop; clicking the backdrop or Escape closes it. A `nested` popup opens on top of the
+   * open ones (they stay); otherwise those are closed first. Returns the function that closes this popup.
    * @param {HTMLElement} popup @param {HTMLElement} parent @param {string} backdropClass @param {() => void} [onClose]
+   * @param {boolean} [nested]
    */
-  function showPopup(popup, parent, backdropClass, onClose) {
-    closePopups();
+  function showPopup(popup, parent, backdropClass, onClose, nested = false) {
+    if (!nested) closePopups();
     const backdrop = document.createElement('div');
     backdrop.className = backdropClass;
-    backdrop.addEventListener('click', () => closePopups());
-    backdrop.addEventListener('contextmenu', e => { e.preventDefault(); closePopups(); });
+    if (nested) {
+      // Above the popup underneath (which is z-index 1001 like the others).
+      backdrop.style.zIndex = '1002';
+      popup.style.zIndex = '1003';
+    }
     parent.append(backdrop, popup);
     popupOpen = true;
-    closeCurrentPopup = () => { backdrop.remove(); popup.remove(); onClose?.(); popupClosed(); };
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      backdrop.remove();
+      popup.remove();
+      onClose?.();
+    };
+    openPopups.push(close);
+    /** Closes this popup and any opened on top of it. */
+    const closeThis = () => {
+      const at = openPopups.indexOf(close);
+      if (at === -1) return;
+      while (openPopups.length > at) closeTopPopup();
+    };
+    backdrop.addEventListener('click', closeThis);
+    backdrop.addEventListener('contextmenu', e => { e.preventDefault(); closeThis(); });
+    return closeThis;
   }
 
   const hours = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`);
@@ -458,22 +491,27 @@
     popup.style.top = `max(0px, min(${e.clientY}px, calc(100vh - 360px)))`;
     const grid = document.createElement('div');
     grid.className = 'hour-grid';
+    /** @type {() => void} */
+    let close = () => {};
     for (const hour of hours) {
       const option = document.createElement('button');
       option.type = 'button';
       option.className = `hour-option${hour === button.dataset.value ? ' hour-option-selected' : ''}`;
       option.textContent = hour;
-      option.addEventListener('click', () => { closePopups(); onPick(hour); });
+      option.addEventListener('click', () => { close(); onPick(hour); });
       grid.append(option);
     }
     const none = document.createElement('button');
     none.type = 'button';
     none.className = 'btn btn-secondary btn-sm';
     none.textContent = 'Bez godziny';
-    none.addEventListener('click', () => { closePopups(); onPick(null); });
+    none.addEventListener('click', () => { close(); onPick(null); });
     popup.append(grid, none);
     button.setAttribute('aria-expanded', 'true');
-    showPopup(popup, popupHost(), 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'));
+    // Opened from inside another popup (the rename popup): on top of it, which stays open. Inside the open phone
+    // sheet (popupHost): everything outside a modal <dialog> is unclickable.
+    const nested = button.closest('.action-popup') !== null;
+    close = showPopup(popup, popupHost(), 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'), nested);
     popup.focus();
   }
 
@@ -626,92 +664,89 @@
     };
   }
 
-  // ---------- the new-table row ----------
+  // ---------- a table's details: shared by the new-table row and the rename popup ----------
 
-  const draft = document.getElementById('draft');
-  if (draft) setUpDraft(draft);
+  /**
+   * @typedef {ReturnType<typeof createLookup>} Lookup
+   * @typedef {{ taken: HTMLInputElement, kind: HTMLSelectElement, kindBox: HTMLElement, hourButton: HTMLElement,
+   *   hourBox: HTMLElement, max: HTMLInputElement, link: HTMLElement, difficulty: HTMLElement,
+   *   coverPreview: HTMLElement, coverLabel: HTMLElement, coverInput: HTMLInputElement }} DetailFields
+   * @typedef {{ kind: string, hour: string | null, maxPlayers: number, takenSlots: number }} DetailValues
+   */
 
-  /** @param {HTMLElement} draftRow */
-  function setUpDraft(draftRow) {
-    const nameInput = /** @type {HTMLInputElement} */ (document.getElementById('new-name'));
-    const takenInput = /** @type {HTMLInputElement} */ (document.getElementById('new-taken'));
-    const kindCell = /** @type {HTMLElement} */ (document.getElementById('new-kind-cell'));
-    const kindSelect = /** @type {HTMLSelectElement} */ (kindCell.querySelector('select'));
-    const hourCell = /** @type {HTMLElement} */ (document.getElementById('new-hour-cell'));
-    const hourButton = /** @type {HTMLElement} */ (hourCell.querySelector('button'));
-    const maxInput = /** @type {HTMLInputElement} */ (document.getElementById('new-max'));
-    const linkCell = /** @type {HTMLElement} */ (document.getElementById('new-link'));
-    const difficultyCell = /** @type {HTMLElement} */ (document.getElementById('new-difficulty'));
-    const coverPreview = /** @type {HTMLElement} */ (document.getElementById('new-cover-preview'));
-    const coverLabel = /** @type {HTMLElement} */ (document.getElementById('new-cover-label'));
-    const coverInput = /** @type {HTMLInputElement} */ (document.getElementById('new-cover'));
-    const panel = /** @type {HTMLElement} */ (document.getElementById('draft-panel'));
-    const createButton = /** @type {HTMLButtonElement} */ (document.getElementById('draft-create'));
-    const bggButton = document.getElementById('draft-bgg');
-    const cancelButton = /** @type {HTMLElement} */ (document.getElementById('draft-cancel'));
-
-    /** Games not found on BGG still use a random count (1–6) during early development, as in .NET. */
-    let drawnMaxPlayers = 1 + Math.floor(Math.random() * 6);
+  /**
+   * The table details a game comes with – kind, hour, seat count, seats marked as taken, BGG link, difficulty, cover –
+   * as one piece of logic for both forms that set them: the new-table row and (since 2026-11-23) the rename popup.
+   * The fields themselves are passed in, because the two forms lay them out differently (row cells vs. a labelled
+   * popup). Defaults from the looked-up game (kind, seat count) are copied only when that game *changes*, so the
+   * user's own choices aren't overwritten by every later update().
+   * @param {DetailFields} f
+   * @param {{ lookup: () => Lookup, name: () => string, fallbackMax: () => number, initial: DetailValues,
+   *   keepInitial: boolean, withoutGame: () => { coverSrc: string | null, canUpload: boolean } }} o
+   *   keepInitial: the initial values stand until another game is looked up (rename: the table's own values);
+   *   otherwise the first update() applies the defaults (new table).
+   *   withoutGame: the cover to show and whether a cover may be uploaded while no game is looked up.
+   */
+  function createTableDetails(f, o) {
     /** @type {string | null} */ let hour = null;
     /** @type {string | null} */ let coverUrl = null;
     /**
-     * The game whose defaults (kind, player count) were last copied into the row. Defaults are copied only when the
-     * looked-up game changes, so the user's own choices aren't overwritten by every later update().
-     * `undefined` = nothing copied yet (null is a real state: no game found).
+     * The game whose defaults were last copied in. `undefined` = nothing copied yet (null is a real state: no game).
      * @type {GameView | null | undefined}
      */
     let appliedGame;
-    const lookup = createLookup(panel, () => nameInput.value, () => kindSelect.value, update);
 
-    /** The game's own count: BGG's (or the catalog's) max players, else the drawn one. */
-    function defaultMaxPlayers() {
-      const g = lookup.state.game;
-      return g && g.maxPlayers > 0 ? g.maxPlayers : drawnMaxPlayers;
+    /** @param {DetailValues} v */
+    function set(v) {
+      f.kind.value = v.kind;
+      hour = v.hour;
+      f.max.value = String(v.maxPlayers);
+      f.taken.value = String(v.takenSlots);
+      f.coverInput.value = '';
+      setCoverPreview(null);
+      appliedGame = o.keepInitial ? null : undefined;
     }
 
-    /** Shows the row's other cells once the name is looked up (Tables.razor DraftDetailsVisible). */
     function update() {
+      const lookup = o.lookup();
       const g = lookup.state.game;
-      const visible = !lookup.state.loading && !lookup.state.candidates && nameInput.value.trim() !== '';
-      for (const cell of draftRow.querySelectorAll('[data-draft-detail]')) cell.toggleAttribute('hidden', !visible);
-      bggButton?.toggleAttribute('hidden', nameInput.value.trim() === '');
-      cancelButton.toggleAttribute('hidden', nameInput.value.trim() === '');
       if (!lookup.state.loading && g !== appliedGame) {
         appliedGame = g;
-        if (g) kindSelect.value = g.kind;
-        maxInput.value = String(defaultMaxPlayers());
+        if (g) f.kind.value = g.kind;
+        f.max.value = String(g && g.maxPlayers > 0 ? g.maxPlayers : o.fallbackMax());
       }
-      kindCell.className = `cell kind-${kindSelect.value}`;
-      hourCell.classList.toggle('hour-unset', hour === null);
-      hourButton.textContent = hour ?? '--:--';
-      hourButton.dataset.value = hour ?? '';
-      takenInput.max = String(Math.max(0, Number(maxInput.value) - 1));
-      maxInput.title = g?.bggId != null ? `Liczba graczy z BGG: ${g.maxPlayers}` : 'Liczba graczy';
-      linkCell.replaceChildren();
+      for (const k of ['small', 'big', 'other']) f.kindBox.classList.toggle(`kind-${k}`, f.kind.value === k);
+      f.hourBox.classList.toggle('hour-unset', hour === null);
+      f.hourButton.textContent = hour ?? '--:--';
+      f.hourButton.dataset.value = hour ?? '';
+      f.taken.max = String(Math.max(0, Number(f.max.value) - 1));
+      f.max.title = g?.bggId != null ? `Liczba graczy z BGG: ${g.maxPlayers}` : 'Liczba graczy';
+      f.link.replaceChildren();
       if (g?.bggUrl) {
         const a = document.createElement('a');
         a.href = g.bggUrl; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Link';
-        linkCell.append(a);
+        f.link.append(a);
       } else {
-        linkCell.textContent = '–';
+        f.link.textContent = '–';
       }
-      difficultyCell.textContent = g ? g.difficultyLabel : '–';
-      difficultyCell.setAttribute('style', g?.difficultyStyle ?? '');
+      f.difficulty.textContent = g ? g.difficultyLabel : '–';
+      f.difficulty.setAttribute('style', g?.difficultyStyle ?? '');
       // Only for a game BGG doesn't have, and which has no cover yet.
-      const canUpload = !g || (g.bggId === null && g.coverUrl === null);
-      coverLabel.hidden = !canUpload;
-      if (!canUpload) { coverInput.value = ''; setCoverPreview(null); }
-      drawCover(g?.coverUrl ?? coverUrl);
+      const without = o.withoutGame();
+      const canUpload = g ? g.bggId === null && g.coverUrl === null : without.canUpload;
+      f.coverLabel.hidden = !canUpload;
+      if (!canUpload) { f.coverInput.value = ''; setCoverPreview(null); }
+      drawCover(coverUrl ?? (g ? g.coverUrl : without.coverSrc));
     }
 
     /** @param {string | null} src */
     function drawCover(src) {
-      coverPreview.replaceChildren();
-      const name = nameInput.value.trim();
+      f.coverPreview.replaceChildren();
+      const name = o.name().trim();
       if (src) {
         const img = document.createElement('img');
         img.className = 'thumb'; img.src = src; img.alt = `Okładka: ${name}`;
-        coverPreview.append(img);
+        f.coverPreview.append(img);
       } else {
         const ph = document.createElement('div');
         ph.className = 'thumb thumb-placeholder';
@@ -720,7 +755,7 @@
         ph.style.backgroundColor = `hsl(${(sum * 47) % 360}, 55%, 35%)`;
         ph.setAttribute('aria-hidden', 'true');
         ph.textContent = name;
-        coverPreview.append(ph);
+        f.coverPreview.append(ph);
       }
     }
 
@@ -730,23 +765,109 @@
       coverUrl = url;
     }
 
+    f.kind.addEventListener('change', update);
+    f.max.addEventListener('input', update);
+    f.hourButton.addEventListener('click', e => openHourPicker(f.hourButton, e, picked => { hour = picked; update(); }));
+    f.coverInput.addEventListener('change', () => {
+      const lookup = o.lookup();
+      const file = f.coverInput.files?.[0];
+      lookup.state.error = null;
+      if (!file) { setCoverPreview(null); update(); return; }
+      // Checked here for a quick answer; the server checks type (by content) and size again.
+      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+        f.coverInput.value = ''; lookup.fail('Okładka musi być obrazem PNG, JPEG, WebP lub GIF.'); return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        f.coverInput.value = ''; lookup.fail('Okładka może mieć maksymalnie 2 MB.'); return;
+      }
+      setCoverPreview(URL.createObjectURL(file));
+      update();
+    });
+
+    set(o.initial);
+    return {
+      update,
+      /** @param {DetailValues} v */
+      reset(v) { set(v); update(); },
+      /** The chosen kind (the lookup sends it, so a game added by hand gets it). */
+      kind: () => f.kind.value,
+      /** The name changed: a cover picked for the previous name no longer applies. */
+      nameChanged() { f.coverInput.value = ''; setCoverPreview(null); },
+      /** Adds the details to a form for POST /api/tables or …/rename. @param {FormData} form */
+      fill(form) {
+        form.set('kind', f.kind.value);
+        form.set('hour', hour ?? '');
+        form.set('takenSlots', f.taken.value || '0');
+        form.set('maxPlayers', f.max.value);
+        const file = f.coverInput.files?.[0];
+        if (file) form.set('cover', file);
+      },
+    };
+  }
+
+  // ---------- the new-table row ----------
+
+  const draft = document.getElementById('draft');
+  if (draft) setUpDraft(draft);
+
+  /** @param {HTMLElement} draftRow */
+  function setUpDraft(draftRow) {
+    const nameInput = /** @type {HTMLInputElement} */ (document.getElementById('new-name'));
+    const kindCell = /** @type {HTMLElement} */ (document.getElementById('new-kind-cell'));
+    const hourCell = /** @type {HTMLElement} */ (document.getElementById('new-hour-cell'));
+    const panel = /** @type {HTMLElement} */ (document.getElementById('draft-panel'));
+    const createButton = /** @type {HTMLButtonElement} */ (document.getElementById('draft-create'));
+    const bggButton = document.getElementById('draft-bgg');
+    const cancelButton = /** @type {HTMLElement} */ (document.getElementById('draft-cancel'));
+    const byId = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
+
+    /** Games not found on BGG still use a random count (1–6) during early development, as in .NET. */
+    let drawnMaxPlayers = 1 + Math.floor(Math.random() * 6);
+    const empty = () => ({ kind: 'small', hour: null, maxPlayers: drawnMaxPlayers, takenSlots: 0 });
+
+    const details = createTableDetails({
+      taken: /** @type {HTMLInputElement} */ (byId('new-taken')),
+      kind: /** @type {HTMLSelectElement} */ (kindCell.querySelector('select')),
+      kindBox: kindCell,
+      hourButton: /** @type {HTMLElement} */ (hourCell.querySelector('button')),
+      hourBox: hourCell,
+      max: /** @type {HTMLInputElement} */ (byId('new-max')),
+      link: byId('new-link'),
+      difficulty: byId('new-difficulty'),
+      coverPreview: byId('new-cover-preview'),
+      coverLabel: byId('new-cover-label'),
+      coverInput: /** @type {HTMLInputElement} */ (byId('new-cover')),
+    }, {
+      lookup: () => lookup,
+      name: () => nameInput.value,
+      fallbackMax: () => drawnMaxPlayers,
+      initial: empty(),
+      keepInitial: false,
+      withoutGame: () => ({ coverSrc: null, canUpload: true }),
+    });
+    const kindSelect = /** @type {HTMLSelectElement} */ (kindCell.querySelector('select'));
+    const lookup = createLookup(panel, () => nameInput.value, () => kindSelect.value, update);
+
+    /** Shows the row's other cells once the name is looked up (Tables.razor DraftDetailsVisible). */
+    function update() {
+      const visible = !lookup.state.loading && !lookup.state.candidates && nameInput.value.trim() !== '';
+      for (const cell of draftRow.querySelectorAll('[data-draft-detail]')) cell.toggleAttribute('hidden', !visible);
+      bggButton?.toggleAttribute('hidden', nameInput.value.trim() === '');
+      cancelButton.toggleAttribute('hidden', nameInput.value.trim() === '');
+      details.update();
+    }
+
     function reset() {
       nameInput.value = '';
-      takenInput.value = '0';
-      kindSelect.value = 'small';
-      hour = null;
-      coverInput.value = '';
-      setCoverPreview(null);
       drawnMaxPlayers = 1 + Math.floor(Math.random() * 6);
-      appliedGame = undefined;
       lookup.reset();
+      details.reset(empty());
       update();
     }
 
     // The name is looked up when the field loses focus ("change"), as with Blazor's @bind.
     nameInput.addEventListener('change', () => {
-      coverInput.value = '';
-      setCoverPreview(null);
+      details.nameChanged();
       lookup.lookup('auto');
       update();
     });
@@ -754,24 +875,6 @@
     nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); } });
     bggButton?.addEventListener('click', () => lookup.lookup('bgg'));
     cancelButton.addEventListener('click', reset);
-    kindSelect.addEventListener('change', update);
-    maxInput.addEventListener('input', update);
-    hourButton.addEventListener('click', e => openHourPicker(hourButton, e, picked => { hour = picked; update(); }));
-
-    coverInput.addEventListener('change', () => {
-      const file = coverInput.files?.[0];
-      lookup.state.error = null;
-      if (!file) { setCoverPreview(null); update(); return; }
-      // Checked here for a quick answer; the server checks type (by content) and size again.
-      if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
-        coverInput.value = ''; lookup.fail('Okładka musi być obrazem PNG, JPEG, WebP lub GIF.'); return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        coverInput.value = ''; lookup.fail('Okładka może mieć maksymalnie 2 MB.'); return;
-      }
-      setCoverPreview(URL.createObjectURL(file));
-      update();
-    });
 
     createButton.addEventListener('click', async () => {
       if (busy || !lookup.ready()) return;
@@ -780,12 +883,7 @@
       const form = new FormData();
       form.set('name', name);
       form.set('gameId', String(lookup.state.game?.id ?? ''));
-      form.set('kind', kindSelect.value);
-      form.set('hour', hour ?? '');
-      form.set('takenSlots', takenInput.value || '0');
-      form.set('maxPlayers', maxInput.value);
-      const file = coverInput.files?.[0];
-      if (file) form.set('cover', file);
+      details.fill(form);
       createButton.disabled = true;
       try {
         const result = await act(async () => {
@@ -804,11 +902,23 @@
 
   // ---------- renaming a table (popup next to the 🏷️ button) ----------
 
-  /** @param {HTMLElement} button @param {number} tableId */
+  /**
+   * "Zmień grę": a new game name, looked up like a new table's, plus the same details as the new-table row – kind,
+   * hour, seat count, seats marked as taken, a cover for a game BGG doesn't know (decided 2026-11-23). They start at
+   * the table's current values (no seats marked: renaming frees them); a newly looked-up game brings its defaults.
+   * @param {HTMLElement} button @param {number} tableId
+   */
   function openRename(button, tableId) {
     const row = /** @type {HTMLElement} */ (button.closest('[data-table-id]'));
     const anchor = /** @type {HTMLElement} */ (button.closest('.action-anchor'));
-    const currentMax = Number(row.dataset.maxPlayers);
+    const currentTitle = row.dataset.title ?? '';
+    const current = {
+      kind: row.dataset.kind ?? 'small',
+      hour: /** @type {HTMLElement | null} */ (row.querySelector('[data-action="hour"]'))?.dataset.value || null,
+      maxPlayers: Number(row.dataset.maxPlayers),
+      takenSlots: 0,
+    };
+    const currentCover = /** @type {HTMLImageElement | null} */ (row.querySelector('.cell-cover img.thumb'))?.getAttribute('src') ?? null;
 
     const popup = document.createElement('div');
     popup.className = 'action-popup action-popup-wide';
@@ -824,8 +934,11 @@
     input.autocomplete = 'off';
     input.value = row.dataset.title ?? '';
     const panel = document.createElement('div');
-    const seats = document.createElement('span');
-    seats.className = 'form-text mt-0';
+    // The details, copied from the server-rendered <template> (view.ts renameDetailsTemplate).
+    const template = /** @type {HTMLTemplateElement} */ (document.getElementById('rename-details-template'));
+    const detailsBox = /** @type {HTMLElement} */ (/** @type {DocumentFragment} */ (template.content.cloneNode(true)).firstElementChild);
+    const field = (/** @type {string} */ name) => /** @type {HTMLElement} */ (detailsBox.querySelector(`[data-field="${name}"]`));
+    const kindBox = field('kind-box');
     const warning = document.createElement('span');
     warning.className = 'rename-warning';
     warning.textContent = 'Zapisanie zwolni wszystkie miejsca (zostaje tylko właściciel).';
@@ -845,25 +958,51 @@
       buttons.append(bgg);
     }
     buttons.append(cancel);
-    popup.append(label, input, panel, seats, warning, buttons);
+    popup.append(label, input, panel, detailsBox, warning, buttons);
 
-    const lookup = createLookup(panel, () => input.value, () => row.dataset.kind ?? 'small', () => {
-      // A BGG game brings its own seat count; otherwise the table keeps its own.
-      const g = lookup.state.game;
-      const next = g && g.bggId !== null && g.maxPlayers > 0 ? g.maxPlayers : currentMax;
-      const ready = !lookup.state.loading && !lookup.state.candidates && input.value.trim() !== '';
-      seats.textContent = ready && next !== currentMax ? `Liczba miejsc: ${currentMax} → ${next}` : '';
+    const details = createTableDetails({
+      taken: /** @type {HTMLInputElement} */ (field('taken')),
+      kind: /** @type {HTMLSelectElement} */ (kindBox.querySelector('select')),
+      kindBox,
+      hourButton: field('hour'),
+      hourBox: field('hour-box'),
+      max: /** @type {HTMLInputElement} */ (field('max')),
+      link: field('link'),
+      difficulty: field('difficulty'),
+      coverPreview: field('cover-preview'),
+      coverLabel: field('cover-label'),
+      coverInput: /** @type {HTMLInputElement} */ (field('cover')),
+    }, {
+      lookup: () => lookup,
+      name: () => input.value,
+      fallbackMax: () => current.maxPlayers,
+      initial: current,
+      keepInitial: true,
+      // Before a new name is looked up it's still the table's own game: its cover, and no upload offered.
+      // A new name that isn't found anywhere becomes a new hand-added game, which may get a cover.
+      withoutGame: () => input.value.trim() === currentTitle
+        ? { coverSrc: currentCover, canUpload: false }
+        : { coverSrc: null, canUpload: true },
+    });
+    const lookup = createLookup(panel, () => input.value, () => details.kind(), () => {
+      // The details wait while a lookup runs or a BGG list is shown, like the new-table row's cells.
+      detailsBox.hidden = lookup.state.loading || lookup.state.candidates !== null || input.value.trim() === '';
+      details.update();
     });
 
-    input.addEventListener('change', () => lookup.lookup('auto'));
+    input.addEventListener('change', () => { details.nameChanged(); lookup.lookup('auto'); });
     input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
     cancel.addEventListener('click', () => closePopups());
     save.addEventListener('click', async () => {
       if (busy || !lookup.ready()) return;
       const name = input.value.trim();
       if (name === '') { lookup.fail('Podaj nazwę gry.'); return; }
+      const form = new FormData();
+      form.set('name', name);
+      form.set('gameId', String(lookup.state.game?.id ?? ''));
+      details.fill(form);
       busy = true;
-      const result = await post(`/api/tables/${tableId}/rename`, { name, gameId: lookup.state.game?.id ?? null });
+      const result = await post(`/api/tables/${tableId}/rename`, form);
       busy = false;
       // An error is shown in the popup, next to the name it's about.
       if (!result.ok) { lookup.fail(result.error); return; }
@@ -875,10 +1014,24 @@
     /** @type {(() => void) | null} */
     let stopFollowing = null;
     showPopup(popup, anchor, 'popup-backdrop', () => stopFollowing?.());
-    // In the phone sheet: a layer attached to the button (on the desktop the CSS already places it beside it).
-    if (sheet.contains(anchor)) stopFollowing = followButton(popup, button);
+    details.update();
+    // In the phone sheet: a layer attached to the button. On the desktop it sits beside the button (CSS), moved up
+    // if the row is low on the screen.
+    if (sheet.contains(anchor)) stopFollowing = followButton(popup, button); else keepOnScreen(popup);
     input.focus({ preventScroll: true });
     input.select();
+  }
+
+  /**
+   * The rename popup sits where it naturally falls, beside its button (position: fixed without offsets). With the
+   * table details it's taller, so for a row low on the screen it's moved up until it fits. @param {HTMLElement} popup
+   */
+  function keepOnScreen(popup) {
+    const r = popup.getBoundingClientRect();
+    const margin = 8;
+    if (r.bottom > window.innerHeight - margin) {
+      popup.style.top = `${Math.max(margin, window.innerHeight - margin - r.height)}px`;
+    }
   }
 
   /**

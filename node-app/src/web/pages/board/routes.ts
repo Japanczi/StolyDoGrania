@@ -302,30 +302,47 @@ export function boardRoutes(app: FastifyInstance, deps: BoardDeps): void {
   });
 
   /**
-   * Rename: the name is looked up like a new table's. A BGG game brings its own seat count; otherwise the table
-   * keeps its count. Every player leaves; a seated owner keeps the first seat (tryChangeGame).
+   * "Zmień grę": the name is looked up like a new table's, and the table's details are set again from the same form
+   * as a new table – kind, seat count, hour, seats marked as taken (decided 2026-11-23; before, a BGG game's seat
+   * count replaced the table's and kind and hour stayed). Multipart, since it may carry a cover for a game BGG doesn't
+   * know. Every player leaves; a seated owner keeps the first seat (tryChangeGame). One transaction.
    */
   app.post('/api/tables/:id/rename', async (request, reply) => {
     const viewer = viewerOf(request);
     const tableId = idParam(request);
-    const body = jsonBody(request);
-    const name = str(body.name).trim();
+    const form = await readCreateForm(request);
+    if ('error' in form) return send(reply, { ok: false, error: form.error });
+    const name = form.fields.name.trim();
     if (name === '') return send(reply, { ok: false, error: 'Podaj nazwę gry.' });
-    const gameId = Number(body.gameId);
+    if (name.length > 200) return send(reply, { ok: false, error: 'Nazwa może mieć maksymalnie 200 znaków.' });
+    const kind = kindOf(form.fields.kind);
+    if (!kind) return send(reply, { ok: false, error: 'Nieznany rodzaj stołu.' });
+    const startHour = form.fields.hour === '' ? null : form.fields.hour;
+    const takenSlots = Number(form.fields.takenSlots || '0');
+    if (!Number.isInteger(takenSlots)) return send(reply, { ok: false, error: 'Podaj liczbę zajętych miejsc.' });
+    const maxPlayers = Number(form.fields.maxPlayers);
+    if (!Number.isInteger(maxPlayers) || maxPlayers < 1) return send(reply, { ok: false, error: 'Nieprawidłowa liczba miejsc.' });
+    const tooMany = tooManySpotsError(maxPlayers);
+    if (tooMany) return send(reply, { ok: false, error: tooMany });
+    const gameId = Number(form.fields.gameId);
     const before = await loadBoardTable(db, tableId);
     const oldTitle = before ? before.gameTitle ?? before.game.name : '';
 
     return change(reply, tableId, 'Nie udało się zmienić gry stołu.', () =>
       editManagedTable(db, tableId, viewer, async (table, trx) => {
+        const details = { title: name, kind, maxPlayers, startHour, takenSlots };
+        // The rule is checked on a copy first, so a bad value is reported before a game or cover is written.
+        const check = tryChangeGame({ ...table, participants: [...table.participants] }, { gameId: table.gameId, ...details });
+        if (!check.ok) return check;
         let game = Number.isInteger(gameId) && gameId > 0 ? await findGameById(trx, gameId) : await findGameByName(trx, name);
-        const maxPlayers = game && game.bggId !== null && game.maxPlayers > 0 ? game.maxPlayers : table.maxPlayers;
-        const tooMany = tooManySpotsError(maxPlayers);
-        if (tooMany) return { ok: false, error: tooMany };
         if (!game) {
-          const id = await insertHandAddedGame(trx, { name, kind: table.kind, maxPlayers, cover: null });
+          const id = await insertHandAddedGame(trx, { name, kind, maxPlayers, cover: form.cover });
           game = await findGameById(trx, id);
+        } else if (form.cover && game.bggId === null && !game.hasCover) {
+          // As for a new table: a cover only for a game without BGG data and without one (checked here, not in the UI).
+          await setUploadedCover(trx, game.id, form.cover);
         }
-        return game ? tryChangeGame(table, game.id, name, maxPlayers) : { ok: false, error: 'Nie udało się zmienić gry stołu.' };
+        return game ? tryChangeGame(table, { gameId: game.id, ...details }) : { ok: false, error: 'Nie udało się zmienić gry stołu.' };
       }), `Zmieniono grę stołu: ${oldTitle} → ${name}.`);
   });
 

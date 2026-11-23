@@ -206,6 +206,11 @@ event instead.
 7. **Step 2's test exposed three older live-update races** (a click silently dropped, an armed ❌ disarmed by a
    live update, refreshes finishing out of order). They are described in
    [live-updates.md](live-updates.md#pitfalls-we-hit).
+8. **Popups on top of popups, inside a floating menu (after merging "Zmień grę" with details, 2026-11-23).** The
+   rename popup gained its own hour button, and popups became a stack (`openPopups`: a nested popup opens on top,
+   Escape closes only the top one). In the sheet the nested hour picker goes into the sheet (`popupHost()`), not
+   `<body>`. And the ⋯ menu's "tap outside closes it" must wait while any popup is open: a tap in the hour picker is
+   outside the menu, and closing the menu (`display: none`) would also hide the rename popup that lives inside it.
 
 ## Testing it
 

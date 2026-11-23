@@ -393,3 +393,28 @@ after a refresh had reset it – now values are captured at the moment of the ch
 Second follow-up: the rename popup is now a layer attached to the "Zmień grę" button (above it, away from the
 on-screen keyboard), re-placed after the sheet's slide-in animation and on scroll/resize. A test measuring the
 sheet's height compared floats exactly and failed once on 397.5 vs 397.50006 – layout sizes need "close to".
+
+---
+
+## "Zmień grę" sets the table's details too (2026-11-23)
+
+**What happened.** The rename popup now has the new-table row's fields – Zajęte, Stół, Godzina, Graczy, BGG link,
+Trudność, cover – starting at the table's current values, and saves them together with the new game. Before, a BGG
+game's player count simply replaced the table's and kind and hour couldn't be set there; an existing table's player
+count couldn't be changed at all. The rule (`tryChangeGame` in `domain/play-table.ts`) now takes the details and checks
+them like `tryCreate`, on a copy first, so an invalid value changes nothing. The endpoint reads the same multipart
+form as "Utwórz stół" (it may carry a cover). Built on its own branch from `master`; the phone sheet adapts it later.
+
+**Different from .NET.** Two things Blazor gave for free had to be built: a *component used in two places* became
+one JS function given each form's fields (`createTableDetails()`), plus a server-rendered `<template>` the popup
+copies; and *nested dialogs* needed a popup stack – opening the hour picker used to close every open popup, which
+would have closed the rename popup underneath. See server-rendered-html.md.
+
+**Lesson.** A rule function that mutates its argument should validate everything before touching it – then the
+route can also check on a copy before writing anything else (a new game, a cover) to the database.
+Merged with the phone branch (PR #14) the same day. Git flagged the obvious overlaps (Escape handling, the hour picker,
+placing the rename popup, the end of the board page), all resolved by keeping both sides. The interesting part was
+what git *didn't* flag: the phone code still used the old single-popup variable that the popup stack had replaced
+(the type-check would have caught it), and in the phone sheet a tap in the nested hour picker counted as a tap
+outside the ⋯ menu, which would have hidden the rename popup inside the menu – found only by thinking through how the
+two features meet. A merge that compiles isn't necessarily a merge that works.
