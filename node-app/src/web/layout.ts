@@ -4,6 +4,7 @@
 // public/js/layout.js only adds closing on Escape and on following a link.
 
 import { html, type SafeHtml } from './html.ts';
+import { themes, type ThemeId } from './theme.ts';
 
 /** The signed-in user as the layout needs it, or null when logged out. */
 export type LayoutUser = {
@@ -18,6 +19,8 @@ export type PageOptions = {
   /** The request path, used to highlight the current menu entry. */
   currentPath: string;
   user: LayoutUser | null;
+  /** The colour theme from the visitor's cookie (theme.ts), written as data-theme on <html> so the first paint is right. */
+  theme: ThemeId;
   /** For the hidden field of the logout forms (see auth/csrf.ts). */
   csrfToken: string;
   body: SafeHtml;
@@ -34,7 +37,7 @@ export type PageOptions = {
 };
 
 /** Renders a complete HTML document around a page's body. */
-export function layout({ title, currentPath, user, csrfToken, body, head, scripts, feedback, designer, enhance }: PageOptions): SafeHtml {
+export function layout({ title, currentPath, user, theme, csrfToken, body, head, scripts, feedback, designer, enhance }: PageOptions): SafeHtml {
   /** Logout is a POST (a link could be triggered by other sites), protected by the CSRF token like every form. */
   const logoutForm = (returnUrl: string, button: SafeHtml) => html`<form action="/Account/Logout" method="post">
                 <input type="hidden" name="_csrf" value="${csrfToken}" />
@@ -43,7 +46,7 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
             </form>`;
 
   return html`<!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" data-theme="${theme}">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -55,6 +58,7 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     <script>document.documentElement.classList.add('js');</script>
     <link rel="stylesheet" href="/lib/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/css/themes.css" />
     <link rel="stylesheet" href="/css/layout.css" />
     <link rel="stylesheet" href="/css/feedback.css" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -81,7 +85,7 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     <label for="app-menu-toggle" class="app-drawer-backdrop" aria-hidden="true"></label>
 
     <aside id="app-drawer" class="app-drawer" aria-label="Menu">
-        ${drawer(currentPath, user, logoutForm(currentPath, html`<button type="submit" class="drawer-link"><span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj</button>`))}
+        ${drawer(currentPath, user, theme, logoutForm(currentPath, html`<button type="submit" class="drawer-link"><span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Wyloguj</button>`))}
     </aside>
 
     <main class="app-main"${enhance ? html` data-enhance` : ''}>
@@ -90,6 +94,7 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     ${feedback}
 </div>
 <script src="/js/layout.js"></script>
+<script src="/js/theme.js"></script>
 <script src="/js/morph.js"></script>
 <script src="/js/enhance.js"></script>
 <script src="/js/feedback.js"></script>
@@ -99,7 +104,7 @@ ${scripts}
 </html>`;
 }
 
-function drawer(currentPath: string, user: LayoutUser | null, logout: SafeHtml): SafeHtml {
+function drawer(currentPath: string, user: LayoutUser | null, theme: ThemeId, logout: SafeHtml): SafeHtml {
   return html`<div class="drawer-head">
             <span class="drawer-title">Menu</span>
             <label for="app-menu-toggle" class="drawer-close" title="Zamknij menu" aria-label="Zamknij menu">✕</label>
@@ -122,12 +127,28 @@ function drawer(currentPath: string, user: LayoutUser | null, logout: SafeHtml):
                   navLink('/Account/Login', 'person-badge', 'Zaloguj się', currentPath),
                 ]}
         </nav>
+        ${themePicker(theme)}
         <!-- Bottom-right corner of the menu. Required by BGG's XML API terms for public-facing uses. -->
         <div class="drawer-foot">
             <a class="bgg-credit" href="https://boardgamegeek.com/" target="_blank" rel="noopener noreferrer" title="Dane gier: BoardGameGeek">
                 <img src="/images/powered-by-bgg.png" alt="Powered by BoardGameGeek" />
             </a>
         </div>`;
+}
+
+/**
+ * The theme choice in the menu: one radio button per theme, with three dots of its colours. public/js/theme.js
+ * applies a pick at once (data-theme + cookie); without JavaScript the picker is hidden (themes.css).
+ */
+function themePicker(current: ThemeId): SafeHtml {
+  return html`<fieldset class="theme-picker" data-theme-picker>
+            <legend>Motyw</legend>
+            ${themes.map(t => html`<label class="theme-option">
+                <input type="radio" name="theme" value="${t.id}"${t.id === current ? html` checked` : ''} />
+                <span class="theme-swatch" aria-hidden="true">${t.swatch.map(colour => html`<i style="background: ${colour}"></i>`)}</span>
+                ${t.label}
+            </label>`)}
+        </fieldset>`;
 }
 
 /** A drawer entry; "active" on the current page, like Blazor's NavLink. "/stoly" is an alias of "/". */

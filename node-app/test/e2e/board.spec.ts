@@ -45,6 +45,8 @@ test('a table created in one browser appears in another, and seats update live b
   await expect(zofiasRow.locator('[data-slot="2"]')).toHaveText('Wolne');
 
   // Jan deletes the table with the two-click button; it disappears from Zofia's page.
+  // Since the design B layout (2026-11-23) the actions are behind the row's ⋯ menu.
+  await jan.getByRole('button', { name: 'Opcje stołu: Gra na żywo' }).click();
   const deleteButton = jan.locator('.table-row', { hasText: 'Gra na żywo' }).locator('[data-action="delete"]');
   await deleteButton.click();
   await deleteButton.click();
@@ -65,6 +67,7 @@ test('a seat taken right before arming the two-click delete shows at once, and t
 
   // Take the seat and arm ❌ with no gap between the clicks (in the page itself: Playwright's own clicks wait long
   // enough in between for the seat to show first, which hid the problem).
+  await row.getByRole('button', { name: 'Opcje stołu: Szybkie kliknięcia' }).click();
   const deleteButton = row.locator('[data-action="delete"]');
   await row.evaluate(el => {
     type Clickable = { click(): void };
@@ -97,6 +100,7 @@ test('with ❌ armed, a click elsewhere disarms it and still does its job', asyn
   // User report 2026-11-23: ❌ then a quick click on a seat – the seat click was swallowed by ❌'s invisible backdrop.
   const jan = await loggedIn(browser, 'Jan Nowak');
   const row = await tableWithFreeSeat(jan, 'Klik obok krzyżyka');
+  await row.getByRole('button', { name: 'Opcje stołu: Klik obok krzyżyka' }).click();
   const deleteButton = row.locator('[data-action="delete"]');
   await deleteButton.click();
   await expect(deleteButton).toHaveClass(/armed/);

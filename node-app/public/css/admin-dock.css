@@ -10,7 +10,7 @@
     padding: .75rem;
     border: 1px solid #55555c;
     border-radius: .5rem;
-    background: #1f1f22;
+    background: var(--popup-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
     font-size: .8125rem;
 }
@@ -122,7 +122,7 @@
 
 .toolbox-switch[aria-checked="true"] .switch-knob {
     transform: translateX(1rem);
-    background: #1f1f22;
+    background: var(--popup-bg);
 }
 
 .switch-label {
@@ -136,7 +136,7 @@
     gap: .2rem;
     padding: .4rem .5rem;
     border-radius: .35rem;
-    background: #1f1f22;
+    background: var(--popup-bg);
     color: #fff;
 }
 

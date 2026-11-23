@@ -81,7 +81,7 @@
     width: min(260px, 85vw);
     display: flex;
     flex-direction: column;
-    background: #1f1f22;
+    background: var(--popup-bg);
     border-right: 1px solid var(--board-border);
     box-shadow: 4px 0 24px rgba(0, 0, 0, .5);
     transform: translateX(-100%);
@@ -177,7 +177,7 @@
         border: none;
         border-radius: 4px;
         background: none;
-        color: #d7d7d7;
+        color: var(--muted);
         font-size: .875rem;
         text-align: left;
         text-decoration: none;
@@ -185,12 +185,12 @@
 
         .drawer-nav .drawer-link:hover {
             background-color: rgba(255, 255, 255, .1);
-            color: #fff;
+            color: var(--text);
         }
 
         .drawer-nav .drawer-link.active {
             background-color: rgba(255, 255, 255, .15);
-            color: #fff;
+            color: var(--text);
         }
 
 .drawer-sep {

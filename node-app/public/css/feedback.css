@@ -48,7 +48,7 @@
     padding: .875rem;
     border: 1px solid rgba(255, 255, 255, .12);
     border-radius: .875rem .875rem .25rem .875rem;
-    background: #1f1f22;
+    background: var(--popup-bg);
     box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
     animation: feedback-pop .18s ease-out;
 }

@@ -333,6 +333,8 @@
     const target = /** @type {HTMLElement} */ (e.target);
     const summary = target.closest('[data-sheet-open]');
     if (summary && inRows(summary)) { openSheet(tableIdOf(summary)); return; }
+    const menuButton = target.closest('[data-row-menu]');
+    if (menuButton && inRows(menuButton)) { toggleRowMenu(/** @type {HTMLElement} */ (menuButton.closest('.cell-actions'))); return; }
     const button = /** @type {HTMLElement | null} */ (target.closest('[data-action]'));
     if (!button || !inRows(button)) return;
     const id = tableIdOf(button);
@@ -345,6 +347,66 @@
       case 'rename': openRename(button, id); break;
     }
   });
+
+  // ---------- the row's "⋯" menu (desktop, design B layout, 2026-11-23) ----------
+  // The actions cell itself becomes the menu (CSS, .menu-open): its buttons are the same ones as before and as in the
+  // phone sheet, handled by the listeners above. While open, the cell is skipped by live updates (data-morph-skip),
+  // so a change made by someone else doesn't close it under the mouse; the next update after closing catches up.
+
+  /** @type {HTMLElement | null} The actions cell whose menu is open. */
+  let openRowMenu = null;
+
+  /** @param {HTMLElement} cell */
+  function toggleRowMenu(cell) {
+    if (openRowMenu === cell) { closeRowMenu(); return; }
+    closeRowMenu();
+    openRowMenu = cell;
+    cell.classList.add('menu-open');
+    cell.dataset.morphSkip = '';
+    cell.querySelector('[data-row-menu]')?.setAttribute('aria-expanded', 'true');
+    placeRowMenu();
+  }
+
+  /**
+   * The menu is "position: fixed" (so the scrolling list doesn't clip it), which also means it doesn't move when the
+   * page scrolls. So it's placed from its button's position: under it, right edges in line – now, and again on every
+   * scroll or resize while open. (Closing on scroll instead also closed it when a click scrolled the button into view.)
+   */
+  function placeRowMenu() {
+    if (!openRowMenu) return;
+    const button = openRowMenu.querySelector('[data-row-menu]');
+    const menu = /** @type {HTMLElement | null} */ (openRowMenu.querySelector('.actions'));
+    if (!button || !menu) return;
+    const r = button.getBoundingClientRect();
+    menu.style.top = `${r.bottom + 4}px`;
+    menu.style.left = `${Math.max(8, r.right - menu.offsetWidth)}px`;
+  }
+
+  function closeRowMenu() {
+    const cell = openRowMenu;
+    if (!cell) return;
+    openRowMenu = null;
+    // An armed ❌ inside goes back to normal with its menu.
+    if (armed && cell.contains(armed.button)) disarm();
+    cell.classList.remove('menu-open');
+    delete cell.dataset.morphSkip;
+    const menu = /** @type {HTMLElement | null} */ (cell.querySelector('.actions'));
+    menu?.style.removeProperty('top');
+    menu?.style.removeProperty('left');
+    cell.querySelector('[data-row-menu]')?.setAttribute('aria-expanded', 'false');
+  }
+
+  // A press outside the menu closes it, like any dropdown. The rename popup lives inside the menu, so pressing in it
+  // doesn't count; while any popup is open (e.g. its hour picker) the menu stays, or the popup would vanish with it.
+  document.addEventListener('pointerdown', e => {
+    if (!openRowMenu || openPopups.length > 0) return;
+    if (openRowMenu.contains(/** @type {Node} */ (e.target))) return;
+    closeRowMenu();
+  }, true);
+
+  // Capture: "scroll" doesn't bubble, but this sees the page and the sideways-scrolling list alike.
+  window.addEventListener('scroll', placeRowMenu, true);
+  window.addEventListener('resize', placeRowMenu);
 
   board.addEventListener('change', e => {
     const input = /** @type {HTMLInputElement} */ (e.target);
@@ -420,7 +482,8 @@
       closeTopPopup();
       return;
     }
-    if (sheetBody.classList.contains('menu-open')) { e.preventDefault(); setSheetMenu(false); }
+    if (sheetBody.classList.contains('menu-open')) { e.preventDefault(); setSheetMenu(false); return; }
+    closeRowMenu();
   });
 
   // ---------- popups (hour picker, add player, rename) ----------
@@ -1009,6 +1072,7 @@
       // An error is shown in the popup, next to the name it's about.
       if (!result.ok) { lookup.fail(result.error); return; }
       closePopups();
+      closeRowMenu();
       // Done: on a phone the ⋯ menu and the sheet close too, back to the board with the message (feedback
       // 20261123-170907 "when game is changed through the rename button, close all boxes"). Closing the sheet
       // also closes its menu and removes its history entry.

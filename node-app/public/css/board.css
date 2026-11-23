@@ -63,18 +63,23 @@
 .table-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     overflow-x: auto;
 }
 
 .table-row {
     display: grid;
-    /* The game column takes 2/15 of the flexible space (was 1/5, then 33% narrower, decided 2026-11-22); the slots get the rest. */
-    grid-template-columns: 62px minmax(100px, 2fr) 64px 84px 96px 60px 52px 76px 108px minmax(280px, 13fr);
-    min-width: 1004px;
+    /* Design B layout (decided 2026-11-23): cover first, the details, the seats, and "⋯" for the actions at the end. */
+    grid-template-columns: 72px minmax(110px, 1.6fr) repeat(6, 84px) minmax(240px, 3.4fr) 48px;
+    min-width: 980px;
     overflow: hidden;
-    border-radius: 6px;
-    background: #3b3b40;
+    border-radius: 8px;
+    background: var(--surface);
+}
+
+/* Tables imported from the sheet are a step quieter than the app's own (only Szczecin gives them their own colour). */
+#imported-rows .table-row {
+    background: var(--surface-imported);
 }
 
 /* Separates the app's tables from those imported from the sheet; as wide as the rows, so it scrolls with them. */
@@ -82,11 +87,11 @@
     display: flex;
     align-items: center;
     gap: .75rem;
-    min-width: 1054px;
+    min-width: 980px;
     /* Space between the new-table row and the divider: design 20261109-162610's ~106px, made 30% smaller on
        2026-11-12 (6.5rem → 4.55rem, ~74px). */
     margin-block: 4.55rem .25rem;
-    color: #f0b429;
+    color: var(--section-text);
     font-size: .8rem;
     font-weight: 700;
     letter-spacing: .04em;
@@ -97,29 +102,39 @@
     .import-divider::after {
         content: "";
         flex: 1;
-        border-top: 2px solid #f0b429;
+        border-top: 2px solid var(--section-line);
     }
 
+/* The column header: a solid bar in the theme's header colour (themes.css), so it stands out from the rows.
+   Semi-bold at 12px with a little letter spacing (2026-11-23: 800 at 11px looked too sharp on Windows' Arial). */
 .table-head {
-    border-radius: 0;
-    background: none;
+    border-bottom: 2px solid var(--head-underline);
+    background: var(--head-bg);
+    color: var(--head-text);
     font-size: .75rem;
     font-weight: 600;
-    letter-spacing: .03em;
+    letter-spacing: .05em;
     text-transform: uppercase;
-    opacity: .7;
 }
 
+    /* Every label the same: no column's own weight (e.g. .cell-difficulty's bold numbers) leaks into the header. */
     .table-head .cell {
         min-height: 0;
-        padding-block: .1rem;
+        padding-block: .5rem;
+        font-weight: inherit;
     }
+
+        /* A short divider before every column but the first: 1px wide, 60% of the bar's height, centred.
+           A one-colour gradient is the usual way to paint a sized block of colour as a background image. */
+        .table-head .cell + .cell {
+            background: linear-gradient(var(--head-divider), var(--head-divider)) left center / 1px 60% no-repeat;
+        }
 
 .cell {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 68px;
+    min-height: 56px;
     padding: 4px 6px;
     text-align: center;
 }
@@ -161,11 +176,11 @@
 
 /* The delete button is the shared ConfirmDeleteButton component (it styles its own armed ✅ state). */
 .action-anchor .confirm-delete {
-    background: #55555c;
+    background: var(--surface-2);
 }
 
     .action-anchor .confirm-delete:hover:not(.armed) {
-        background: #77777f;
+        background: var(--line);
     }
 
 .action-placeholder {
@@ -197,9 +212,9 @@
     width: 220px;
     margin-left: 30px;
     padding: .5rem .6rem;
-    border: 1px solid #55555c;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #1f1f22;
+    background: var(--popup-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
     font-size: .8125rem;
     text-align: left;
@@ -232,7 +247,7 @@
     margin: 0;
     padding: 2px 6px;
     border-radius: 4px;
-    background: #3b3b40;
+    background: var(--surface-2);
     white-space: nowrap;
 }
 
@@ -265,7 +280,7 @@
 
 .cell-cover {
     padding: 0;
-    background: #000;
+    background: none;
 }
 
 .cell-slots {
@@ -275,7 +290,7 @@
 }
 
 .table-row a {
-    color: #8ab4f8;
+    color: var(--link);
 }
 
 .game-name {
@@ -285,8 +300,8 @@
 
 .thumb {
     flex: none;
-    width: 100px;
-    height: 100px;
+    width: 56px;
+    height: 56px;
     object-fit: cover;
 }
 
@@ -305,15 +320,16 @@
 
 /* The row for adding a table: its cells line up with the columns of the tables above. */
 .table-draft {
-    outline: 1px dashed #77777f;
+    /* Darker than the text (asked 2026-11-23): a quiet hint of the row, not a frame. */
+    outline: 1px dashed var(--line);
     outline-offset: -1px;
 }
 
 .draft-panel {
-    min-width: 1054px;
+    min-width: 980px;
     padding: .5rem .75rem;
     border-radius: 6px;
-    background: #2c2c30;
+    background: var(--surface);
 }
 
 /* As wide as the longest title, so the links line up in a column. */
@@ -343,8 +359,8 @@
 
 .draft-cover {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 56px;
+    height: 56px;
 }
 
 /* A quarter of the cover's area. */
@@ -370,24 +386,29 @@
     }
 
     .cover-upload:focus-within {
-        outline: 2px solid #8ab4f8;
+        outline: 2px solid var(--focus);
     }
 
+/* Table kinds differ by lightness, not hue: Duży solid light, Mały outlined, Inny muted (themes.css). */
 .kind-small {
-    background: #2f6b4f;
+    background: var(--kind-small-bg);
+    box-shadow: inset 0 0 0 1px var(--kind-small-border);
+    color: var(--kind-small-text);
 }
 
 .kind-big {
-    background: #8c4545;
+    background: var(--kind-big-bg);
+    color: var(--kind-big-text);
 }
 
 .kind-other {
-    background: #55555c;
+    background: var(--kind-other-bg);
+    color: var(--kind-other-text);
 }
 
 .hour-unset {
-    background: #d60000;
-    color: #fff;
+    background: var(--alarm-bg);
+    color: var(--alarm-text);
 }
 
 .cell-input {
@@ -416,10 +437,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* A fixed square, as tall as a row with a cover (100px, less the cell's padding). Long names wrap (see .slot-name). */
+    /* A fixed 72px square (design B layout, 2026-11-23; was 92px). Long names wrap (see .slot-name). */
     flex: none;
-    width: 92px;
-    height: 92px;
+    width: 72px;
+    height: 72px;
     padding: 2px 6px;
     overflow: hidden;
     border: 2px solid transparent;
@@ -458,29 +479,37 @@ button.slot:not(:disabled):not(.slot-inert) {
 }
 
 button.slot:focus-visible {
-    outline: 2px solid #8ab4f8;
+    outline: 2px solid var(--focus);
     outline-offset: 1px;
 }
 
+/* Seats differ by shape as well as colour: free is a dashed outline, taken a solid tile, blocked (held by the
+   table's owner) a striped tile, the host a tile in the theme's host colour (themes.css). */
 .slot-free {
-    background: #fff;
-    color: #555;
+    border-style: dashed;
+    border-color: var(--slot-free-border);
+    background: var(--slot-free-bg);
+    color: var(--slot-free-text);
 }
 
 .slot-taken {
-    background: #ad2f69;
-    color: #fff;
+    border-width: 1px;
+    border-color: var(--slot-taken-border);
+    background: var(--slot-taken-bg);
+    color: var(--slot-taken-text);
 }
 
 .slot-blocked {
-    background: #fa8072;
-    color: #3a1410;
+    border-width: 1px;
+    border-color: var(--line);
+    background: repeating-linear-gradient(135deg, var(--slot-blocked-bg) 0 6px, var(--slot-blocked-stripe) 6px 12px);
+    color: var(--slot-blocked-text);
 }
 
 .slot-owner {
-    border-color: #d4af37;
-    background: #560c33;
-    color: #fff;
+    border-color: var(--slot-host-bg);
+    background: var(--slot-host-bg);
+    color: var(--slot-host-text);
 }
 
 /* Add-player popup */
@@ -499,9 +528,9 @@ button.slot:focus-visible {
     width: 260px;
     height: 320px;
     padding: .6rem;
-    border: 1px solid #55555c;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #1f1f22;
+    background: var(--popup-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
 }
 
@@ -523,7 +552,7 @@ button.slot:focus-visible {
     padding: .25rem .5rem;
     border: 0;
     border-radius: 4px;
-    background: #3b3b40;
+    background: var(--surface-2);
     color: inherit;
     font-size: .8125rem;
     text-align: left;
@@ -531,7 +560,7 @@ button.slot:focus-visible {
 }
 
     .add-player-option:hover {
-        background: #55555c;
+        background: var(--line);
     }
 
 .add-player-empty {
@@ -583,12 +612,18 @@ button.slot:focus-visible {
 .hour-button {
     width: 100%;
     padding: 2px;
-    border: 1px solid transparent;
+    border: 1px solid var(--hour-border, transparent);
     border-radius: 3px;
     background: transparent;
-    color: inherit;
+    color: var(--hour-text, inherit);
     font-size: .875rem;
 }
+
+    /* With no hour the cell itself is the alarm; the button inside just takes its colours. */
+    .hour-unset .hour-button {
+        border-color: transparent;
+        color: inherit;
+    }
 
     .hour-button:hover {
         border-color: rgba(255, 255, 255, .4);
@@ -610,12 +645,12 @@ button.slot:focus-visible {
     width: 400px;
     height: 350px;
     padding: .5rem;
-    border: 1px solid #55555c;
+    border: 1px solid var(--line);
     border-radius: 8px;
     outline: none;
-    background: #1f1f22;
+    background: var(--popup-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
-    color: #fff;
+    color: var(--text);
 }
 
 /* Two hours per row. */
@@ -630,18 +665,19 @@ button.slot:focus-visible {
     padding: 0;
     border: 0;
     border-radius: 3px;
-    background: #3b3b40;
+    background: var(--surface-2);
     color: inherit;
     font-size: .75rem;
 }
 
     .hour-option:hover {
-        background: #55555c;
+        background: var(--line);
     }
 
 .hour-option-selected,
 .hour-option-selected:hover {
-    background: #ad2f69;
+    background: var(--accent);
+    color: var(--accent-text);
 }
 
 /* ===== ConfirmButton.razor.css ===== */
@@ -706,6 +742,205 @@ button.confirm-button.armed {
         display: none;
     }
 
+/* ===== Design B layout (decided 2026-11-23, "Planszówkarz palette" canvas) =====
+   Compact rows: a 56px cover first, the details as small chips, 72px seats that wrap to a second line on big tables,
+   and the table's actions behind "⋯" at the end. Colours come from the theme tokens (themes.css). */
+
+/* Every column has a class and a fixed place. The new-table row hides cells it doesn't need yet (the cover before a
+   game is found); without fixed places the others would slide left into the gap. Only in the list: the phone sheet
+   lays the same cells out on its own 4-column grid. */
+.table-list .table-row > .cell-cover { grid-column: 1; }
+.table-list .table-row > .cell-game { grid-column: 2; }
+.table-list .table-row > .cell-taken { grid-column: 3; }
+.table-list .table-row > .cell-kind { grid-column: 4; }
+.table-list .table-row > .cell-hour { grid-column: 5; }
+.table-list .table-row > .cell-max { grid-column: 6; }
+.table-list .table-row > .cell-bgg { grid-column: 7; }
+.table-list .table-row > .cell-difficulty { grid-column: 8; }
+.table-list .table-row > .cell-slots { grid-column: 9; }
+.table-list .table-row > .cell-actions { grid-column: 10; }
+
+.table-list .table-row:not(.table-head) {
+    padding-block: .5rem;
+}
+
+.table-list .table-row > .cell-game {
+    align-items: flex-start;
+    text-align: left;
+}
+
+.table-list .cell-slots {
+    gap: 6px;
+}
+
+.thumb {
+    border-radius: 6px;
+}
+
+/* The header's divider is drawn before every column but the first; the empty ⋯ column gets none. */
+.table-head .cell-actions {
+    background: none !important;
+}
+
+/* Section headings: a label and a line. "Stoły w aplikacji" over the app's own tables; the sheet divider below. */
+.section-heading,
+.import-divider {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 980px;
+    font-size: .8125rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.section-heading {
+    margin-top: .5rem;
+    color: var(--section-own-text);
+}
+
+    .section-heading::after {
+        content: "";
+        flex: 1;
+        height: 2px;
+        background: var(--section-own-line);
+    }
+
+    .import-divider::before {
+        display: none;
+    }
+
+/* Table kind and hour as small chips inside their cells (not whole coloured cells). */
+.table-row > .cell-kind,
+.table-row > .cell-hour.hour-unset {
+    background: none;
+    box-shadow: none;
+    color: inherit;
+}
+
+.cell-kind > :is(select, .kind-chip) {
+    width: auto;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 4px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+.kind-big > :is(select, .kind-chip) {
+    background: var(--kind-big-bg);
+    color: var(--kind-big-text);
+}
+
+.kind-small > :is(select, .kind-chip) {
+    background: var(--kind-small-bg);
+    box-shadow: inset 0 0 0 1px var(--kind-small-border);
+    color: var(--kind-small-text);
+}
+
+.kind-other > :is(select, .kind-chip) {
+    background: var(--kind-other-bg);
+    color: var(--kind-other-text);
+}
+
+.cell-hour > :is(.hour-button, .hour-chip) {
+    width: auto;
+    min-width: 3.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.hour-unset > :is(.hour-button, .hour-chip) {
+    border-color: transparent;
+    background: var(--alarm-bg);
+    color: var(--alarm-text);
+}
+
+/* "⋯": opens the table's actions as a small menu under the button (board.js toggles .menu-open on the cell). */
+.row-menu-button {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+    .row-menu-button:hover,
+    .row-menu-button[aria-expanded="true"] {
+        background: var(--surface-2);
+        color: var(--text);
+    }
+
+/* Block, centred in the row. The menu below is "position: fixed", so the scrolling list doesn't clip it; board.js places
+   it under its button (placeRowMenu). The rename popup inside it opens where it naturally sits, to its left. */
+.table-list .table-row > .cell-actions {
+    display: block;
+    align-self: center;
+    min-height: 0;
+    padding: 0 6px;
+}
+
+    .table-list .cell-actions .actions {
+        display: none;
+    }
+
+    .table-list .cell-actions.menu-open .actions {
+        position: fixed;
+        inset: auto;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 4px;
+        width: 14rem;
+        /* Placed by board.js (placeRowMenu): under the ⋯ button, right edges in line, following it on scroll. */
+        margin: 0;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--popup-bg);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, .6);
+    }
+
+    .table-list .cell-actions .action-anchor {
+        display: block;
+    }
+
+    .table-list .cell-actions .action-placeholder {
+        display: none;
+    }
+
+    /* Each entry says what it does: its own title ("Usuń stół", "Zmień grę", "Kliknij ponownie…" while armed). */
+    .table-list .cell-actions .action-button,
+    .table-list .cell-actions .action-anchor .confirm-delete {
+        justify-content: flex-start;
+        gap: .6rem;
+        width: 100%;
+        height: 36px;
+        padding: 0 .75rem;
+        border-radius: 6px;
+        font-size: .875rem;
+    }
+
+        .table-list .cell-actions .action-button::after,
+        .table-list .cell-actions .action-anchor .confirm-delete::after {
+            content: attr(title);
+            font-size: .875rem;
+        }
+
+    /* The rename popup opens to the left of the menu (the menu is at the right edge of the row). */
+    .table-list .cell-actions .action-popup {
+        margin-left: calc(-360px - 12px);
+    }
+
 /* ===== Phones and portrait tablets: one line per table + a bottom sheet (decided 2026-11-23, variant C) =====
    Only with JavaScript (html.js, set in the layout's <head>): the sheet needs it. Without it the wide table stays. */
 
@@ -720,7 +955,9 @@ button.confirm-button.armed {
         overflow-x: visible;
     }
 
-    html.js .table-list .table-head {
+    /* Must outrank the "html.js .table-list .table-row:not(.table-draft)" rule below (equal specificity would lose,
+       since that rule comes later), or the – now coloured – header stays as an empty 2px strip. */
+    html.js .table-list .table-row.table-head:not(.table-draft) {
         display: none;
     }
 
@@ -728,6 +965,7 @@ button.confirm-button.armed {
     html.js .table-list .table-row:not(.table-draft) {
         display: block;
         min-width: 0;
+        padding: 0;
     }
 
         html.js .table-list .table-row:not(.table-draft) > .cell {
@@ -748,6 +986,7 @@ button.confirm-button.armed {
     }
 
     html.js .import-divider,
+    html.js .section-heading,
     html.js .draft-panel {
         min-width: 0;
     }
@@ -768,7 +1007,7 @@ button.confirm-button.armed {
 
     /* "Am I in?" at a glance: a gold edge on tables where the viewer holds a seat. */
     html.js .has-my-seat > .row-summary {
-        border-left-color: #d4af37;
+        border-left-color: var(--mine);
     }
 
     .summary-hour {
@@ -804,6 +1043,13 @@ button.confirm-button.armed {
         margin-block: -.5rem;
     }
 
+        /* A 5px bar can't show an outline, so "Mały" uses its outline colour as a fill (by lightness: Duży light,
+           Mały mid, Inny dark). */
+        .summary-kind.kind-small {
+            background: var(--kind-small-border);
+            box-shadow: none;
+        }
+
     /* The sheet: a native <dialog> opened with showModal(), so the browser handles the backdrop, focus and Escape.
        No transform on it: the hour picker inside is position: fixed and must stay relative to the screen. */
     html.js .table-sheet[open] {
@@ -816,10 +1062,10 @@ button.confirm-button.armed {
         padding: 0;
         overflow-y: auto;
         border: 0;
-        border-top: 1px solid #55555c;
+        border-top: 1px solid var(--line);
         border-radius: 14px 14px 0 0;
-        background: #1f1f22;
-        color: #fff;
+        background: var(--popup-bg);
+        color: var(--text);
         animation: sheet-up .2s ease-out;
     }
 
@@ -848,16 +1094,16 @@ button.confirm-button.armed {
         min-width: 44px;
         min-height: 36px;
         padding: 0 .5rem;
-        border: 1px solid #55555c;
+        border: 1px solid var(--line);
         border-radius: 6px;
-        background: #3b3b40;
-        color: #fff;
+        background: var(--surface-2);
+        color: var(--text);
         font-size: 1.25rem;
         line-height: 1;
     }
 
         .sheet-menu-button[aria-expanded="true"] {
-            background: #55555c;
+            background: var(--line);
         }
 
     .sheet-grip {
@@ -868,7 +1114,7 @@ button.confirm-button.armed {
         height: 4px;
         margin-left: -20px;
         border-radius: 2px;
-        background: #666;
+        background: var(--line);
     }
 
     /* The copied row, stacked: name and details on top, the seats below. */
@@ -881,7 +1127,8 @@ button.confirm-button.armed {
         background: none;
     }
 
-        .table-sheet .table-row > .row-summary {
+        .table-sheet .table-row > .row-summary,
+        .table-sheet .row-menu-button {
             display: none;
         }
 
@@ -892,7 +1139,7 @@ button.confirm-button.armed {
 
     /* :where() adds no specificity, so the kind and "no hour" colours (.kind-small, .hour-unset) still win. */
     :where(.table-sheet .table-row > .cell) {
-        background-color: #3b3b40;
+        background-color: var(--surface-2);
     }
 
         .table-sheet .table-row > .cell-game {
@@ -926,9 +1173,9 @@ button.confirm-button.armed {
                 width: min(16rem, calc(100% - 1.5rem));
                 min-height: 0;
                 padding: 4px;
-                border: 1px solid #55555c;
+                border: 1px solid var(--line);
                 border-radius: 8px;
-                background: #1f1f22;
+                background: var(--popup-bg);
                 box-shadow: 0 6px 20px rgba(0, 0, 0, .6);
             }
 
@@ -1083,7 +1330,7 @@ button.confirm-button.armed {
             }
 
     :where(.sheet-draft .table-draft > .cell) {
-        background-color: #3b3b40;
+        background-color: var(--surface-2);
     }
 
         /* Labels for the small cells, so "4" and "2.84" mean something without the column headers. */

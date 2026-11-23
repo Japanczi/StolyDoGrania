@@ -433,3 +433,37 @@ padding, so the bar spans the whole line without touching its edge). The files w
 the page then started believing a sheet entry was current. board.js now clears it on load.
 
 **Lesson.** Real users find what tests don't ask about – here, what "done" should look like after an action.
+
+---
+
+## Three colour themes and a picker (2026-11-23)
+
+**What happened.** The palette was designed first on a canvas (three dark directions, each with a phone view, refined
+over many rounds), then built: every colour that differs between themes became a CSS custom property set per theme
+on `<html data-theme>`, the server writes `data-theme` from a `theme` cookie, and a radio group in the menu switches
+it in place. See themes.md.
+
+**Easier than in .NET.** Nothing to re-render: changing one attribute recolours the page, and the Playwright test can
+prove it happened without a reload. The server part is one line in `sendPage`.
+
+**Harder.** Untangling the old colours: the same hex value meant different things in different rules, so each use had
+to be given a token by its *role*. The canvas helped here – it had already named the roles (header, host, free seat,
+alarm) before any CSS was touched.
+
+**Lesson.** Design the roles, not the colours. Once "host", "alarm" and "header" are names, a new theme is a list of
+values and the rest of the CSS never changes.
+
+---
+
+## The board's layout follows the design B mockup (2026-11-23)
+
+**What happened.** After testing the themes, the user preferred the mockup's *layout* too. Four choices were theirs
+(asked before building): actions behind a ⋯ menu, a 56px cover first, 72px seats that wrap, and difficulty as a slim
+bar on a green-to-red scale. The row markup was reordered, each cell got a class with a fixed grid column, and the
+actions cell became the ⋯ menu – the same buttons as before, so the existing click handlers kept working.
+
+**What broke.** Four Playwright tests: they clicked ❌ and 🏷️ directly, which are now inside a closed menu. The fix was
+one line each (open ⋯ first) – a sign the tests describe what a user does, which is what you want.
+
+**Lesson.** A layout change touches more than CSS when it moves controls between "always visible" and "behind a
+click": tests, keyboard (Escape), live updates and scrolling all have to agree on when the menu is open.
