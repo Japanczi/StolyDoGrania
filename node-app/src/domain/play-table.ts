@@ -215,23 +215,47 @@ export function tryAssignOwner(table: PlayTable, newOwnerUserId: string, partici
   return ok;
 }
 
+/** What the rename popup sends: the new game and the table's details, as chosen there (like a new table). */
+export type GameChange = {
+  gameId: number;
+  title: string;
+  kind: TableKind;
+  maxPlayers: number;
+  startHour: string | null;
+  takenSlots: number;
+};
+
 /**
- * Owner's action: switches the table to another game (or just retitles it), with that game's seat count.
- * Starts the sign-up over: every player leaves and the marks are cleared; a seated owner keeps the first seat.
+ * Owner's action: switches the table to another game (or just retitles it) and sets its details again – kind, seat
+ * count, hour and seats marked as taken – like creating a table (decided 2026-11-23; before, the seat count came from
+ * BGG and kind and hour stayed). Starts the sign-up over: every player leaves; a seated owner keeps the first seat.
+ * Everything is checked first: on an error the table is left unchanged.
  */
-export function tryChangeGame(table: PlayTable, gameId: number, title: string, maxPlayers: number): Result {
-  const name = title.trim();
+export function tryChangeGame(table: PlayTable, change: GameChange): Result {
+  const name = change.title.trim();
   if (name.length === 0 || name.length > 200) {
     return fail('Nazwa gry musi mieć od 1 do 200 znaków.');
   }
-  if (maxPlayers < 1) {
+  if (!Number.isInteger(change.maxPlayers) || change.maxPlayers < 1) {
     return fail('Gra musi mieć co najmniej jedno miejsce.');
   }
-  table.participants = table.participants.filter(p => p.slotNumber === ownerSlot && isOwner(table, p.userId));
-  table.gameId = gameId;
-  table.gameTitle = name;
-  table.maxPlayers = maxPlayers;
-  table.takenSlots = 0;
+  if (change.startHour !== null && !isValidHour(change.startHour)) {
+    return fail('Nieprawidłowa godzina.');
+  }
+  const next: PlayTable = {
+    ...table,
+    participants: table.participants.filter(p => p.slotNumber === ownerSlot && isOwner(table, p.userId)),
+    gameId: change.gameId,
+    gameTitle: name,
+    kind: change.kind,
+    maxPlayers: change.maxPlayers,
+    startHour: change.startHour,
+    takenSlots: 0,
+  };
+  // The marks are checked against the new seat count, with only the owner (if seated) left at the table.
+  const marked = trySetTakenSlots(next, change.takenSlots);
+  if (!marked.ok) return marked;
+  Object.assign(table, next);
   return ok;
 }
 

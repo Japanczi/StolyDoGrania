@@ -315,3 +315,22 @@ into `integrations/bgg/add-to-catalog.ts`, so the import reuses it instead of co
 
 **Lesson.** Keep slow external calls out of database transactions: BGG work happens first, then one short sync
 transaction. See the BGG note's new sections.
+
+---
+
+## "Zmień grę" sets the table's details too (2026-11-23)
+
+**What happened.** The rename popup now has the new-table row's fields – Zajęte, Stół, Godzina, Graczy, BGG link,
+Trudność, cover – starting at the table's current values, and saves them together with the new game. Before, a BGG
+game's player count simply replaced the table's and kind and hour couldn't be set there; an existing table's player
+count couldn't be changed at all. The rule (`tryChangeGame` in `domain/play-table.ts`) now takes the details and checks
+them like `tryCreate`, on a copy first, so an invalid value changes nothing. The endpoint reads the same multipart
+form as "Utwórz stół" (it may carry a cover). Built on its own branch from `master`; the phone sheet adapts it later.
+
+**Different from .NET.** Two things Blazor gave for free had to be built: a *component used in two places* became
+one JS function given each form's fields (`createTableDetails()`), plus a server-rendered `<template>` the popup
+copies; and *nested dialogs* needed a popup stack – opening the hour picker used to close every open popup, which
+would have closed the rename popup underneath. See server-rendered-html.md.
+
+**Lesson.** A rule function that mutates its argument should validate everything before touching it – then the
+route can also check on a copy before writing anything else (a new game, a cover) to the database.

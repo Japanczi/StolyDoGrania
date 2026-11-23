@@ -67,7 +67,15 @@ Game lookup (adding a table):
 - No "recently used names" list under the game-name field (the "Ostatnio:" chips were removed); the phrases are only recorded.
 
 Table owner:
-- Owner can rename the table (🏷️): the game name is typed again and looked up like a new table (catalog, then BGG). A BGG game brings its own player count; otherwise the table keeps its count. Renaming wipes all slots: every player leaves and the slots taken counter goes to 0; a seated owner keeps the first slot. The popup warns about this before saving. Hour and table type stay.
+- Owner can rename the table (🏷️): the game name is typed again and looked up like a new table (catalog, then BGG). Renaming wipes all slots: every player leaves; a seated owner keeps the first slot. The popup warns about this before saving.
+  Decided 2026-11-23: the rename popup also has the new-table row's details – Zajęte, Stół (kind), Godzina, Graczy,
+  BGG link, Trudność and the cover (🗁 upload only for a game without BGG data and without a cover) – labelled, two per
+  line. They start at the table's current values (Zajęte at 0, since renaming frees the seats); a newly looked-up game
+  brings its defaults (kind, player count) as for a new table; the hour stays unless changed (user: "Keep it"). The
+  chosen values are saved (before: a BGG game's player count replaced the table's, kind and hour stayed). The hour
+  picker opens on top of the rename popup, which stays open; Escape closes the innermost popup first. Same rules as a
+  new table, checked on the server (tryChangeGame). Desktop first (branch feature/rename-with-details); the phone
+  sheet adapts it on the phone branch.
 - Owner always sits in the first slot and can free it; while it is vacant they keep owner rights and can only return to the first slot.
 - The player who takes the vacated first slot becomes the new owner; the previous owner becomes a regular player.
 - The first slot can't be marked as taken by owner.

@@ -64,6 +64,14 @@ async function createTable(b: TestBrowser, fields: Record<string, string> = {}, 
   return body.tableId;
 }
 
+/** "Zmień grę" as board.js sends it: the same multipart form as a new table (defaults: the table as created above). */
+function renameTable(b: TestBrowser, id: number, fields: Record<string, string>, cover?: Blob) {
+  const form = new FormData();
+  for (const [k, v] of Object.entries({ kind: 'small', hour: '', takenSlots: '0', maxPlayers: '4', gameId: '', ...fields })) form.set(k, v);
+  if (cover) form.set('cover', cover, 'cover.png');
+  return b.postMultipart(`/api/tables/${id}/rename`, form);
+}
+
 const seats = (db: Db, tableId: number) =>
   db.selectFrom('table_slots').select(['slot_number', 'participant_name']).where('play_table_id', '=', tableId).orderBy('slot_number').execute();
 
@@ -271,7 +279,7 @@ describe("owner's edits", () => {
     const id = await createTable(owner);
     await (await s.browser('Ala')).postJson(`/api/tables/${id}/slots/2/take`);
 
-    const renamed = (await owner.postJson(`/api/tables/${id}/rename`, { name: 'Inna Gra' })).json();
+    const renamed = (await renameTable(owner, id, { name: 'Inna Gra' })).json();
     assert.deepEqual(renamed, { ok: true, message: 'Zmieniono grę stołu: Moja Gra → Inna Gra.' });
     assert.deepEqual((await seats(s.db, id)).map(x => x.participant_name), ['Owner']);
 
@@ -279,6 +287,39 @@ describe("owner's edits", () => {
     assert.deepEqual((await owner.postJson(`/api/tables/${id}/delete`)).json(), { ok: true, message: 'Usunięto stół: Inna Gra.' });
     assert.equal((await owner.get(`/fragments/table/${id}`)).statusCode, 404);
     assert.equal((await s.db.selectFrom('games').select('id').execute()).length, 2, 'games stay in the catalog');
+  });
+
+  test('rename sets the table\'s details from the form too: kind, seat count, hour, marked seats, a cover', async t => {
+    // Decided 2026-11-23: renaming offers the new-table form; the chosen values are saved (before: BGG's seat count,
+    // kind and hour unchanged).
+    const s = await setUp();
+    t.after(s.close);
+    const owner = await s.browser('Owner');
+    const id = await createTable(owner, { kind: 'small', maxPlayers: '4', hour: '18:00' });
+
+    const res = (await renameTable(owner, id, { name: 'Nowa Gra', kind: 'big', maxPlayers: '6', hour: '20:15', takenSlots: '2' },
+      new Blob([png], { type: 'image/png' }))).json();
+    assert.equal(res.ok, true, res.error);
+    const table = await s.db.selectFrom('play_tables').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+    assert.deepEqual([table.game_title, table.kind, table.max_players, table.start_hour, table.taken_slots], ['Nowa Gra', 'big', 6, '20:15', 2]);
+    const cover = await owner.get(`/covers/${table.game_id}`);
+    assert.equal(cover.statusCode, 200, 'the hand-added game got the uploaded cover');
+
+    // Invalid details are refused and nothing changes.
+    for (const [fields, error] of [
+      [{ maxPlayers: '6', takenSlots: '6' }, /zakresie 0–5/], [{ hour: '25:00' }, /Nieprawidłowa godzina/], [{ maxPlayers: '0' }, /liczba miejsc/],
+      [{ kind: 'huge' }, /Nieznany rodzaj/],
+    ] as const) {
+      const bad = (await renameTable(owner, id, { name: 'Zła Gra', ...fields })).json();
+      assert.equal(bad.ok, false);
+      assert.match(bad.error, error);
+    }
+    const after = await s.db.selectFrom('play_tables').select(['game_title', 'max_players']).where('id', '=', id).executeTakeFirstOrThrow();
+    assert.deepEqual([after.game_title, after.max_players], ['Nowa Gra', 6]);
+    assert.equal((await s.db.selectFrom('games').select('id').where('name', '=', 'Zła Gra').execute()).length, 0, 'no game written');
+
+    // Only the owner or an admin.
+    assert.equal((await renameTable(await s.browser('Obcy'), id, { name: 'Cudza' })).json().ok, false);
   });
 
   test('changes without the CSRF header are refused', async t => {

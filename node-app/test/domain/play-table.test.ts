@@ -120,16 +120,40 @@ describe('PlayTable', () => {
     assert.deepEqual(table.participants, [{ slotNumber: ownerSlot, participantName: 'Ala', userId: 'ala' }]);
   });
 
-  test('tryChangeGame clears the players but keeps the owner', () => {
+  const change = { gameId: 2, title: '  Azul ', kind: 'big', maxPlayers: 6, startHour: '19:30', takenSlots: 0 } as const;
+
+  test('tryChangeGame clears the players but keeps the owner, and sets the new details', () => {
     const table = createTable(4, 1);
     tryTakeSlot(table, 2, 'Ala', 'ala');
-    assert.ok(tryChangeGame(table, 2, '  Azul ', 6).ok);
+    assert.ok(tryChangeGame(table, change).ok);
     assert.equal(table.gameTitle, 'Azul');
     assert.equal(table.gameId, 2);
-    assert.equal(table.maxPlayers, 6);
-    assert.equal(table.takenSlots, 0);
+    assert.deepEqual([table.kind, table.maxPlayers, table.startHour, table.takenSlots], ['big', 6, '19:30', 0]);
     assert.deepEqual(table.participants.map(p => p.userId), ['owner']);
   });
+
+  test('tryChangeGame marks seats as taken against the new seat count (the seated owner\'s seat excluded)', () => {
+    const table = createTable(4);
+    assert.ok(tryChangeGame(table, { ...change, maxPlayers: 3, takenSlots: 2 }).ok);
+    assert.equal(table.takenSlots, 2);
+    const other = createTable(4);
+    const tooMany = tryChangeGame(other, { ...change, maxPlayers: 3, takenSlots: 3 });
+    assert.equal(tooMany.ok, false);
+    assert.ok(!tooMany.ok && /0–2/.test(tooMany.error));
+  });
+
+  for (const [why, bad] of [
+    ['an empty name', { title: '  ' }], ['no seats', { maxPlayers: 0 }], ['a wrong hour', { startHour: '25:00' }],
+    ['negative marks', { takenSlots: -1 }],
+  ] as const) {
+    test(`tryChangeGame rejects ${why} and leaves the table unchanged`, () => {
+      const table = createTable(4, 1);
+      tryTakeSlot(table, 2, 'Ala', 'ala');
+      const before = structuredClone(table);
+      assert.equal(tryChangeGame(table, { ...change, ...bad }).ok, false);
+      assert.deepEqual(table, before);
+    });
+  }
 
   test('join uses the first free unmarked seat and returns null when full', () => {
     const table = createTable(3, 1);

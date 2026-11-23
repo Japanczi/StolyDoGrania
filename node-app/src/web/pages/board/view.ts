@@ -64,8 +64,43 @@ export function boardPage(m: BoardPageModel): SafeHtml {
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
         ${importedRows(m.viewer, m.tables, m.highlightId)}
     </div>
+    ${loggedIn && renameDetailsTemplate()}
 </div>
 ${m.admin && adminDock(m.admin)}`;
+}
+
+/**
+ * The table details in the "Zmień grę" popup – the same fields as the new-table row (decided 2026-11-23), as a
+ * labelled form. A <template>: the browser parses it but doesn't show it; board.js copies it into each rename popup
+ * (keeping the markup here, with the rest of the HTML). Fields are found by data-field, not id: several copies may
+ * exist. No data-action anywhere: these controls belong to the popup, not to the row's own buttons.
+ */
+function renameDetailsTemplate(): SafeHtml {
+  return html`<template id="rename-details-template">
+    <div class="rename-details" data-field="details">
+        <label class="rename-field">Zajęte
+            <input type="number" class="cell-input" data-field="taken" min="0" value="0" aria-label="Liczba miejsc oznaczonych jako zajęte" />
+        </label>
+        <label class="rename-field" data-field="kind-box">Stół ${kindSelect('small', 'Rodzaj stołu', null)}</label>
+        <div class="rename-field" data-field="hour-box">Godzina
+            <button type="button" class="hour-button" data-field="hour" data-value="" aria-label="Godzina spotkania" aria-haspopup="dialog" aria-expanded="false">--:--</button>
+        </div>
+        <label class="rename-field">Graczy
+            <input type="number" class="cell-input" data-field="max" min="1" max="${maximumSpotsAllowed}" value="1" aria-label="Liczba graczy" />
+        </label>
+        <div class="rename-field">BGG <span data-field="link"></span></div>
+        <div class="rename-field" data-field="difficulty-box">Trudność <span data-field="difficulty"></span></div>
+        <div class="rename-cover">
+            <div class="draft-cover">
+                <div data-field="cover-preview"></div>
+                <label class="cover-upload" data-field="cover-label" title="Dodaj okładkę (PNG, JPEG, WebP lub GIF, maks. 2 MB)">
+                    <span aria-hidden="true">🗁</span>
+                    <input type="file" class="visually-hidden" data-field="cover" aria-label="Dodaj okładkę" accept="image/png,image/jpeg,image/webp,image/gif" />
+                </label>
+            </div>
+        </div>
+    </div>
+</template>`;
 }
 
 /**

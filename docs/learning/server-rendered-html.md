@@ -82,6 +82,30 @@ HTML has no such build step, so both files were merged into `public/css/layout.c
 names (`app-bar`, `drawer-link` …) are unique enough that scoping isn't needed. `app.css` and Bootstrap were copied
 unchanged.
 
+## Markup the browser copies: `<template>` (added 2026-11-23)
+
+The "Zmień grę" popup is built by board.js when you click 🏷️, but since it got the new-table row's details (kind,
+hour, players, …) it needs a lot of markup. Instead of building that with `document.createElement` calls, the server
+renders it once, inside a `<template>` element (`renameDetailsTemplate()` in `pages/board/view.ts`):
+
+```html
+<template id="rename-details-template">
+    <div class="rename-details"> … labelled fields with data-field="…" … </div>
+</template>
+```
+
+The browser parses a `<template>`'s content but never shows it or runs it; board.js copies it per popup:
+
+```js
+const box = template.content.cloneNode(true).firstElementChild;   // a fresh copy each time
+const field = name => box.querySelector(`[data-field="${name}"]`);   // not ids: several copies may exist
+```
+
+So the HTML stays in one place, written with the `html` tag (escaped like everything else), and the browser code
+only wires it up. In Blazor this would simply have been a component rendered inside the popup; the `<template>` is the
+plain-HTML way to say "markup to stamp out later". The two forms that set a table's details (the new-table row and
+this popup) share their logic in one function, `createTableDetails()` in board.js, which is given each form's fields.
+
 ## Could this be used with .NET?
 
 The approach, yes: ASP.NET Core can render plain HTML with Razor Pages or MVC views (no circuit), and the
