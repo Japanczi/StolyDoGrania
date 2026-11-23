@@ -20,14 +20,14 @@ const mark = (page: Page) => page.evaluate(() => { (globalThis as unknown as { n
 const stillSamePage = (page: Page) => page.evaluate(() => (globalThis as unknown as { noReload?: boolean }).noReload === true);
 
 test('phone: tables are one line each, the sheet takes a seat and follows live changes, Back closes it', async ({ browser }) => {
-  // Zofia creates a 4-seat table on a desktop browser.
-  const zofia = await loggedIn(browser, 'Zofia Wiśniewska');
-  await zofia.getByLabel('Nazwa gry nowego stołu').fill('Stół na telefon');
-  await zofia.getByLabel('Nazwa gry nowego stołu').press('Tab');
-  await expect(zofia.locator('#new-max')).toBeVisible();
-  await zofia.locator('#new-max').fill('4');
-  await zofia.getByRole('button', { name: 'Utwórz stół' }).click();
-  await expect(zofia.locator('#table-rows .table-row', { hasText: 'Stół na telefon' })).toBeVisible();
+  // Grzegorz creates a 4-seat table on a desktop browser.
+  const grzegorz = await loggedIn(browser, 'Grzegorz Brzęczyszczykiewicz');
+  await grzegorz.getByLabel('Nazwa gry nowego stołu').fill('Stół na telefon');
+  await grzegorz.getByLabel('Nazwa gry nowego stołu').press('Tab');
+  await expect(grzegorz.locator('#new-max')).toBeVisible();
+  await grzegorz.locator('#new-max').fill('4');
+  await grzegorz.getByRole('button', { name: 'Utwórz stół' }).click();
+  await expect(grzegorz.locator('#table-rows .table-row', { hasText: 'Stół na telefon' })).toBeVisible();
 
   const jan = await loggedIn(browser, 'Jan Nowak', phone);
   const row = jan.locator('#table-rows .table-row', { hasText: 'Stół na telefon' });
@@ -55,7 +55,7 @@ test('phone: tables are one line each, the sheet takes a seat and follows live c
   await expect(row).toHaveClass(/has-my-seat/);
 
   // Someone else's change arrives live while the sheet is open: the owner marks one seat as taken.
-  const taken = zofia.locator('#table-rows .table-row', { hasText: 'Stół na telefon' }).getByLabel('Liczba miejsc oznaczonych jako zajęte: Stół na telefon');
+  const taken = grzegorz.locator('#table-rows .table-row', { hasText: 'Stół na telefon' }).getByLabel('Liczba miejsc oznaczonych jako zajęte: Stół na telefon');
   await taken.fill('1');
   await taken.press('Tab');
   await expect(sheet.locator('.slot-blocked')).toHaveCount(1);
@@ -66,4 +66,38 @@ test('phone: tables are one line each, the sheet takes a seat and follows live c
   await expect(sheet).toBeHidden();
   expect(new URL(jan.url()).pathname).toBe('/');
   expect(await stillSamePage(jan)).toBe(true);
+});
+
+test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating closes it and shows the line', async ({ browser }) => {
+  const malgorzata = await loggedIn(browser, 'Małgorzata Szczepańska-Dąbrowska', phone);
+  // On a phone the new-table row is not in the list; the button is.
+  await expect(malgorzata.locator('#table-list > #draft')).toBeHidden();
+  const open = malgorzata.getByRole('button', { name: '+ Nowy stół' });
+  await expect(open).toBeVisible();
+
+  await mark(malgorzata);
+  await open.tap();
+  const sheet = malgorzata.locator('#table-sheet');
+  await expect(sheet).toBeVisible();
+  const name = sheet.getByLabel('Nazwa gry nowego stołu');
+  await expect(name).toBeFocused();
+
+  // Closing keeps what was typed (the row goes back to the list, hidden), reopening shows it again.
+  await name.fill('Stół z telefonu');
+  await name.press('Enter');
+  await expect(sheet.locator('#new-max')).toBeVisible();
+  await malgorzata.goBack();
+  await expect(sheet).toBeHidden();
+  await open.tap();
+  await expect(sheet.getByLabel('Nazwa gry nowego stołu')).toHaveValue('Stół z telefonu');
+
+  await sheet.locator('#new-max').fill('3');
+  await sheet.getByRole('button', { name: 'Utwórz stół' }).tap();
+  await expect(sheet).toBeHidden();
+  const line = malgorzata.locator('#table-rows .table-row', { hasText: 'Stół z telefonu' }).locator('.row-summary');
+  await expect(line).toBeVisible();
+  await expect(line).toContainText('1/3');
+  await expect(malgorzata.getByText('Utworzono stół: Stół z telefonu.')).toBeVisible();
+  expect(new URL(malgorzata.url()).pathname).toBe('/');
+  expect(await stillSamePage(malgorzata)).toBe(true);
 });

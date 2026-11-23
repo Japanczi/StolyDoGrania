@@ -30,6 +30,7 @@ Server-rendered HTML gives us the new HTML but not the diff – so we compute it
 | New node | insert it |
 | Node no longer there | remove it |
 | An input the user is typing in | leave its value alone |
+| An element marked `data-morph-skip` (added 2026-11-23) | leave it entirely alone – used by the armed two-click ❌ |
 
 Because unchanged attributes aren't touched, an `<img>` with the same `src` is never reloaded – no flash. This is what
 libraries like **idiomorph** (used by htmx and Turbo) or **morphdom** do; ours is small enough to read.

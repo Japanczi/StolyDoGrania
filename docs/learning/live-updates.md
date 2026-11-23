@@ -86,7 +86,17 @@ if (missedSome || msg.tableId == null) void refreshBoard(); else void refreshTab
 ## What a popup does to refreshes
 
 Replacing a row while its owner has the rename popup open would destroy the popup. So while any popup is open,
-refreshes are postponed and run once it closes (`popupOpen` / `refreshPending` in board.js).
+refreshes are postponed and run once it closes (`popupOpen` / `refreshPending` in board.js). An **armed two-click
+delete** is handled more finely: refreshes go on, but morph skips that one button (`data-morph-skip`) – see the
+pitfalls.
+
+## Refreshes run one at a time (added 2026-11-23)
+
+Every refresh is put in a queue (`queued()` in board.js: each one starts with `.then()` on the previous one's
+promise). In .NET terms it's like awaiting each refresh before starting the next one, or a `SemaphoreSlim(1)`
+around them. Without it, two refreshes run side by side, and an *older* answer can arrive *last* and undo a newer
+one (a whole-board refresh rendered just before a delete put the deleted table back). In a queue, each refresh
+fetches only after the previous one has been applied, so the page always ends at the newest state.
 
 ## Could this be used with .NET?
 
@@ -101,6 +111,35 @@ for us automatically. The `ws`-based code itself is JavaScript.
 - `app.injectWS()` (the plugin's test helper) never resolved here; the tests use a real listening server instead,
   which is closer to reality anyway.
 - `@fastify/websocket`'s TypeScript types need the separate `@types/ws` package.
+- **A flaky end-to-end test was a real bug (2026-11-23).** After a new test began creating tables at the same time,
+  `board.spec.ts` failed about once in ten runs: a deleted table stayed on the other browser's page. Looping the suite
+  until it failed and reading Playwright's page snapshot (`test-results/…/error-context.md`) showed the delete was
+  never even sent. Three causes, all in `board.js`:
+  1. The two-click ❌ was armed when a live update patched the row. Morph reset the button (its armed look, *and*
+     the class that lifted it above its invisible backdrop), so the confirming click hit the backdrop and disarmed.
+     First fix: an armed button held *all* refreshes, like a popup. The user found the flaw at once: take a seat and
+     click ❌ right after, and the seat looked ignored for up to 4 s, because the refresh showing it was held back.
+     Final fix: refreshes go on, and morph leaves out only the armed button – it carries `data-morph-skip`, which
+     `morph.js` honours (the same idea as idiomorph's "don't morph this node" callback). The regression test clicks
+     the seat and ❌ from inside the page with no gap: with Playwright's own two clicks the seat always showed first,
+     so the test passed even against the flawed fix.
+  2. `act()` kept its `busy` flag until the follow-up refresh had finished, so a click during that refresh was
+     dropped silently. First fix: `busy` covered only the request. Still not enough for the user, who clicks fast:
+     a click while the request itself was on its way (about a quarter of a second) was still dropped. Final fix:
+     **actions queue up** (`act()` chains them like the refresh queue), so every click happens, in order. To keep a
+     double click from sending "take this seat" twice, a keyed action (`actOnce()`: take, free, delete) is ignored
+     while the same one is already waiting – until the page shows its result, because until then the button still
+     offers the old action.
+  3. Refreshes ran side by side and could finish out of order. Fix: the queue above.
+  Lesson: a test that fails "sometimes" when more happens at once is usually showing a race a real user can hit.
+  `--repeat-each` didn't help here (every repeat shares one database); plain repeated runs did.
+- **An invisible backdrop swallowed clicks (2026-11-23).** The armed ❌ (ported from .NET's `ConfirmButton`) put a
+  transparent full-page layer under itself, so "a click anywhere else disarms". That click did nothing else, so
+  ❌ → seat lost the seat click. Now there is no layer: a `pointerdown` listener in the *capture* phase (it runs
+  before any element's own handlers) disarms, and the click carries on to whatever was pressed. Testing pitfall:
+  Playwright waits for anything covering an element to go away before clicking, and the backdrop went away by
+  itself after 4 s – so the first version of the test passed against the bug. `click({ force: true })` clicks
+  at once, like a person.
 
 ## Official docs
 

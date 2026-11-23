@@ -60,6 +60,8 @@ export function boardPage(m: BoardPageModel): SafeHtml {
             <div class="cell cell-slots">Miejsca</div>
         </div>
         ${ownRows(m.viewer, m.tables, m.highlightId)}
+        <!-- Phones only (CSS): opens the new-table row below in the sheet. -->
+        ${loggedIn && html`<button type="button" class="btn btn-success new-table-open" id="new-table-open" aria-haspopup="dialog">+ Nowy stół</button>`}
         ${loggedIn && draftRow(m.bggConfigured)}
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
         ${importedRows(m.viewer, m.tables, m.highlightId)}

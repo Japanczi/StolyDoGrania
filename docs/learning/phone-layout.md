@@ -1,6 +1,6 @@
 # A phone layout: media queries, `<dialog>` and the History API
 
-*Added 2026-11-23 (the board's phone layout, step 1: the list and the sheet). Files:
+*Added 2026-11-23 (the board's phone layout, step 1: the list and the sheet; step 2: the new-table form). Files:
 [`node-app/public/css/board.css`](../../node-app/public/css/board.css) (section "Phones and portrait tablets"),
 [`node-app/public/js/board.js`](../../node-app/public/js/board.js) (section "the phone sheet"),
 [`node-app/src/web/pages/board/view.ts`](../../node-app/src/web/pages/board/view.ts) (`rowSummary`, the `<dialog>`),
@@ -99,6 +99,25 @@ In Blazor this would have been a component rendered in two places (`<TableRow>` 
 re-rendered from the same data. Here the browser has only HTML, so "render it twice" becomes "copy it and keep the copy
 in step".
 
+### The new-table form: moved, not copied (step 2)
+
+"+ Nowy stół" (phones only) opens the new-table row in the same sheet. This time the row is **moved**, not copied:
+
+```js
+sheetBody.replaceChildren(draftRow, draftPanel);            // open: the elements move into the sheet
+rowContainers[1].before(draftRow, draftPanel);              // close: back to their place in the list
+```
+
+Moving a DOM element keeps everything attached to it: its event listeners, what the user typed, the lookup's
+state. That's why closing the sheet halfway and opening it again shows the half-filled form. A copy would have lost
+all of that, and the row's listeners (set up once in `setUpDraft()`) would only work on the original. The table rows
+are different: live updates patch them, so the sheet needs a copy that is re-synced; the new-table row is never
+touched by live updates, so it can simply move.
+
+Inside the sheet, CSS rearranges the form with `display: contents`: the row's own box (and its name cell's box)
+disappear, and their children become items of the sheet's grid, so `order` can put the name field first, the
+lookup messages under it, the details in two columns and the buttons last – without changing the HTML.
+
 ## The Back button: the History API
 
 On a phone, Back is how people close things. Without help, Back would leave the board. So opening the sheet adds a
@@ -149,12 +168,23 @@ event instead.
 5. **Escape closed two things at once.** The first Escape should close the hour picker, not the whole sheet. The
    board's Escape handler calls `preventDefault()` when it closed a popup, which stops the dialog's own `cancel`.
 
+6. **The moved form got the rows' click handling.** The board's click listener handles `[data-action]` buttons in
+   rows and in the sheet; the new-table row's hour button has `data-action="hour"` too. Once that row was in the
+   sheet, a click would have been sent as "change the hour of table NaN". `inRows()` now leaves the sheet out while
+   it shows the new-table form.
+7. **Step 2's test exposed three older live-update races** (a click silently dropped, an armed ❌ disarmed by a
+   live update, refreshes finishing out of order). They are described in
+   [live-updates.md](live-updates.md#pitfalls-we-hit).
+
 ## Testing it
 
 Playwright can pretend to be a phone: `browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true,
 isMobile: true })`, then `locator.tap()` instead of `click()` and `page.goBack()` for the Back button.
 `phone-board.spec.ts` checks: one line per table, no sideways scroll, a seat taken in the sheet, a live change from
-another browser arriving in the open sheet, and Back closing it without a reload.
+another browser arriving in the open sheet, and Back closing it without a reload. A second test creates a table on
+a phone: "+ Nowy stół", the form keeping what was typed after Back and reopening, the sheet closing on success and
+the new line appearing. The tests use test users no other test renames, because the e2e tests run in parallel
+against one database (another test renames "Zofia Wiśniewska").
 
 ## Official docs
 

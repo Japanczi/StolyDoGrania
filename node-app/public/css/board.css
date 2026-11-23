@@ -607,15 +607,11 @@ button.slot:focus-visible {
 }
 
 /* ===== ConfirmButton.razor.css ===== */
-/* Invisible layer: a click anywhere else disarms the button (same approach as the board's popups). */
-.confirm-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-}
+/* (The invisible "click elsewhere disarms" layer is gone since 2026-11-23: it swallowed that click. board.js now
+   disarms on any press elsewhere and lets the click through.) */
 
 /*
-    Armed: the whole button turns solid green with white content, raised above the backdrop.
+    Armed: the whole button turns solid green with white content, raised above its neighbours.
     "button" raises specificity above the callers' base rules, whatever the bundle order;
     callers keep their own hover colours off an armed button with :not(.armed).
 */
@@ -676,6 +672,7 @@ button.confirm-button.armed {
    Only with JavaScript (html.js, set in the layout's <head>): the sheet needs it. Without it the wide table stays. */
 
 .row-summary,
+.new-table-open,
 .table-sheet {
     display: none;
 }
@@ -699,11 +696,17 @@ button.confirm-button.armed {
             display: none;
         }
 
-    /* The new-table row wraps its cells for now (its own phone layout is a later step). */
-    html.js .table-list .table-draft {
-        display: flex;
-        flex-wrap: wrap;
-        min-width: 0;
+    /* The new-table row lives in the sheet on phones ("+ Nowy stół" moves it there); hidden in the list. */
+    html.js .table-list > .table-draft,
+    html.js .table-list > .draft-panel {
+        display: none;
+    }
+
+    html.js .new-table-open {
+        display: block;
+        min-height: 48px;
+        margin-top: .25rem;
+        font-weight: 600;
     }
 
     html.js .import-divider,
@@ -911,6 +914,86 @@ button.confirm-button.armed {
             margin-left: 0;
             overflow-y: auto;
         }
+
+        /* The new-table form in the sheet. The row and its name cell are "display: contents" (their boxes vanish,
+           their children join the sheet's grid), so the pieces can be reordered: name, lookup messages, the
+           details in two columns, and the buttons last. */
+        .sheet-draft {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+            .sheet-draft .table-draft,
+            .sheet-draft .table-draft > .cell-game {
+                display: contents;
+            }
+
+            .sheet-draft .table-draft > .cell:first-child {
+                display: none;
+            }
+
+            .sheet-draft #new-name {
+                grid-column: 1 / -1;
+                order: -3;
+                min-height: 44px;
+                font-size: 1rem;
+            }
+
+            .sheet-draft .draft-panel {
+                grid-column: 1 / -1;
+                order: -2;
+                min-width: 0;
+            }
+
+            .sheet-draft .table-draft > .cell {
+                justify-content: flex-start;
+                gap: .4rem;
+                min-height: 44px;
+                border-radius: 6px;
+            }
+
+            .sheet-draft .table-draft > .cell-cover {
+                grid-column: 1 / -1;
+                background: none;
+            }
+
+            .sheet-draft .draft-actions {
+                grid-column: 1 / -1;
+                order: 5;
+                flex-direction: row;
+                gap: 6px;
+            }
+
+                .sheet-draft .draft-actions .btn {
+                    min-height: 44px;
+                }
+
+                .sheet-draft #draft-create {
+                    flex: 1;
+                }
+
+            .sheet-draft .cell-input {
+                font-size: 1rem;
+            }
+
+            /* Labels instead of the column headers. */
+            .sheet-draft .table-draft > .cell:nth-child(3)::before { content: "Zajęte"; }
+            .sheet-draft #new-kind-cell::before { content: "Stół"; }
+            .sheet-draft #new-hour-cell::before { content: "Godzina"; }
+            .sheet-draft #new-max-cell::before { content: "Graczy"; }
+            .sheet-draft #new-link::before { content: "BGG"; }
+            .sheet-draft #new-difficulty::before { content: "Trudność"; }
+            .sheet-draft .table-draft > .cell::before {
+                flex: none;
+                opacity: .7;
+                font-size: .75rem;
+                font-weight: 400;
+            }
+
+    :where(.sheet-draft .table-draft > .cell) {
+        background-color: #3b3b40;
+    }
 
         /* Labels for the small cells, so "4" and "2.84" mean something without the column headers. */
         .table-sheet .table-row > .cell:nth-child(4)::before { content: "Zajęte "; }

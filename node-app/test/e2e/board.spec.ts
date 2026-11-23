@@ -50,3 +50,78 @@ test('a table created in one browser appears in another, and seats update live b
   await deleteButton.click();
   await expect(zofia.locator('.table-row', { hasText: 'Gra na żywo' })).toHaveCount(0);
 });
+
+test('a seat taken right before arming the two-click delete shows at once, and the second click still deletes', async ({ browser }) => {
+  // User report 2026-11-23: with ❌ armed, live updates were held back, so a seat just taken looked ignored for 4 s.
+  const jan = await loggedIn(browser, 'Jan Nowak');
+  await jan.getByLabel('Nazwa gry nowego stołu').fill('Szybkie kliknięcia');
+  await jan.getByLabel('Nazwa gry nowego stołu').press('Tab');
+  await expect(jan.locator('#new-max')).toBeVisible();
+  await jan.locator('#new-max').fill('3');
+  await jan.getByRole('button', { name: 'Utwórz stół' }).click();
+  const row = jan.locator('#table-rows .table-row', { hasText: 'Szybkie kliknięcia' });
+  await row.getByTitle('Zwolnij miejsce: Jan Nowak').click();
+  await expect(row.locator('[data-slot="1"]')).toHaveText('Wolne');
+
+  // Take the seat and arm ❌ with no gap between the clicks (in the page itself: Playwright's own clicks wait long
+  // enough in between for the seat to show first, which hid the problem).
+  const deleteButton = row.locator('[data-action="delete"]');
+  await row.evaluate(el => {
+    type Clickable = { click(): void };
+    (el.querySelector('[data-slot="1"]') as unknown as Clickable).click();
+    (el.querySelector('[data-action="delete"]') as unknown as Clickable).click();
+  });
+  await expect(row.locator('[data-slot="1"]')).toHaveText('Jan Nowak', { timeout: 3000 });
+  await expect(deleteButton).toHaveClass(/armed/);
+
+  await deleteButton.click();
+  await expect(row).toHaveCount(0);
+});
+
+/** Creates a 3-seat table for Jan and frees his seat, so seat 1 can be taken by a click. */
+async function tableWithFreeSeat(jan: Page, name: string) {
+  await jan.getByLabel('Nazwa gry nowego stołu').fill(name);
+  await jan.getByLabel('Nazwa gry nowego stołu').press('Tab');
+  await expect(jan.locator('#new-max')).toBeVisible();
+  await jan.locator('#new-max').fill('3');
+  await jan.getByRole('button', { name: 'Utwórz stół' }).click();
+  const row = jan.locator('#table-rows .table-row', { hasText: name });
+  await row.getByTitle('Zwolnij miejsce: Jan Nowak').click();
+  await expect(row.locator('[data-slot="1"]')).toHaveText('Wolne');
+  return row;
+}
+
+type Clickable = { click(): void };
+
+test('with ❌ armed, a click elsewhere disarms it and still does its job', async ({ browser }) => {
+  // User report 2026-11-23: ❌ then a quick click on a seat – the seat click was swallowed by ❌'s invisible backdrop.
+  const jan = await loggedIn(browser, 'Jan Nowak');
+  const row = await tableWithFreeSeat(jan, 'Klik obok krzyżyka');
+  const deleteButton = row.locator('[data-action="delete"]');
+  await deleteButton.click();
+  await expect(deleteButton).toHaveClass(/armed/);
+  // force: click right there, at once, like a person – without it Playwright would wait for anything covering the
+  // seat to go away (the old backdrop went away by itself after 4 s, which hid the problem).
+  await row.locator('[data-slot="1"]').click({ force: true });
+  await expect(row.locator('[data-slot="1"]')).toHaveText('Jan Nowak', { timeout: 2000 });
+  await expect(deleteButton).not.toHaveClass(/armed/);
+});
+
+test('actions clicked in quick succession all happen, in order; a double click is sent once', async ({ browser }) => {
+  // User report 2026-11-23: a click made while the previous request was on its way was dropped.
+  const jan = await loggedIn(browser, 'Jan Nowak');
+  const row = await tableWithFreeSeat(jan, 'Szybka seria');
+  // In the page itself, so nothing waits between the clicks: take the seat (twice – a double click), change the kind.
+  await row.evaluate(el => {
+    const seat = el.querySelector('[data-slot="1"]') as unknown as Clickable;
+    seat.click();
+    seat.click();
+    const kind = el.querySelector('select[data-action="kind"]') as unknown as { value: string; dispatchEvent(e: unknown): void };
+    kind.value = 'big';
+    kind.dispatchEvent(new (globalThis as unknown as { Event: new (type: string, init: object) => unknown }).Event('change', { bubbles: true }));
+  });
+  await expect(row.locator('[data-slot="1"]')).toHaveText('Jan Nowak');
+  await expect(row.locator('.cell.kind-big')).toHaveCount(1);
+  // The second click on the seat wasn't sent as a second "take" (that would have shown an error).
+  await expect(jan.locator('.alert-warning')).toHaveCount(0);
+});

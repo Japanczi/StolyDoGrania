@@ -339,3 +339,34 @@ asynchronous, so a quick close-and-reopen closed the new sheet.
 
 **Lesson.** When one piece of UI must appear in two places, keep one source of truth (the server-rendered row) and
 derive the other from it, rather than rendering it twice.
+
+---
+
+## The board on phones, step 2: the new-table form, and three races a test found (2026-11-23)
+
+**What happened.** On phones the new-table row is no longer squeezed into the list: "+ Nowy stół" opens it in the
+bottom sheet. Unlike a table row (copied into the sheet and kept in step), this row is *moved* there and back, so what
+the user typed and the row's listeners survive. Creating a table closes the sheet and shows the new line. See
+[phone-layout.md](phone-layout.md).
+
+**The surprise: a new test made an old test flaky – and it was right.** Once the phone test created a table at the
+same moment, `board.spec.ts` failed about one run in ten. Looping the suite until it failed and reading Playwright's
+page snapshot showed three real races in `board.js`, all older than this step: an armed ❌ reset by a live update
+(its confirming click then hit the invisible backdrop), a click dropped because `busy` also covered the refresh, and
+refreshes finishing out of order. Fixed and explained in [live-updates.md](live-updates.md#pitfalls-we-hit); 40 runs
+in a row pass. The first fix for the armed ❌ (hold every refresh while it's armed) passed all tests but failed the
+user's own test – taking a seat and clicking ❌ right after made the seat look ignored. The final fix skips only that
+button when patching (`data-morph-skip` in morph.js); its regression test now fails against the first fix.
+The user then clicked even faster – alternating ❌ and a seat – and found two older habits ported from .NET: clicks
+made while a request was on its way were *dropped* (a "busy" flag), and the armed ❌'s invisible backdrop *swallowed*
+the next click. Both make sense for a slow server round-trip in Blazor Server, but feel broken on a fast local
+page. Now actions queue up (a double click on one seat is still sent once), and a click next to an armed ❌ disarms
+it and goes through. Each regression test was first checked to fail against the old code – one passed at first,
+because Playwright politely waited for the backdrop to disappear.
+
+**Different from .NET.** Blazor Server would have serialized all of this for us: one circuit handles one event at a
+time, and its renderer never applies an older render after a newer one. With plain JavaScript, "one at a time" has to
+be built – here a promise chain, the JS cousin of awaiting each `Task` in turn.
+
+**Lesson.** "Flaky" tests deserve a root cause; this one would have been a user saying "I clicked delete and nothing
+happened".
