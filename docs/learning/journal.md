@@ -418,3 +418,18 @@ what git *didn't* flag: the phone code still used the old single-popup variable 
 (the type-check would have caught it), and in the phone sheet a tap in the nested hour picker counted as a tap
 outside the ⋯ menu, which would have hidden the rename popup inside the menu – found only by thinking through how the
 two features meet. A merge that compiles isn't necessarily a merge that works.
+
+---
+
+## First feedback from the live phone layout (2026-11-23)
+
+**What happened.** Two notes arrived through the feedback box within minutes of deploying: close everything after
+renaming a table, and show the table kind as a 5px full-height bar instead of a dot. Both were small: one
+`sheet.close()` after a successful save, and CSS (`align-self: stretch` plus negative margins that undo the line's
+padding, so the bar spans the whole line without touching its edge). The files were fetched from the server with
+`ssh`/`scp`, leaving them there (the admin dock's button would download *and delete* them).
+
+**Found on the way.** Reloading the page while a sheet was open kept that history entry's state (`{ sheet: … }`):
+the page then started believing a sheet entry was current. board.js now clears it on load.
+
+**Lesson.** Real users find what tests don't ask about – here, what "done" should look like after an action.
