@@ -54,6 +54,47 @@ very dark pink with 2px golden border = table owner's slot (owner automatically 
 - Game picture should be displayed as a small thumbnail in its own column, between difficulty and game slots, sizable enough to be recognizable, but not too large to take up too much space (100px square)
 - Background of entire subpage - dark gray, with a subtle pattern or texture to add visual interest without being distracting
 
+Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
+Design/ApplicationDesign.md, "Mobile audit"):
+- On phones the board is a list with one line per table: hour (red "--:--" when not set), game name, taken/total
+  seats ("2/4") and a dot in the table-kind colour. No sideways scrolling.
+- Tapping a line opens a bottom sheet with the whole table: cover, name, kind, hour, players, difficulty, BGG link and
+  the seat grid (same seat colours and rules as on the desktop board). Taking/freeing a seat happens in the sheet.
+- Admin row actions (❌ 🏷️ 🛠️) are one "⋯" menu on phones instead of a stack of small icons.
+- Desktop keeps the current table layout. Same URLs and server-rendered HTML; the phone layout is CSS plus a small
+  amount of JavaScript for the sheet. Live updates and no-flash rules apply to the list and the open sheet alike.
+- Details (approved 2026-11-23): the list is used below 992px (Bootstrap lg), so portrait tablets get it too. A gold
+  left edge marks tables where the viewer holds a seat. The sheet is a native <dialog> showing a copy of the table's
+  row, restacked (name, cover, details, admin buttons, seats 4 per line); it closes with ✕, a tap outside, Escape or
+  the phone's Back button. Owner/admin controls work in the sheet; the hour picker there spans the screen's width.
+  A "+ Nowy stół" button on phones will open the new-table form in the sheet (later step; until then the new-table
+  row wraps). Without JavaScript the wide table is shown. Order as on desktop (own tables, divider, imported).
+- Step 1 done 2026-11-23 (list + sheet, branch feature/mobile-board-list). In the sheet the rename (🏷️) popup is a
+  layer attached to the "Zmień grę" button that opened it (user, 2026-11-23: "Rename box should also be viewed in
+  another layer and anchored to the button triggering it"): just above the button (below it when the button is in
+  the upper half of the screen), on screen, following it when the sheet scrolls or the screen size changes.
+- Step 2 done 2026-11-23: on phones the new-table row is hidden in the list; a full-width "+ Nowy stół" button (only
+  for logged-in users) opens it in the sheet: name first, lookup messages, details in two labelled columns, then
+  "Utwórz stół" / BGG / Anuluj. Closing keeps what was typed; "Anuluj" empties the form and closes the sheet; creating
+  closes the sheet and shows the new table's line.
+- Live-update fixes found by step 2's tests (2026-11-23, desktop too): a live update no longer disarms an armed
+  two-click ❌ (the rest of the row still updates, e.g. a seat just taken shows at once – holding all refreshes while
+  armed was tried first and rejected by the user: "taking seat was being ignored"); refreshes run one at a time, in
+  order.
+- Rapid clicking (user report 2026-11-23: "The seat button click does not register until quarter of a second
+  passes"): every click on the board counts. Actions queue up and run in order instead of being dropped while an
+  earlier request is on its way; a repeated click on the same seat/delete while it's still waiting is sent once.
+  With ❌ armed, a click anywhere else disarms it AND does what it was for (no invisible backdrop swallowing it any
+  more; the .NET ConfirmButton swallowed it). Baza gier's delete (games.js) still uses the old swallowing backdrop.
+- Step 3 done 2026-11-23: in the phone sheet a "⋯" button (top left, "Opcje stołu"; only when the viewer has actions
+  for that table, i.e. owner or admin) shows the row's actions as labelled buttons in a menu floating over the sheet,
+  just under ⋯ – the sheet keeps its size (user, 2026-11-23: "Do not resize the box … pop these options in another
+  layer over the box"): "❌ Usuń stół" (two taps; "Kliknij ponownie, aby usunąć stół" while armed) and "🏷️ Zmień
+  grę". A tap outside the menu or Escape closes it. The disabled 🛠️ placeholders are not shown on phones. Desktop
+  unchanged.
+- Next: the smaller audit fixes (admin dock toolbox width, /admin/users sideways
+  scroll, Login label overlapping its placeholder, floating buttons covering content, drawer link height).
+
 Game lookup (adding a table):
 - No "new table" form: the last row of the list is, for logged-in users, a free-text game name field with a "Utwórz stół" button that creates the table.
 - When that field loses focus the game is looked up, and the rest of the row's columns appear (slots taken, table type, hour, players, BGG link, difficulty, cover). Enter doesn't create the table.

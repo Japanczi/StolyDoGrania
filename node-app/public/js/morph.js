@@ -72,6 +72,9 @@ function patch(target, source) {
     if (target.nodeValue !== source.nodeValue) target.nodeValue = source.nodeValue;
     return;
   }
+  // An element in the middle of an interaction can ask to be left as it is (e.g. the armed two-click delete button
+  // in board.js); everything around it is still updated.
+  if (target.hasAttribute('data-morph-skip')) return;
   // Attributes: remove the old ones that are gone, set the ones that changed (unchanged ones are left alone,
   // so e.g. an <img> with the same src isn't reloaded).
   for (const attr of [...target.attributes]) {

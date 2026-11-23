@@ -318,6 +318,84 @@ transaction. See the BGG note's new sections.
 
 ---
 
+## The board on phones, step 1: one line per table + a bottom sheet (2026-11-23)
+
+**What happened.** A phone audit (Design/ApplicationDesign.md, "Mobile audit") showed the board unusable below about
+1000px: a 10-column grid scrolling sideways, seats 700px off-screen. Of three sketches, variant C was chosen: one line
+per table (hour, name, "2/4", kind dot, a gold edge when you hold a seat) and a bottom sheet with the whole table. Step 1
+builds both for widths below 992px. The sheet is a native `<dialog>` holding a copy of the row, kept in step with
+morph after every refresh; Back closes it via the History API; the hour picker fills the screen's width inside it.
+New note: [phone-layout.md](phone-layout.md). Still to do: the new-table row on phones, a "⋯" menu for admin actions,
+the smaller audit fixes.
+
+**Different from .NET.** Nothing here is Node – it is CSS, HTML and browser APIs, usable from Blazor as is. The real
+difference is *where state lives*: in Blazor "which table is open" would be a C# field and the dialog rendered from
+it on the server; here it is purely the browser's business, and the server keeps rendering rows exactly as before.
+
+**Easier than expected:** `<dialog>` + `showModal()` replaced what our older popups do by hand (backdrop, Escape,
+focus, blocking the rest of the page). **Harder than expected:** small interactions between features – the modal
+made our `<body>`-level popups unclickable, Escape closed two layers at once, and `history.back()` turned out to be
+asynchronous, so a quick close-and-reopen closed the new sheet.
+
+**Lesson.** When one piece of UI must appear in two places, keep one source of truth (the server-rendered row) and
+derive the other from it, rather than rendering it twice.
+
+---
+
+## The board on phones, step 2: the new-table form, and three races a test found (2026-11-23)
+
+**What happened.** On phones the new-table row is no longer squeezed into the list: "+ Nowy stół" opens it in the
+bottom sheet. Unlike a table row (copied into the sheet and kept in step), this row is *moved* there and back, so what
+the user typed and the row's listeners survive. Creating a table closes the sheet and shows the new line. See
+[phone-layout.md](phone-layout.md).
+
+**The surprise: a new test made an old test flaky – and it was right.** Once the phone test created a table at the
+same moment, `board.spec.ts` failed about one run in ten. Looping the suite until it failed and reading Playwright's
+page snapshot showed three real races in `board.js`, all older than this step: an armed ❌ reset by a live update
+(its confirming click then hit the invisible backdrop), a click dropped because `busy` also covered the refresh, and
+refreshes finishing out of order. Fixed and explained in [live-updates.md](live-updates.md#pitfalls-we-hit); 40 runs
+in a row pass. The first fix for the armed ❌ (hold every refresh while it's armed) passed all tests but failed the
+user's own test – taking a seat and clicking ❌ right after made the seat look ignored. The final fix skips only that
+button when patching (`data-morph-skip` in morph.js); its regression test now fails against the first fix.
+The user then clicked even faster – alternating ❌ and a seat – and found two older habits ported from .NET: clicks
+made while a request was on its way were *dropped* (a "busy" flag), and the armed ❌'s invisible backdrop *swallowed*
+the next click. Both make sense for a slow server round-trip in Blazor Server, but feel broken on a fast local
+page. Now actions queue up (a double click on one seat is still sent once), and a click next to an armed ❌ disarms
+it and goes through. Each regression test was first checked to fail against the old code – one passed at first,
+because Playwright politely waited for the backdrop to disappear.
+
+**Different from .NET.** Blazor Server would have serialized all of this for us: one circuit handles one event at a
+time, and its renderer never applies an older render after a newer one. With plain JavaScript, "one at a time" has to
+be built – here a promise chain, the JS cousin of awaiting each `Task` in turn.
+
+**Lesson.** "Flaky" tests deserve a root cause; this one would have been a user saying "I clicked delete and nothing
+happened".
+
+---
+
+## The board on phones, step 3: the "⋯" menu (2026-11-23)
+
+**What happened.** In the phone sheet, the owner's/admin's tiny emoji buttons became a "⋯" menu: tapping it shows
+"❌ Usuń stół" and "🏷️ Zmień grę" as full-width, labelled buttons; the disabled placeholders are hidden. It is pure
+CSS over the row's existing buttons (a class toggled by board.js), with labels from each button's `title` via
+`content: attr(title)` – so the armed delete's "Kliknij ponownie…" shows up in the menu by itself.
+
+**Different from .NET.** In Blazor this would have been a menu component with its own `@onclick` handlers calling
+the same methods as the row buttons. Here the cheapest correct option was to *reuse the very same elements* and
+change only how they look – one set of buttons, one set of listeners, one place where rights are decided (the server
+rendering the row).
+
+**Lesson.** Before writing a new UI piece, check whether an existing element can be restyled into it.
+Follow-up the same day: the user asked for the menu to float *over* the sheet instead of pushing its content down;
+now it's an absolutely positioned layer under ⋯ that closes on a tap outside or Escape. Re-running the suite also
+caught a bug the action queue had introduced: the kind select's queued action read the select's value when it ran,
+after a refresh had reset it – now values are captured at the moment of the change.
+Second follow-up: the rename popup is now a layer attached to the "Zmień grę" button (above it, away from the
+on-screen keyboard), re-placed after the sheet's slide-in animation and on scroll/resize. A test measuring the
+sheet's height compared floats exactly and failed once on 397.5 vs 397.50006 – layout sizes need "close to".
+
+---
+
 ## "Zmień grę" sets the table's details too (2026-11-23)
 
 **What happened.** The rename popup now has the new-table row's fields – Zajęte, Stół, Godzina, Graczy, BGG link,
@@ -334,3 +412,9 @@ would have closed the rename popup underneath. See server-rendered-html.md.
 
 **Lesson.** A rule function that mutates its argument should validate everything before touching it – then the
 route can also check on a copy before writing anything else (a new game, a cover) to the database.
+Merged with the phone branch (PR #14) the same day. Git flagged the obvious overlaps (Escape handling, the hour picker,
+placing the rename popup, the end of the board page), all resolved by keeping both sides. The interesting part was
+what git *didn't* flag: the phone code still used the old single-popup variable that the popup stack had replaced
+(the type-check would have caught it), and in the phone sheet a tap in the nested hour picker counted as a tap
+outside the ⋯ menu, which would have hidden the rename popup inside the menu – found only by thinking through how the
+two features meet. A merge that compiles isn't necessarily a merge that works.

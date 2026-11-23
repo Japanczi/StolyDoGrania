@@ -645,15 +645,11 @@ button.slot:focus-visible {
 }
 
 /* ===== ConfirmButton.razor.css ===== */
-/* Invisible layer: a click anywhere else disarms the button (same approach as the board's popups). */
-.confirm-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-}
+/* (The invisible "click elsewhere disarms" layer is gone since 2026-11-23: it swallowed that click. board.js now
+   disarms on any press elsewhere and lets the click through.) */
 
 /*
-    Armed: the whole button turns solid green with white content, raised above the backdrop.
+    Armed: the whole button turns solid green with white content, raised above its neighbours.
     "button" raises specificity above the callers' base rules, whatever the bundle order;
     callers keep their own hover colours off an armed button with :not(.armed).
 */
@@ -709,3 +705,401 @@ button.confirm-button.armed {
     .live-status[hidden] {
         display: none;
     }
+
+/* ===== Phones and portrait tablets: one line per table + a bottom sheet (decided 2026-11-23, variant C) =====
+   Only with JavaScript (html.js, set in the layout's <head>): the sheet needs it. Without it the wide table stays. */
+
+.row-summary,
+.new-table-open,
+.table-sheet {
+    display: none;
+}
+
+@media (max-width: 991.98px) {
+    html.js .table-list {
+        overflow-x: visible;
+    }
+
+    html.js .table-list .table-head {
+        display: none;
+    }
+
+    /* The row shrinks to its summary line; its cells are still there (the sheet shows a copy of them). */
+    html.js .table-list .table-row:not(.table-draft) {
+        display: block;
+        min-width: 0;
+    }
+
+        html.js .table-list .table-row:not(.table-draft) > .cell {
+            display: none;
+        }
+
+    /* The new-table row lives in the sheet on phones ("+ Nowy stół" moves it there); hidden in the list. */
+    html.js .table-list > .table-draft,
+    html.js .table-list > .draft-panel {
+        display: none;
+    }
+
+    html.js .new-table-open {
+        display: block;
+        min-height: 48px;
+        margin-top: .25rem;
+        font-weight: 600;
+    }
+
+    html.js .import-divider,
+    html.js .draft-panel {
+        min-width: 0;
+    }
+
+    html.js .row-summary {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        width: 100%;
+        min-height: 48px;
+        padding: .5rem .75rem;
+        border: 0;
+        border-left: 4px solid transparent;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+    }
+
+    /* "Am I in?" at a glance: a gold edge on tables where the viewer holds a seat. */
+    html.js .has-my-seat > .row-summary {
+        border-left-color: #d4af37;
+    }
+
+    .summary-hour {
+        flex: none;
+        min-width: 3.4rem;
+        padding: .1rem .3rem;
+        border-radius: 4px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+    }
+
+    .summary-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .summary-seats {
+        flex: none;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .summary-kind {
+        flex: none;
+        width: .75rem;
+        height: .75rem;
+        border-radius: 50%;
+    }
+
+    /* The sheet: a native <dialog> opened with showModal(), so the browser handles the backdrop, focus and Escape.
+       No transform on it: the hour picker inside is position: fixed and must stay relative to the screen. */
+    html.js .table-sheet[open] {
+        display: block;
+        inset: auto 0 0 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: 85dvh;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        border: 0;
+        border-top: 1px solid #55555c;
+        border-radius: 14px 14px 0 0;
+        background: #1f1f22;
+        color: #fff;
+        animation: sheet-up .2s ease-out;
+    }
+
+    .table-sheet::backdrop {
+        background: rgba(0, 0, 0, .55);
+    }
+
+    .sheet-inner {
+        position: relative;
+        padding: .5rem .75rem 1rem;
+    }
+
+    .sheet-head {
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 2rem;
+    }
+
+    /* Keeps the ✕ on the right, with or without the ⋯ button on the left. */
+    .sheet-head .btn-close {
+        margin-left: auto;
+    }
+
+    .sheet-menu-button {
+        min-width: 44px;
+        min-height: 36px;
+        padding: 0 .5rem;
+        border: 1px solid #55555c;
+        border-radius: 6px;
+        background: #3b3b40;
+        color: #fff;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+        .sheet-menu-button[aria-expanded="true"] {
+            background: #55555c;
+        }
+
+    .sheet-grip {
+        position: absolute;
+        top: .25rem;
+        left: 50%;
+        width: 40px;
+        height: 4px;
+        margin-left: -20px;
+        border-radius: 2px;
+        background: #666;
+    }
+
+    /* The copied row, stacked: name and details on top, the seats below. */
+    .table-sheet .table-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        min-width: 0;
+        gap: 4px;
+        overflow: visible;
+        background: none;
+    }
+
+        .table-sheet .table-row > .row-summary {
+            display: none;
+        }
+
+        .table-sheet .table-row > .cell {
+            min-height: 44px;
+            border-radius: 6px;
+        }
+
+    /* :where() adds no specificity, so the kind and "no hour" colours (.kind-small, .hour-unset) still win. */
+    :where(.table-sheet .table-row > .cell) {
+        background-color: #3b3b40;
+    }
+
+        .table-sheet .table-row > .cell-game {
+            grid-column: 1 / -1;
+            order: -2;
+            background: none;
+            font-size: 1.125rem;
+        }
+
+        .table-sheet .table-row > .cell-cover {
+            grid-column: 1 / -1;
+            order: -1;
+            justify-content: flex-start;
+            background: none;
+        }
+
+        /* The row's actions, behind the sheet's "⋯" button (board.js toggles .menu-open): a floating menu just
+           under the button, on a layer *over* the sheet – the sheet itself keeps its size (asked 2026-11-23).
+           Each button is labelled with its own title ("Usuń stół", "Zmień grę" – and "Kliknij ponownie…" while the
+           delete is armed). The disabled placeholders (🛠️) are left out. Positioned against .sheet-inner. */
+        .table-sheet .table-row > .cell-actions {
+            display: none;
+        }
+
+            .table-sheet .menu-open .table-row > .cell-actions {
+                position: absolute;
+                top: 2.75rem;
+                left: .75rem;
+                z-index: 5;
+                display: block;
+                width: min(16rem, calc(100% - 1.5rem));
+                min-height: 0;
+                padding: 4px;
+                border: 1px solid #55555c;
+                border-radius: 8px;
+                background: #1f1f22;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, .6);
+            }
+
+        .table-sheet .actions {
+            position: static;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: 4px;
+        }
+
+        .table-sheet .action-anchor {
+            display: block;
+        }
+
+        .table-sheet .action-placeholder {
+            display: none;
+        }
+
+        .table-sheet .action-button,
+        .table-sheet .action-anchor .confirm-delete {
+            justify-content: flex-start;
+            gap: .6rem;
+            width: 100%;
+            height: 44px;
+            padding: 0 .75rem;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+            .table-sheet .action-button::after,
+            .table-sheet .action-anchor .confirm-delete::after {
+                content: attr(title);
+                font-size: .9375rem;
+            }
+
+        /* The seats: full width, four per line, each a big square. */
+        .table-sheet .table-row > .cell-slots {
+            display: grid;
+            grid-column: 1 / -1;
+            order: 2;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            padding: 0;
+            background: none;
+        }
+
+        .table-sheet .slot {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+        }
+
+        /* The hour picker in the sheet: the full width of the screen, at the bottom, with finger-sized hours.
+           !important beats the left/top that board.js sets next to the click (meant for the desktop). */
+        .table-sheet .hour-popup {
+            top: auto !important;
+            right: 0;
+            bottom: 0;
+            left: 0 !important;
+            width: 100%;
+            height: auto;
+            border-radius: 14px 14px 0 0;
+        }
+
+            .table-sheet .hour-popup .hour-grid {
+                grid-auto-rows: 36px;
+            }
+
+        /* The rename popup (🏷️): on the desktop it sits beside its button, which on a phone puts it off-screen.
+           In the sheet it is a layer attached to its "Zmień grę" button: board.js (anchorToButton) places it just
+           above or below the button and limits its height to the room there; it scrolls inside if it needs more. */
+        .table-sheet .action-popup {
+            width: min(22rem, calc(100vw - 1rem));
+            margin-left: 0;
+            overflow-y: auto;
+        }
+
+        /* The new-table form in the sheet. The row and its name cell are "display: contents" (their boxes vanish,
+           their children join the sheet's grid), so the pieces can be reordered: name, lookup messages, the
+           details in two columns, and the buttons last. */
+        .sheet-draft {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+            .sheet-draft .table-draft,
+            .sheet-draft .table-draft > .cell-game {
+                display: contents;
+            }
+
+            .sheet-draft .table-draft > .cell:first-child {
+                display: none;
+            }
+
+            .sheet-draft #new-name {
+                grid-column: 1 / -1;
+                order: -3;
+                min-height: 44px;
+                font-size: 1rem;
+            }
+
+            .sheet-draft .draft-panel {
+                grid-column: 1 / -1;
+                order: -2;
+                min-width: 0;
+            }
+
+            .sheet-draft .table-draft > .cell {
+                justify-content: flex-start;
+                gap: .4rem;
+                min-height: 44px;
+                border-radius: 6px;
+            }
+
+            .sheet-draft .table-draft > .cell-cover {
+                grid-column: 1 / -1;
+                background: none;
+            }
+
+            .sheet-draft .draft-actions {
+                grid-column: 1 / -1;
+                order: 5;
+                flex-direction: row;
+                gap: 6px;
+            }
+
+                .sheet-draft .draft-actions .btn {
+                    min-height: 44px;
+                }
+
+                .sheet-draft #draft-create {
+                    flex: 1;
+                }
+
+            .sheet-draft .cell-input {
+                font-size: 1rem;
+            }
+
+            /* Labels instead of the column headers. */
+            .sheet-draft .table-draft > .cell:nth-child(3)::before { content: "Zajęte"; }
+            .sheet-draft #new-kind-cell::before { content: "Stół"; }
+            .sheet-draft #new-hour-cell::before { content: "Godzina"; }
+            .sheet-draft #new-max-cell::before { content: "Graczy"; }
+            .sheet-draft #new-link::before { content: "BGG"; }
+            .sheet-draft #new-difficulty::before { content: "Trudność"; }
+            .sheet-draft .table-draft > .cell::before {
+                flex: none;
+                opacity: .7;
+                font-size: .75rem;
+                font-weight: 400;
+            }
+
+    :where(.sheet-draft .table-draft > .cell) {
+        background-color: #3b3b40;
+    }
+
+        /* Labels for the small cells, so "4" and "2.84" mean something without the column headers. */
+        .table-sheet .table-row > .cell:nth-child(4)::before { content: "Zajęte "; }
+        .table-sheet .table-row > .cell:nth-child(7)::before { content: "Graczy "; }
+        .table-sheet .table-row > .cell:nth-child(4)::before,
+        .table-sheet .table-row > .cell:nth-child(7)::before {
+            margin-right: .3em;
+            opacity: .7;
+            font-size: .75rem;
+        }
+}
+
+@keyframes sheet-up {
+    from { translate: 0 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .table-sheet[open] {
+        animation: none;
+    }
+}

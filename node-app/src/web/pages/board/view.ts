@@ -8,7 +8,7 @@ import type { BoardTable, Viewer } from '../../../db/queries/board.ts';
 import {
   catalogLabel, defaultBggUrl, difficultyLabel, difficultyStyle, kindClass, kindLabel, maximumSpotsAllowed, placeholderHue,
 } from '../../../domain/game.ts';
-import { isOwner, isSlotTaken, maxTakenSlots, ownerSlot, tableKinds, type TableKind } from '../../../domain/play-table.ts';
+import { freeSlots, isOwner, isSlotTaken, maxTakenSlots, ownerSlot, tableKinds, type TableKind } from '../../../domain/play-table.ts';
 import { html, type SafeHtml } from '../../html.ts';
 import { adminDock, type AdminDockModel } from './admin-dock.ts';
 
@@ -60,10 +60,26 @@ export function boardPage(m: BoardPageModel): SafeHtml {
             <div class="cell cell-slots">Miejsca</div>
         </div>
         ${ownRows(m.viewer, m.tables, m.highlightId)}
+        <!-- Phones only (CSS): opens the new-table row below in the sheet. -->
+        ${loggedIn && html`<button type="button" class="btn btn-success new-table-open" id="new-table-open" aria-haspopup="dialog">+ Nowy stół</button>`}
         ${loggedIn && draftRow(m.bggConfigured)}
         ${loggedIn && html`<div class="draft-panel" id="draft-panel" hidden></div>`}
         ${importedRows(m.viewer, m.tables, m.highlightId)}
     </div>
+    <!-- Phones: tapping a table's line shows the whole row here (board.js copies it in and keeps it up to date). -->
+    <dialog class="table-sheet" id="table-sheet" aria-label="Szczegóły stołu">
+        <div class="sheet-inner">
+            <div class="sheet-head">
+                <!-- The table's actions (Usuń stół, Zmień grę) as a labelled list; board.js shows the button only
+                     when the row has actions for this viewer. -->
+                <button type="button" class="sheet-menu-button" id="sheet-menu" data-sheet-menu aria-label="Opcje stołu"
+                        aria-expanded="false" aria-controls="sheet-body" hidden>⋯</button>
+                <span class="sheet-grip" aria-hidden="true"></span>
+                <button type="button" class="btn-close" data-sheet-close aria-label="Zamknij"></button>
+            </div>
+            <div class="sheet-body" id="sheet-body"></div>
+        </div>
+    </dialog>
     ${loggedIn && renameDetailsTemplate()}
 </div>
 ${m.admin && adminDock(m.admin)}`;
@@ -134,8 +150,9 @@ export function tableRow(viewer: Viewer, t: BoardTable, highlight = false): Safe
   const canManage = owner || (viewer.isAdmin && viewer.userId !== null);
   const hasSeat = viewer.userId !== null && t.participants.some(p => p.userId === viewer.userId);
 
-  return html`<div class="table-row${highlight ? ' table-new' : ''}" id="table-${t.id}" data-table-id="${t.id}" data-title="${title}"
+  return html`<div class="table-row${highlight ? ' table-new' : ''}${hasSeat ? ' has-my-seat' : ''}" id="table-${t.id}" data-table-id="${t.id}" data-title="${title}"
          data-max-players="${t.maxPlayers}" data-kind="${t.kind}" data-has-players="${t.takenSlots > 0 || t.participants.some(p => !(p.slotNumber === ownerSlot && isOwner(t, p.userId))) ? 'true' : 'false'}"${highlight ? html` tabindex="-1"` : ''}>
+    ${rowSummary(t, title, hasSeat)}
     <div class="cell cell-actions">
         <div class="actions">
             ${canManage && html`<div class="action-anchor">
@@ -178,6 +195,22 @@ export function tableRow(viewer: Viewer, t: BoardTable, highlight = false): Safe
 
     <div class="cell cell-slots">${slots(viewer, t, owner, canManage, hasSeat)}</div>
 </div>`;
+}
+
+/**
+ * The table as one line, for phones (decided 2026-11-23, Resources.txt "Mobile layout of the board"): hour, name,
+ * occupied/all seats and the kind's colour. Hidden by CSS on wider screens; a tap opens the row in the sheet.
+ */
+function rowSummary(t: BoardTable, title: string, hasSeat: boolean): SafeHtml {
+  const occupied = t.maxPlayers - freeSlots(t);
+  const hour = t.startHour ?? '--:--';
+  const label = `${title}, ${t.startHour ?? 'bez godziny'}, ${kindLabel(t.kind)}, zajęte ${occupied} z ${t.maxPlayers}${hasSeat ? ', masz tu miejsce' : ''}`;
+  return html`<button type="button" class="row-summary" data-sheet-open aria-haspopup="dialog" aria-label="${label}">
+        <span class="summary-hour${t.startHour === null ? ' hour-unset' : ''}" aria-hidden="true">${hour}</span>
+        <span class="summary-name" aria-hidden="true">${title}</span>
+        <span class="summary-seats" aria-hidden="true">${occupied}/${t.maxPlayers}</span>
+        <span class="summary-kind ${kindClass(t.kind)}" aria-hidden="true"></span>
+    </button>`;
 }
 
 function slots(viewer: Viewer, t: BoardTable, owner: boolean, canManage: boolean, hasSeat: boolean): SafeHtml[] {

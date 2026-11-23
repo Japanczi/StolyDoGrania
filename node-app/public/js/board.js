@@ -42,12 +42,29 @@
     }
   }
 
-  /** Runs one action at a time (like the .NET page's busy flag), then shows its message and refreshes. */
-  async function act(/** @type {() => Promise<any>} */ action, /** @type {number | null} */ tableId) {
-    if (busy) return;
-    busy = true;
-    try {
-      const result = await action();
+  /**
+   * Actions run one at a time, in the order they were clicked: a click made while an earlier request is still on its
+   * way *waits its turn*. (It used to be dropped while "busy", so quick clicks seemed ignored for about a quarter of a
+   * second – user report, 2026-11-23.) Then the action's message is shown and the page refreshed.
+   * `key` (the request's URL) keeps the *same* action from being queued twice, e.g. a double click on one seat; it is
+   * released once the page shows the result, because until then the button still offers the old action.
+   */
+  let actionQueue = Promise.resolve();
+  /** @type {Set<string>} */
+  const queuedKeys = new Set();
+
+  /** @param {() => Promise<any>} action @param {number | null} tableId @param {string} [key] */
+  function act(action, tableId, key) {
+    if (key !== undefined) {
+      if (queuedKeys.has(key)) return Promise.resolve(undefined);
+      queuedKeys.add(key);
+    }
+    const sent = actionQueue.then(async () => {
+      busy = true;
+      try { return await action(); } finally { busy = false; }
+    });
+    actionQueue = sent.then(() => {}, () => {});
+    return sent.then(async result => {
       if (result.ok) {
         if (result.message) showAlert(result.message, 'success');
       } else {
@@ -55,9 +72,16 @@
       }
       if (tableId !== null && !result.created) await refreshTable(tableId); else await refreshBoard();
       return result;
-    } finally {
-      busy = false;
-    }
+    }).finally(() => { if (key !== undefined) queuedKeys.delete(key); });
+  }
+
+  /**
+   * A button action that is one POST with no data (take/free a seat, delete): its URL is its key, so a double click
+   * sends it once. (Changes with a value – hour, kind, count – aren't keyed: a second, different value must go too.)
+   * @param {number | null} tableId @param {string} url
+   */
+  function actOnce(tableId, url) {
+    return act(() => post(url), tableId, url);
   }
 
   // ---------- alerts ----------
@@ -88,14 +112,47 @@
 
   // The app's own tables, then (below the new-table row) the ones imported from the sheet – TEMPORARY (sheet import).
   const rowContainers = ['table-rows', 'imported-rows'].map(id => /** @type {HTMLElement} */ (document.getElementById(id)));
-  /** @param {Node} node */
-  const inRows = node => rowContainers.some(c => c.contains(node));
-  /** While a popup is open its row must not be replaced; refreshes wait until it closes. */
+  const sheet = /** @type {HTMLDialogElement} */ (document.getElementById('table-sheet'));
+  const sheetBody = /** @type {HTMLElement} */ (document.getElementById('sheet-body'));
+  /**
+   * A row's controls work the same in its copy in the phone sheet. (Not the new-table row when it's in the sheet:
+   * it has its own listeners, see setUpDraft.) @param {Node} node
+   */
+  const inRows = node => rowContainers.some(c => c.contains(node)) || (sheetKey !== 'new' && sheetBody.contains(node));
+  /**
+   * While a popup is open the rows must not be patched (the rename popup lives inside its row): refreshes wait until
+   * it closes. An armed two-click ❌ doesn't hold refreshes – that hid a seat just taken for up to 4 s (user report,
+   * 2026-11-23); instead only the button itself is skipped by morph (data-morph-skip, see confirmClick).
+   */
   let popupOpen = false;
   let refreshPending = false;
+  const refreshesOnHold = () => popupOpen;
 
-  async function refreshBoard() {
-    if (popupOpen) { refreshPending = true; return; }
+  /** Runs a refresh that waited, once nothing holds refreshes any more. */
+  function releaseRefreshes() {
+    if (refreshPending && !refreshesOnHold()) { refreshPending = false; void refreshBoard(); }
+  }
+
+  /**
+   * Refreshes run one at a time, in the order they were asked for. Run side by side, an older answer could arrive
+   * last and undo a newer one: a whole-board refresh rendered just *before* a delete, landing after the delete's own
+   * refresh had removed the row, put the deleted table back (seen in the e2e tests, 2026-11-23). In a queue, each
+   * refresh fetches only after the previous one has been applied, so the page ends up at the newest state.
+   */
+  let refreshQueue = Promise.resolve();
+  /** @param {() => Promise<void>} task */
+  function queued(task) {
+    const run = refreshQueue.then(task, task);
+    refreshQueue = run.catch(() => {});
+    return run;
+  }
+
+  const refreshBoard = () => queued(refreshBoardNow);
+  /** @param {number} id */
+  const refreshTable = id => queued(() => refreshTableNow(id));
+
+  async function refreshBoardNow() {
+    if (refreshesOnHold()) { refreshPending = true; return; }
     const response = await fetch('/fragments/board', { credentials: 'same-origin' });
     if (!response.ok) return;
     version = Math.max(version, Number(response.headers.get('X-Board-Version')));
@@ -107,6 +164,7 @@
       const source = fresh.querySelector(`#${container.id}`);
       if (source) window.morph.morphChildren(container, source);
     }
+    syncSheet();
     if (!loggedIn) {
       const empty = rowContainers.every(c => c.children.length === 0);
       document.getElementById('board-empty')?.toggleAttribute('hidden', !empty);
@@ -115,19 +173,153 @@
   }
 
   /** @param {number} id */
-  async function refreshTable(id) {
-    if (popupOpen) { refreshPending = true; return; }
-    const row = document.getElementById(`table-${id}`);
+  async function refreshTableNow(id) {
+    if (refreshesOnHold()) { refreshPending = true; return; }
     const response = await fetch(`/fragments/table/${id}`, { credentials: 'same-origin' });
-    if (response.status === 404) { row?.remove(); return; }
+    const row = document.getElementById(`table-${id}`);
+    if (response.status === 404) { row?.remove(); syncSheet(); return; }
     if (!response.ok) return;
     const fresh = window.morph.parseFragment(await response.text()).firstElementChild;
-    if (row && fresh) window.morph.morphElement(row, fresh); else await refreshBoard();
+    // A table this page doesn't have yet: fetch the whole board (directly – we're already in the queue).
+    if (row && fresh) { window.morph.morphElement(row, fresh); syncSheet(); } else await refreshBoardNow();
   }
+
+  // ---------- the phone sheet (one table's whole row, opened from its summary line) ----------
+  // The sheet holds a *copy* of the row, kept in step with morph after every refresh: the row stays the single
+  // source of truth, rendered on the server with this viewer's rights, and its buttons work through the same
+  // listeners (see inRows). The copy gets its own id, so ids stay unique on the page.
+
+  // The sheet also shows the new-table row ("+ Nowy stół"). That row isn't a copy: it is *moved* into the sheet and
+  // back, because it holds what the user is typing and has its own listeners. Live updates never touch it.
+
+  /** What the sheet shows: a table's id, 'new' for the new-table row, or null when closed. @type {number | 'new' | null} */
+  let sheetKey = null;
+  const draftRow = document.getElementById('draft');
+  const draftPanel = document.getElementById('draft-panel');
+
+  /** @param {number} id */
+  function sheetCopyOf(id) {
+    const row = document.getElementById(`table-${id}`);
+    if (!row) return null;
+    const copy = /** @type {HTMLElement} */ (row.cloneNode(true));
+    copy.id = `sheet-table-${id}`;
+    return copy;
+  }
+
+  /** @param {number} id */
+  function openSheet(id) {
+    const copy = sheetCopyOf(id);
+    if (!copy) return;
+    sheetBody.replaceChildren(copy);
+    showSheet(id, 'Szczegóły stołu');
+  }
+
+  /** The new-table row (and its lookup messages) moved into the sheet, the name field focused. */
+  function openDraftSheet() {
+    if (!draftRow || !draftPanel) return;
+    sheetBody.replaceChildren(draftRow, draftPanel);
+    showSheet('new', 'Nowy stół');
+    /** @type {HTMLInputElement | null} */ (draftRow.querySelector('#new-name'))?.focus();
+  }
+
+  /** @param {number | 'new'} key @param {string} label */
+  function showSheet(key, label) {
+    sheetKey = key;
+    sheetBody.classList.toggle('sheet-draft', key === 'new');
+    sheet.setAttribute('aria-label', label);
+    setSheetMenu(false);
+    sheet.showModal();
+    // The phone's Back button should close the sheet, not leave the page: give it a history entry to go back from.
+    // If the previous sheet's entry is still being removed (history.back() is asynchronous), add it once that's done.
+    if (!backPending) history.pushState({ sheet: key }, '');
+  }
+
+  /** Set between our own history.back() and the popstate event it causes. */
+  let backPending = false;
+
+  /** After a refresh: patch the copy to match its row, or close the sheet if the table is gone. */
+  function syncSheet() {
+    if (typeof sheetKey !== 'number' || !sheet.open) return;
+    const copy = sheetCopyOf(sheetKey);
+    const current = sheetBody.firstElementChild;
+    if (!copy) { sheet.close(); return; }
+    if (current) window.morph.morphElement(current, copy); else sheetBody.replaceChildren(copy);
+    setSheetMenu(sheetBody.classList.contains('menu-open'));
+  }
+
+  // ---------- the "⋯" menu in the sheet: the row's action buttons as a labelled list (phones) ----------
+  // No menu of its own: the row's actions cell is shown or hidden (CSS, .menu-open), so the buttons are the very
+  // same ones as on the desktop and work through the same listeners. The menu button shows only when the row
+  // offers this viewer an action – rendered by the server with the viewer's rights, so it follows them.
+
+  const sheetMenuButton = /** @type {HTMLButtonElement} */ (document.getElementById('sheet-menu'));
+
+  // The menu floats over the sheet; a press anywhere outside it (and outside ⋯) closes it, like any dropdown.
+  // The rename popup lives inside its menu item, so pressing in it doesn't count as outside. While any popup is open
+  // (e.g. the hour picker opened from the rename popup, which sits outside the menu) the menu stays: closing it would
+  // hide the rename popup inside it.
+  document.addEventListener('pointerdown', e => {
+    if (!sheetBody.classList.contains('menu-open') || openPopups.length > 0) return;
+    const target = /** @type {Element} */ (e.target);
+    if (target.closest('.table-sheet .cell-actions') || target.closest('[data-sheet-menu]')) return;
+    setSheetMenu(false);
+  }, true);
+
+  /** @param {boolean} open */
+  function setSheetMenu(open) {
+    const hasActions = typeof sheetKey === 'number' && sheetBody.querySelector('.cell-actions button:not([disabled])') !== null;
+    sheetMenuButton.hidden = !hasActions;
+    const show = open && hasActions;
+    sheetBody.classList.toggle('menu-open', show);
+    sheetMenuButton.setAttribute('aria-expanded', String(show));
+  }
+
+  // However it was closed (✕, a tap outside, Escape, Back), drop the history entry and the copy. The new-table row
+  // goes back to its place in the list (half-filled, as the user left it) – between the two row containers.
+  sheet.addEventListener('close', () => {
+    closePopups();
+    disarm();
+    if (sheetKey === 'new' && draftRow && draftPanel) rowContainers[1].before(draftRow, draftPanel);
+    sheetKey = null;
+    sheetBody.replaceChildren();
+    if (history.state?.sheet) { backPending = true; history.back(); }
+  });
+
+  document.getElementById('new-table-open')?.addEventListener('click', openDraftSheet);
+  // "Anuluj" empties the form (setUpDraft); on a phone it also closes the sheet.
+  document.getElementById('draft-cancel')?.addEventListener('click', () => { if (sheetKey === 'new') sheet.close(); });
+
+  /** A table was created from the sheet: close it and show the new table's line. @param {number} id */
+  function draftCreated(id) {
+    if (sheetKey !== 'new') return;
+    sheet.close();
+    document.getElementById(`table-${id}`)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  window.addEventListener('popstate', () => {
+    if (backPending) {
+      // Our own back() finished. A sheet opened meanwhile gets its history entry now.
+      backPending = false;
+      if (sheet.open && sheetKey !== null) history.pushState({ sheet: sheetKey }, '');
+      return;
+    }
+    // The user pressed Back while the sheet was open: its entry is already gone, so just close it.
+    if (sheet.open) sheet.close();
+  });
+
+  sheet.addEventListener('click', e => {
+    const target = /** @type {HTMLElement} */ (e.target);
+    // A click on the dialog element itself (not its content) is a click on the backdrop around it.
+    if (target === sheet || target.closest('[data-sheet-close]')) sheet.close();
+    if (target.closest('[data-sheet-menu]')) setSheetMenu(!sheetBody.classList.contains('menu-open'));
+  });
+
+  /** Popups go inside the open sheet: showModal() makes everything outside it unclickable. */
+  const popupHost = () => (sheet.open ? sheet : document.body);
 
   function popupClosed() {
     popupOpen = false;
-    if (refreshPending) { refreshPending = false; void refreshBoard(); }
+    releaseRefreshes();
   }
 
   // ---------- row actions (event delegation: one listener for every row, even rows added later) ----------
@@ -137,14 +329,16 @@
 
   board.addEventListener('click', e => {
     const target = /** @type {HTMLElement} */ (e.target);
+    const summary = target.closest('[data-sheet-open]');
+    if (summary && inRows(summary)) { openSheet(tableIdOf(summary)); return; }
     const button = /** @type {HTMLElement | null} */ (target.closest('[data-action]'));
     if (!button || !inRows(button)) return;
     const id = tableIdOf(button);
     const slot = Number(button.dataset.slot);
     switch (button.dataset.action) {
-      case 'take': void act(() => post(`/api/tables/${id}/slots/${slot}/take`), id); break;
-      case 'free': void act(() => post(`/api/tables/${id}/slots/${slot}/free`), id); break;
-      case 'delete': confirmClick(button, () => act(() => post(`/api/tables/${id}/delete`), null)); break;
+      case 'take': void actOnce(id, `/api/tables/${id}/slots/${slot}/take`); break;
+      case 'free': void actOnce(id, `/api/tables/${id}/slots/${slot}/free`); break;
+      case 'delete': confirmClick(button, () => actOnce(null, `/api/tables/${id}/delete`)); break;
       case 'hour': openHourPicker(button, e, hour => act(() => post(`/api/tables/${id}/hour`, { hour: hour ?? '' }), id)); break;
       case 'rename': openRename(button, id); break;
     }
@@ -154,8 +348,11 @@
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (!inRows(input)) return;
     const id = tableIdOf(input);
-    if (input.dataset.action === 'taken') void act(() => post(`/api/tables/${id}/taken`, { count: input.value }), id);
-    if (input.dataset.action === 'kind') void act(() => post(`/api/tables/${id}/kind`, { kind: input.value }), id);
+    // The value is read now, not when the queued action runs: a refresh in between may have reset the field to the
+    // server's old value (found by the e2e tests, 2026-11-23).
+    const value = input.value;
+    if (input.dataset.action === 'taken') void act(() => post(`/api/tables/${id}/taken`, { count: value }), id);
+    if (input.dataset.action === 'kind') void act(() => post(`/api/tables/${id}/kind`, { kind: value }), id);
   });
 
   // Right-click on a seat: the owner's "add player" / the admin's "choose owner" popup.
@@ -168,41 +365,60 @@
 
   // ---------- two-click delete (ConfirmButton.razor) ----------
 
-  /** @type {{ button: HTMLElement, timer: number, backdrop: HTMLElement } | null} */
+  /** @type {{ button: HTMLElement, timer: number } | null} */
   let armed = null;
 
-  /** First click arms (solid green ✓), second confirms; Escape, a click elsewhere or 4 s disarm it. */
+  /**
+   * First click arms (solid green ✓), second confirms; Escape, a click elsewhere or 4 s disarm it.
+   * A click elsewhere disarms *and still does what it was for* (e.g. takes a seat). It used to land on an invisible
+   * backdrop that only disarmed, so a quick ❌ → seat lost the seat click (user report, 2026-11-23).
+   */
   function confirmClick(/** @type {HTMLElement} */ button, /** @type {() => unknown} */ onConfirm) {
     if (armed?.button === button) { disarm(); onConfirm(); return; }
     disarm();
-    const backdrop = document.createElement('div');
-    backdrop.className = 'confirm-backdrop';
-    backdrop.addEventListener('click', disarm);
-    backdrop.addEventListener('contextmenu', ev => { ev.preventDefault(); disarm(); });
-    document.body.append(backdrop);
     button.classList.add('armed');
     button.dataset.original = button.innerHTML;
+    button.dataset.originalLabel = button.getAttribute('aria-label') ?? '';
     button.innerHTML = '<span class="confirm-check" aria-hidden="true">✓</span>';
     button.title = button.dataset.armedTitle ?? '';
     button.setAttribute('aria-label', button.dataset.armedLabel ?? '');
+    // Live updates still patch the row (a seat just taken shows up), but not this button: patching it would undo its
+    // armed look while it's still armed.
+    button.dataset.morphSkip = '';
     button.focus();
-    armed = { button, backdrop, timer: window.setTimeout(disarm, 4000) };
+    armed = { button, timer: window.setTimeout(disarm, 4000) };
   }
+
+  // A press anywhere but the armed button disarms it. "pointerdown" in the capture phase runs before the click
+  // itself, and nothing is cancelled, so the click then reaches whatever was pressed as usual.
+  document.addEventListener('pointerdown', e => {
+    if (armed && !armed.button.contains(/** @type {Node} */ (e.target))) disarm();
+  }, true);
 
   function disarm() {
     if (!armed) return;
-    const { button, backdrop, timer } = armed;
+    const { button, timer } = armed;
     armed = null;
     clearTimeout(timer);
-    backdrop.remove();
     button.classList.remove('armed');
     button.innerHTML = button.dataset.original ?? '❌';
     button.title = 'Usuń stół';
+    if (button.dataset.originalLabel) button.setAttribute('aria-label', button.dataset.originalLabel);
+    delete button.dataset.morphSkip;
   }
 
-  // Escape closes the innermost popup only (e.g. the hour picker opened from the rename popup).
+  // Escape closes the innermost thing only: an armed button or the top popup first (e.g. the hour picker opened from
+  // the rename popup, which stays), then the phone sheet's ⋯ menu, and the sheet itself the next time.
+  // preventDefault() stops the sheet's <dialog> from also closing on that same Escape.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { disarm(); closeTopPopup(); }
+    if (e.key !== 'Escape') return;
+    if (armed || openPopups.length > 0) {
+      e.preventDefault();
+      disarm();
+      closeTopPopup();
+      return;
+    }
+    if (sheetBody.classList.contains('menu-open')) { e.preventDefault(); setSheetMenu(false); }
   });
 
   // ---------- popups (hour picker, add player, rename) ----------
@@ -292,9 +508,10 @@
     none.addEventListener('click', () => { close(); onPick(null); });
     popup.append(grid, none);
     button.setAttribute('aria-expanded', 'true');
-    // Opened from inside another popup (the rename popup): on top of it, which stays open.
+    // Opened from inside another popup (the rename popup): on top of it, which stays open. Inside the open phone
+    // sheet (popupHost): everything outside a modal <dialog> is unclickable.
     const nested = button.closest('.action-popup') !== null;
-    close = showPopup(popup, document.body, 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'), nested);
+    close = showPopup(popup, popupHost(), 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'), nested);
     popup.focus();
   }
 
@@ -319,7 +536,7 @@
       const name = /** @type {HTMLInputElement} */ (popup.querySelector('input[name="name"]')).value;
       if (name.trim() !== '') add({ name });
     });
-    showPopup(popup, document.body, 'popup-backdrop');
+    showPopup(popup, popupHost(), 'popup-backdrop');
     /** @type {HTMLInputElement | null} */ (popup.querySelector('input[name="name"]'))?.focus();
   }
 
@@ -674,7 +891,7 @@
           if (!r.ok) { lookup.fail(r.error); return { ok: true }; }
           return r;
         }, null);
-        if (result?.tableId) reset();
+        if (result?.tableId) { reset(); draftCreated(result.tableId); }
       } finally {
         createButton.disabled = false;
       }
@@ -794,10 +1011,14 @@
       await refreshTable(tableId);
     });
 
-    showPopup(popup, anchor, 'popup-backdrop');
+    /** @type {(() => void) | null} */
+    let stopFollowing = null;
+    showPopup(popup, anchor, 'popup-backdrop', () => stopFollowing?.());
     details.update();
-    keepOnScreen(popup);
-    input.focus();
+    // In the phone sheet: a layer attached to the button. On the desktop it sits beside the button (CSS), moved up
+    // if the row is low on the screen.
+    if (sheet.contains(anchor)) stopFollowing = followButton(popup, button); else keepOnScreen(popup);
+    input.focus({ preventScroll: true });
     input.select();
   }
 
@@ -810,6 +1031,48 @@
     const margin = 8;
     if (r.bottom > window.innerHeight - margin) {
       popup.style.top = `${Math.max(margin, window.innerHeight - margin - r.height)}px`;
+    }
+  }
+
+  /**
+   * Keeps a popup attached to its button while it's open: placed now, again once the sheet's slide-in animation has
+   * finished, and whenever the sheet scrolls or the screen changes size (e.g. the on-screen keyboard opens).
+   * Returns the function that stops following. @param {HTMLElement} popup @param {HTMLElement} button
+   */
+  function followButton(popup, button) {
+    const place = () => anchorToButton(popup, button);
+    place();
+    void Promise.all(sheet.getAnimations().map(a => a.finished)).then(place, () => {});
+    sheet.addEventListener('scroll', place);
+    window.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('resize', place);
+    return () => {
+      sheet.removeEventListener('scroll', place);
+      window.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('resize', place);
+    };
+  }
+
+  /**
+   * Places a fixed popup next to `button`, inside the screen: above it when the button is in the lower half (the
+   * on-screen keyboard comes up from the bottom, and the popup then grows upwards, away from it), else below it.
+   * Its height is limited to the room on that side; it scrolls inside if the lookup list needs more.
+   * @param {HTMLElement} popup @param {HTMLElement} button
+   */
+  function anchorToButton(popup, button) {
+    const gap = 4;
+    const margin = 8;
+    const r = button.getBoundingClientRect();
+    const left = Math.max(margin, Math.min(r.left, window.innerWidth - popup.offsetWidth - margin));
+    popup.style.left = `${left}px`;
+    if (r.top + r.height / 2 > window.innerHeight / 2) {
+      popup.style.top = 'auto';
+      popup.style.bottom = `${window.innerHeight - r.top + gap}px`;
+      popup.style.maxHeight = `${r.top - gap - margin}px`;
+    } else {
+      popup.style.bottom = 'auto';
+      popup.style.top = `${r.bottom + gap}px`;
+      popup.style.maxHeight = `${window.innerHeight - r.bottom - gap - margin}px`;
     }
   }
 
