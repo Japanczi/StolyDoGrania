@@ -50,6 +50,9 @@ export function layout({ title, currentPath, user, csrfToken, body, head, script
     <!-- For fetch() calls from page scripts: sent back in the x-csrf-token header (see auth/csrf.ts). -->
     <meta name="csrf-token" content="${csrfToken}" />
     <title>${title}</title>
+    <!-- Marks the page as having JavaScript before anything is drawn, so CSS can choose layouts that need it (the
+         board's phone list) without first showing the other one. Without JavaScript the class is never added. -->
+    <script>document.documentElement.classList.add('js');</script>
     <link rel="stylesheet" href="/lib/bootstrap/css/bootstrap.min.css" />
     <link rel="stylesheet" href="/css/app.css" />
     <link rel="stylesheet" href="/css/layout.css" />

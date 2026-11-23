@@ -54,6 +54,25 @@ very dark pink with 2px golden border = table owner's slot (owner automatically 
 - Game picture should be displayed as a small thumbnail in its own column, between difficulty and game slots, sizable enough to be recognizable, but not too large to take up too much space (100px square)
 - Background of entire subpage - dark gray, with a subtle pattern or texture to add visual interest without being distracting
 
+Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
+Design/ApplicationDesign.md, "Mobile audit"):
+- On phones the board is a list with one line per table: hour (red "--:--" when not set), game name, taken/total
+  seats ("2/4") and a dot in the table-kind colour. No sideways scrolling.
+- Tapping a line opens a bottom sheet with the whole table: cover, name, kind, hour, players, difficulty, BGG link and
+  the seat grid (same seat colours and rules as on the desktop board). Taking/freeing a seat happens in the sheet.
+- Admin row actions (❌ 🏷️ 🛠️) are one "⋯" menu on phones instead of a stack of small icons.
+- Desktop keeps the current table layout. Same URLs and server-rendered HTML; the phone layout is CSS plus a small
+  amount of JavaScript for the sheet. Live updates and no-flash rules apply to the list and the open sheet alike.
+- Details (approved 2026-11-23): the list is used below 992px (Bootstrap lg), so portrait tablets get it too. A gold
+  left edge marks tables where the viewer holds a seat. The sheet is a native <dialog> showing a copy of the table's
+  row, restacked (name, cover, details, admin buttons, seats 4 per line); it closes with ✕, a tap outside, Escape or
+  the phone's Back button. Owner/admin controls work in the sheet; the hour picker there spans the screen's width.
+  A "+ Nowy stół" button on phones will open the new-table form in the sheet (later step; until then the new-table
+  row wraps). Without JavaScript the wide table is shown. Order as on desktop (own tables, divider, imported).
+- Step 1 done 2026-11-23 (list + sheet, branch feature/mobile-board-list). Next: new table on phones, "⋯" menu for
+  admin actions, then the smaller audit fixes (admin dock toolbox width, /admin/users sideways scroll, Login label
+  overlapping its placeholder, floating buttons covering content, drawer link height).
+
 Game lookup (adding a table):
 - No "new table" form: the last row of the list is, for logged-in users, a free-text game name field with a "Utwórz stół" button that creates the table.
 - When that field loses focus the game is looked up, and the rest of the row's columns appear (slots taken, table type, hour, players, BGG link, difficulty, cover). Enter doesn't create the table.

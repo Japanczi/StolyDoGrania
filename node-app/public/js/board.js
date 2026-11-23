@@ -88,8 +88,10 @@
 
   // The app's own tables, then (below the new-table row) the ones imported from the sheet – TEMPORARY (sheet import).
   const rowContainers = ['table-rows', 'imported-rows'].map(id => /** @type {HTMLElement} */ (document.getElementById(id)));
-  /** @param {Node} node */
-  const inRows = node => rowContainers.some(c => c.contains(node));
+  const sheet = /** @type {HTMLDialogElement} */ (document.getElementById('table-sheet'));
+  const sheetBody = /** @type {HTMLElement} */ (document.getElementById('sheet-body'));
+  /** A row's controls work the same in its copy in the phone sheet. @param {Node} node */
+  const inRows = node => rowContainers.some(c => c.contains(node)) || sheetBody.contains(node);
   /** While a popup is open its row must not be replaced; refreshes wait until it closes. */
   let popupOpen = false;
   let refreshPending = false;
@@ -107,6 +109,7 @@
       const source = fresh.querySelector(`#${container.id}`);
       if (source) window.morph.morphChildren(container, source);
     }
+    syncSheet();
     if (!loggedIn) {
       const empty = rowContainers.every(c => c.children.length === 0);
       document.getElementById('board-empty')?.toggleAttribute('hidden', !empty);
@@ -119,11 +122,81 @@
     if (popupOpen) { refreshPending = true; return; }
     const row = document.getElementById(`table-${id}`);
     const response = await fetch(`/fragments/table/${id}`, { credentials: 'same-origin' });
-    if (response.status === 404) { row?.remove(); return; }
+    if (response.status === 404) { row?.remove(); syncSheet(); return; }
     if (!response.ok) return;
     const fresh = window.morph.parseFragment(await response.text()).firstElementChild;
-    if (row && fresh) window.morph.morphElement(row, fresh); else await refreshBoard();
+    if (row && fresh) { window.morph.morphElement(row, fresh); syncSheet(); } else await refreshBoard();
   }
+
+  // ---------- the phone sheet (one table's whole row, opened from its summary line) ----------
+  // The sheet holds a *copy* of the row, kept in step with morph after every refresh: the row stays the single
+  // source of truth, rendered on the server with this viewer's rights, and its buttons work through the same
+  // listeners (see inRows). The copy gets its own id, so ids stay unique on the page.
+
+  /** @type {number | null} */
+  let sheetTableId = null;
+
+  /** @param {number} id */
+  function sheetCopyOf(id) {
+    const row = document.getElementById(`table-${id}`);
+    if (!row) return null;
+    const copy = /** @type {HTMLElement} */ (row.cloneNode(true));
+    copy.id = `sheet-table-${id}`;
+    return copy;
+  }
+
+  /** @param {number} id */
+  function openSheet(id) {
+    const copy = sheetCopyOf(id);
+    if (!copy) return;
+    sheetTableId = id;
+    sheetBody.replaceChildren(copy);
+    sheet.showModal();
+    // The phone's Back button should close the sheet, not leave the page: give it a history entry to go back from.
+    // If the previous sheet's entry is still being removed (history.back() is asynchronous), add it once that's done.
+    if (!backPending) history.pushState({ sheet: id }, '');
+  }
+
+  /** Set between our own history.back() and the popstate event it causes. */
+  let backPending = false;
+
+  /** After a refresh: patch the copy to match its row, or close the sheet if the table is gone. */
+  function syncSheet() {
+    if (sheetTableId === null || !sheet.open) return;
+    const copy = sheetCopyOf(sheetTableId);
+    const current = sheetBody.firstElementChild;
+    if (!copy) { sheet.close(); return; }
+    if (current) window.morph.morphElement(current, copy); else sheetBody.replaceChildren(copy);
+  }
+
+  // However it was closed (✕, a tap outside, Escape, Back), drop the history entry and the copy.
+  sheet.addEventListener('close', () => {
+    closePopups();
+    disarm();
+    sheetTableId = null;
+    sheetBody.replaceChildren();
+    if (history.state?.sheet) { backPending = true; history.back(); }
+  });
+
+  window.addEventListener('popstate', () => {
+    if (backPending) {
+      // Our own back() finished. A sheet opened meanwhile gets its history entry now.
+      backPending = false;
+      if (sheet.open && sheetTableId !== null) history.pushState({ sheet: sheetTableId }, '');
+      return;
+    }
+    // The user pressed Back while the sheet was open: its entry is already gone, so just close it.
+    if (sheet.open) sheet.close();
+  });
+
+  sheet.addEventListener('click', e => {
+    const target = /** @type {HTMLElement} */ (e.target);
+    // A click on the dialog element itself (not its content) is a click on the backdrop around it.
+    if (target === sheet || target.closest('[data-sheet-close]')) sheet.close();
+  });
+
+  /** Popups go inside the open sheet: showModal() makes everything outside it unclickable. */
+  const popupHost = () => (sheet.open ? sheet : document.body);
 
   function popupClosed() {
     popupOpen = false;
@@ -137,6 +210,8 @@
 
   board.addEventListener('click', e => {
     const target = /** @type {HTMLElement} */ (e.target);
+    const summary = target.closest('[data-sheet-open]');
+    if (summary && inRows(summary)) { openSheet(tableIdOf(summary)); return; }
     const button = /** @type {HTMLElement | null} */ (target.closest('[data-action]'));
     if (!button || !inRows(button)) return;
     const id = tableIdOf(button);
@@ -179,7 +254,7 @@
     backdrop.className = 'confirm-backdrop';
     backdrop.addEventListener('click', disarm);
     backdrop.addEventListener('contextmenu', ev => { ev.preventDefault(); disarm(); });
-    document.body.append(backdrop);
+    popupHost().append(backdrop);
     button.classList.add('armed');
     button.dataset.original = button.innerHTML;
     button.innerHTML = '<span class="confirm-check" aria-hidden="true">✓</span>';
@@ -201,7 +276,11 @@
   }
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { disarm(); closePopups(); }
+    if (e.key !== 'Escape') return;
+    // Escape closes the innermost thing only: a popup or an armed button first, the sheet the next time.
+    if (armed || closeCurrentPopup) e.preventDefault();
+    disarm();
+    closePopups();
   });
 
   // ---------- popups (hour picker, add player, rename) ----------
@@ -259,7 +338,7 @@
     none.addEventListener('click', () => { closePopups(); onPick(null); });
     popup.append(grid, none);
     button.setAttribute('aria-expanded', 'true');
-    showPopup(popup, document.body, 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'));
+    showPopup(popup, popupHost(), 'hour-backdrop', () => button.setAttribute('aria-expanded', 'false'));
     popup.focus();
   }
 
@@ -284,7 +363,7 @@
       const name = /** @type {HTMLInputElement} */ (popup.querySelector('input[name="name"]')).value;
       if (name.trim() !== '') add({ name });
     });
-    showPopup(popup, document.body, 'popup-backdrop');
+    showPopup(popup, popupHost(), 'popup-backdrop');
     /** @type {HTMLInputElement | null} */ (popup.querySelector('input[name="name"]'))?.focus();
   }
 

@@ -315,3 +315,27 @@ into `integrations/bgg/add-to-catalog.ts`, so the import reuses it instead of co
 
 **Lesson.** Keep slow external calls out of database transactions: BGG work happens first, then one short sync
 transaction. See the BGG note's new sections.
+
+---
+
+## The board on phones, step 1: one line per table + a bottom sheet (2026-11-23)
+
+**What happened.** A phone audit (Design/ApplicationDesign.md, "Mobile audit") showed the board unusable below about
+1000px: a 10-column grid scrolling sideways, seats 700px off-screen. Of three sketches, variant C was chosen: one line
+per table (hour, name, "2/4", kind dot, a gold edge when you hold a seat) and a bottom sheet with the whole table. Step 1
+builds both for widths below 992px. The sheet is a native `<dialog>` holding a copy of the row, kept in step with
+morph after every refresh; Back closes it via the History API; the hour picker fills the screen's width inside it.
+New note: [phone-layout.md](phone-layout.md). Still to do: the new-table row on phones, a "⋯" menu for admin actions,
+the smaller audit fixes.
+
+**Different from .NET.** Nothing here is Node – it is CSS, HTML and browser APIs, usable from Blazor as is. The real
+difference is *where state lives*: in Blazor "which table is open" would be a C# field and the dialog rendered from
+it on the server; here it is purely the browser's business, and the server keeps rendering rows exactly as before.
+
+**Easier than expected:** `<dialog>` + `showModal()` replaced what our older popups do by hand (backdrop, Escape,
+focus, blocking the rest of the page). **Harder than expected:** small interactions between features – the modal
+made our `<body>`-level popups unclickable, Escape closed two layers at once, and `history.back()` turned out to be
+asynchronous, so a quick close-and-reopen closed the new sheet.
+
+**Lesson.** When one piece of UI must appear in two places, keep one source of truth (the server-rendered row) and
+derive the other from it, rather than rendering it twice.

@@ -671,3 +671,264 @@ button.confirm-button.armed {
     .live-status[hidden] {
         display: none;
     }
+
+/* ===== Phones and portrait tablets: one line per table + a bottom sheet (decided 2026-11-23, variant C) =====
+   Only with JavaScript (html.js, set in the layout's <head>): the sheet needs it. Without it the wide table stays. */
+
+.row-summary,
+.table-sheet {
+    display: none;
+}
+
+@media (max-width: 991.98px) {
+    html.js .table-list {
+        overflow-x: visible;
+    }
+
+    html.js .table-list .table-head {
+        display: none;
+    }
+
+    /* The row shrinks to its summary line; its cells are still there (the sheet shows a copy of them). */
+    html.js .table-list .table-row:not(.table-draft) {
+        display: block;
+        min-width: 0;
+    }
+
+        html.js .table-list .table-row:not(.table-draft) > .cell {
+            display: none;
+        }
+
+    /* The new-table row wraps its cells for now (its own phone layout is a later step). */
+    html.js .table-list .table-draft {
+        display: flex;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    html.js .import-divider,
+    html.js .draft-panel {
+        min-width: 0;
+    }
+
+    html.js .row-summary {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        width: 100%;
+        min-height: 48px;
+        padding: .5rem .75rem;
+        border: 0;
+        border-left: 4px solid transparent;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+    }
+
+    /* "Am I in?" at a glance: a gold edge on tables where the viewer holds a seat. */
+    html.js .has-my-seat > .row-summary {
+        border-left-color: #d4af37;
+    }
+
+    .summary-hour {
+        flex: none;
+        min-width: 3.4rem;
+        padding: .1rem .3rem;
+        border-radius: 4px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+    }
+
+    .summary-name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .summary-seats {
+        flex: none;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .summary-kind {
+        flex: none;
+        width: .75rem;
+        height: .75rem;
+        border-radius: 50%;
+    }
+
+    /* The sheet: a native <dialog> opened with showModal(), so the browser handles the backdrop, focus and Escape.
+       No transform on it: the hour picker inside is position: fixed and must stay relative to the screen. */
+    html.js .table-sheet[open] {
+        display: block;
+        inset: auto 0 0 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: 85dvh;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        border: 0;
+        border-top: 1px solid #55555c;
+        border-radius: 14px 14px 0 0;
+        background: #1f1f22;
+        color: #fff;
+        animation: sheet-up .2s ease-out;
+    }
+
+    .table-sheet::backdrop {
+        background: rgba(0, 0, 0, .55);
+    }
+
+    .sheet-inner {
+        padding: .5rem .75rem 1rem;
+    }
+
+    .sheet-head {
+        position: relative;
+        display: flex;
+        justify-content: flex-end;
+        min-height: 2rem;
+    }
+
+    .sheet-grip {
+        position: absolute;
+        top: .25rem;
+        left: 50%;
+        width: 40px;
+        height: 4px;
+        margin-left: -20px;
+        border-radius: 2px;
+        background: #666;
+    }
+
+    /* The copied row, stacked: name and details on top, the seats below. */
+    .table-sheet .table-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        min-width: 0;
+        gap: 4px;
+        overflow: visible;
+        background: none;
+    }
+
+        .table-sheet .table-row > .row-summary {
+            display: none;
+        }
+
+        .table-sheet .table-row > .cell {
+            min-height: 44px;
+            border-radius: 6px;
+        }
+
+    /* :where() adds no specificity, so the kind and "no hour" colours (.kind-small, .hour-unset) still win. */
+    :where(.table-sheet .table-row > .cell) {
+        background-color: #3b3b40;
+    }
+
+        .table-sheet .table-row > .cell-game {
+            grid-column: 1 / -1;
+            order: -2;
+            background: none;
+            font-size: 1.125rem;
+        }
+
+        .table-sheet .table-row > .cell-cover {
+            grid-column: 1 / -1;
+            order: -1;
+            justify-content: flex-start;
+            background: none;
+        }
+
+        /* Only when there is something to manage; then the buttons sit in a row. */
+        .table-sheet .table-row > .cell-actions {
+            grid-column: 1 / -1;
+            order: 1;
+            min-height: 0;
+            background: none;
+        }
+
+            .table-sheet .table-row > .cell-actions:not(:has(button)) {
+                display: none;
+            }
+
+        .table-sheet .actions {
+            position: static;
+            flex-direction: row;
+            gap: .5rem;
+        }
+
+        .table-sheet .action-button,
+        .table-sheet .action-anchor .confirm-delete {
+            width: 44px;
+            height: 36px;
+            font-size: 1rem;
+        }
+
+        /* The seats: full width, four per line, each a big square. */
+        .table-sheet .table-row > .cell-slots {
+            display: grid;
+            grid-column: 1 / -1;
+            order: 2;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            padding: 0;
+            background: none;
+        }
+
+        .table-sheet .slot {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+        }
+
+        /* The hour picker in the sheet: the full width of the screen, at the bottom, with finger-sized hours.
+           !important beats the left/top that board.js sets next to the click (meant for the desktop). */
+        .table-sheet .hour-popup {
+            top: auto !important;
+            right: 0;
+            bottom: 0;
+            left: 0 !important;
+            width: 100%;
+            height: auto;
+            border-radius: 14px 14px 0 0;
+        }
+
+            .table-sheet .hour-popup .hour-grid {
+                grid-auto-rows: 36px;
+            }
+
+        /* The rename popup (🏷️): on the desktop it sits beside its button, which on a phone puts it off-screen.
+           In the sheet it spans the screen's width at the top, where the on-screen keyboard doesn't cover it. */
+        .table-sheet .action-popup {
+            top: .5rem;
+            right: .5rem;
+            left: .5rem;
+            width: auto;
+            max-height: calc(100dvh - 1rem);
+            margin-left: 0;
+            overflow-y: auto;
+        }
+
+        /* Labels for the small cells, so "4" and "2.84" mean something without the column headers. */
+        .table-sheet .table-row > .cell:nth-child(4)::before { content: "Zajęte "; }
+        .table-sheet .table-row > .cell:nth-child(7)::before { content: "Graczy "; }
+        .table-sheet .table-row > .cell:nth-child(4)::before,
+        .table-sheet .table-row > .cell:nth-child(7)::before {
+            margin-right: .3em;
+            opacity: .7;
+            font-size: .75rem;
+        }
+}
+
+@keyframes sheet-up {
+    from { translate: 0 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .table-sheet[open] {
+        animation: none;
+    }
+}
