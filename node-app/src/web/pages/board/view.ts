@@ -41,6 +41,10 @@ export function boardPage(m: BoardPageModel): SafeHtml {
     </div>`}
 </div>
 <div class="board-alerts" id="board-alerts" aria-live="polite">${m.statusMessage && html`<div class="alert alert-success alert-dismissible py-2" role="alert">${m.statusMessage}<button type="button" class="btn-close py-2" aria-label="Zamknij" data-dismiss-alert></button></div>`}</div>
+<ul class="kind-legend" aria-label="Kolory rodzajów stołów">
+    <li aria-hidden="true">Stół:</li>
+    ${tableKinds.map(k => html`<li><span class="kind-swatch ${kindClass(k)}" aria-hidden="true"></span>${kindLabel(k)}</li>`)}
+</ul>
 <div class="live-status" id="live-status" role="status" hidden>Łączenie… zmiany innych osób pojawią się po odświeżeniu połączenia.</div>
 <div id="board" data-version="${m.version}" data-logged-in="${loggedIn ? 'true' : 'false'}" data-admin="${m.viewer.isAdmin ? 'true' : 'false'}"
      data-bgg="${m.bggConfigured ? 'true' : 'false'}"${m.highlightId !== null ? html` data-highlight="${m.highlightId}"` : ''}>

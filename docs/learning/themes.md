@@ -148,3 +148,17 @@ And a small CSS one: the difficulty bar is `linear-gradient(to top, colour 62%, 
 same position give a hard edge instead of a blend, so one gradient draws both the filled part and the empty track.
 The server only sends two custom properties (`--difficulty-fill`, `--difficulty-color`); if they're missing (a game
 with no difficulty), the gradient is invalid and nothing is drawn – no special case needed.
+
+## 6. Tokens that are not part of a theme; a native select that looks like ours (2026-11-24)
+
+- **Meaning vs mood.** The table kinds got fixed colours (Duży red, Mały white, Inny gray), so their tokens moved out of the
+  three theme blocks to plain `:root`: a colour that *means* something must not change when the mood does. The other side
+  of that: one colour can't mean two things, so "no hour", also red, became an outline.
+- **`appearance: none`** removes the browser's own drawing of a `<select>`, leaving a box we can style; the arrow is two
+  gradient triangles in `currentColor`. The *list* it opens stays the browser's: phones show their own picker and the
+  keyboard works, which a hand-made list would have to rebuild. Blazor's `<InputSelect>` renders the same `<select>`, so
+  the same CSS would work there.
+- **Pitfall:** the shorthand `background: red` also resets `background-image` and would erase the arrow – the kinds set
+  `background-color`.
+
+- MDN: [`appearance`](https://developer.mozilla.org/en-US/docs/Web/CSS/appearance)

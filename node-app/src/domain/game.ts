@@ -62,7 +62,7 @@ export function difficultyLabel(weight: string): string {
 /**
  * The difficulty bar (decided 2026-11-23): how full it is (0–5 → 0–100%) and its colour on a heat scale, green (easy)
  * through yellow and orange to red (hard). Only two CSS custom properties: the bar itself is drawn by the CSS
- * (.cell-difficulty::before in app.css), so the board, the new-table row and Baza gier all share one look.
+ * (.cell-difficulty::after in app.css), so the board, the new-table row and Baza gier all share one look.
  */
 export function difficultyStyle(weight: string): string | null {
   const value = Number(weight);

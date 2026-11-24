@@ -389,10 +389,9 @@
         outline: 2px solid var(--focus);
     }
 
-/* Table kinds differ by lightness, not hue: Duży solid light, Mały outlined, Inny muted (themes.css). */
+/* Table kinds: Duży red, Mały white, Inny gray, in every theme (themes.css). */
 .kind-small {
     background: var(--kind-small-bg);
-    box-shadow: inset 0 0 0 1px var(--kind-small-border);
     color: var(--kind-small-text);
 }
 
@@ -406,9 +405,10 @@
     color: var(--kind-other-text);
 }
 
+/* An outline, not a fill: filled red is a big table (decided 2026-11-24). */
 .hour-unset {
-    background: var(--alarm-bg);
-    color: var(--alarm-text);
+    box-shadow: inset 0 0 0 1px var(--alarm);
+    color: var(--alarm);
 }
 
 .cell-input {
@@ -428,8 +428,8 @@
     }
 
     .cell-input option {
-        background: #fff;
-        color: #000;
+        background: var(--popup-bg);
+        color: var(--text);
     }
 
 /* Player slots */
@@ -828,29 +828,86 @@ button.confirm-button.armed {
     color: inherit;
 }
 
-.cell-kind > :is(select, .kind-chip) {
-    width: auto;
+.rename-field:is(.kind-small, .kind-big, .kind-other, .hour-unset) {
+    background: var(--surface-2);
+    box-shadow: none;
+    color: inherit;
+}
+
+/* The owner's selector and everyone else's label are the same chip; the selector has a small arrow of its own instead
+   of the browser's combo box (feedback 20261124-083849). The list it opens stays the browser's: phones show their own
+   picker, and the keyboard works. */
+:is(.cell-kind, .rename-field) > :is(select, .kind-chip) {
+    flex: none;
+    box-sizing: border-box;
+    width: 4.25rem;
     padding: 4px 8px;
     border: 0;
     border-radius: 4px;
     font-size: .75rem;
     font-weight: 700;
+    line-height: 1.25rem;
+    text-align: center;
 }
 
+:is(.cell-kind, .rename-field) > select {
+    appearance: none;
+    padding: 4px 1.25rem 4px .75rem;
+    text-align: left;
+    /* The arrow: two small triangles in the text's colour. (The kind's colour is background-color, underneath.) */
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%);
+    background-position: right 11px center, right 7px center;
+    background-repeat: no-repeat;
+    background-size: 4px 4px;
+    cursor: pointer;
+}
+
+    :is(.cell-kind, .rename-field) > select:hover {
+        filter: brightness(1.1);
+    }
+
+    :is(.cell-kind, .rename-field) > select:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 1px;
+    }
+
 .kind-big > :is(select, .kind-chip) {
-    background: var(--kind-big-bg);
+    background-color: var(--kind-big-bg);
     color: var(--kind-big-text);
 }
 
 .kind-small > :is(select, .kind-chip) {
-    background: var(--kind-small-bg);
-    box-shadow: inset 0 0 0 1px var(--kind-small-border);
+    background-color: var(--kind-small-bg);
     color: var(--kind-small-text);
 }
 
 .kind-other > :is(select, .kind-chip) {
-    background: var(--kind-other-bg);
+    background-color: var(--kind-other-bg);
     color: var(--kind-other-text);
+}
+
+/* What the kinds' colours mean, above the list (feedback 20261124-083959). On phones the lines show only the colour. */
+.kind-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1rem;
+    margin: 0 0 .5rem;
+    padding: 0;
+    color: var(--muted);
+    font-size: .8125rem;
+    list-style: none;
+}
+
+    .kind-legend li {
+        display: flex;
+        align-items: center;
+        gap: .4rem;
+    }
+
+.kind-swatch {
+    width: .875rem;
+    height: .875rem;
+    border-radius: 3px;
 }
 
 .cell-hour > :is(.hour-button, .hour-chip) {
@@ -863,9 +920,8 @@ button.confirm-button.armed {
 }
 
 .hour-unset > :is(.hour-button, .hour-chip) {
-    border-color: transparent;
-    background: var(--alarm-bg);
-    color: var(--alarm-text);
+    border: 1px solid var(--alarm);
+    color: var(--alarm);
 }
 
 /* "⋯": opens the table's actions as a small menu under the button (board.js toggles .menu-open on the cell). */
@@ -1051,13 +1107,6 @@ button.confirm-button.armed {
         margin-block: -.5rem;
     }
 
-        /* A 5px bar can't show an outline, so "Mały" uses its outline colour as a fill (by lightness: Duży light,
-           Mały mid, Inny dark). */
-        .summary-kind.kind-small {
-            background: var(--kind-small-border);
-            box-shadow: none;
-        }
-
     /* The board underneath doesn't scroll while the sheet is open (user report 2026-11-24): showModal() blocks clicks
        outside the dialog, but not scrolling. The gutter keeps the width in a narrow desktop window, where the scrollbar
        takes up room. */
@@ -1161,6 +1210,45 @@ button.confirm-button.armed {
         .table-sheet .table-row > .cell {
             min-height: 44px;
             border-radius: 6px;
+        }
+
+        /* The kind and the hour fill their boxes, so they have the same shape and size as the others (asked 2026-11-24);
+           in the new-table form, which has labels in the boxes, they fill the rest of them. */
+        .table-sheet .table-row:not(.table-draft) > :is(.cell-kind, .cell-hour) {
+            padding: 0;
+        }
+
+        .table-sheet :is(.cell-kind > :is(select, .kind-chip), .cell-hour > :is(.hour-button, .hour-chip)) {
+            display: flex;
+            flex: 1;
+            align-items: center;
+            align-self: stretch;
+            justify-content: center;
+            width: 100%;
+            min-width: 0;
+            border-radius: 6px;
+            font-size: .875rem;
+        }
+
+        .table-sheet .cell-kind > select {
+            padding-inline: 1rem;
+            text-align: center;
+            text-align-last: center;
+        }
+
+        .table-sheet .cell-hour > :is(.hour-button, .hour-chip) {
+            background-color: var(--surface-2);
+        }
+
+        .table-sheet .table-draft > :is(.cell-kind, .cell-hour) {
+            background-color: var(--surface-2);
+        }
+
+        /* Big enough to tap the upload button (a quarter of the cover). */
+        .draft-cover,
+        .draft-cover .thumb {
+            width: 96px;
+            height: 96px;
         }
 
     /* :where() adds no specificity, so the kind and "no hour" colours (.kind-small, .hour-unset) still win. */
@@ -1293,10 +1381,6 @@ button.confirm-button.armed {
                 display: contents;
             }
 
-            .sheet-draft .table-draft > .cell:first-child {
-                display: none;
-            }
-
             .sheet-draft #new-name {
                 grid-column: 1 / -1;
                 order: -3;
@@ -1317,8 +1401,10 @@ button.confirm-button.armed {
                 border-radius: 6px;
             }
 
+            /* After the details, before the buttons. */
             .sheet-draft .table-draft > .cell-cover {
                 grid-column: 1 / -1;
+                order: 4;
                 background: none;
             }
 
@@ -1342,7 +1428,7 @@ button.confirm-button.armed {
             }
 
             /* Labels instead of the column headers. */
-            .sheet-draft .table-draft > .cell:nth-child(3)::before { content: "Zajęte"; }
+            .sheet-draft .table-draft > .cell-taken::before { content: "Zajęte"; }
             .sheet-draft #new-kind-cell::before { content: "Stół"; }
             .sheet-draft #new-hour-cell::before { content: "Godzina"; }
             .sheet-draft #new-max-cell::before { content: "Graczy"; }
@@ -1360,10 +1446,10 @@ button.confirm-button.armed {
     }
 
         /* Labels for the small cells, so "4" and "2.84" mean something without the column headers. */
-        .table-sheet .table-row > .cell:nth-child(4)::before { content: "Zajęte "; }
-        .table-sheet .table-row > .cell:nth-child(7)::before { content: "Graczy "; }
-        .table-sheet .table-row > .cell:nth-child(4)::before,
-        .table-sheet .table-row > .cell:nth-child(7)::before {
+        .table-sheet .table-row > .cell-taken::before { content: "Zajęte "; }
+        .table-sheet .table-row > .cell-max::before { content: "Graczy "; }
+        .table-sheet .table-row > .cell-taken::before,
+        .table-sheet .table-row > .cell-max::before {
             margin-right: .3em;
             opacity: .7;
             font-size: .75rem;

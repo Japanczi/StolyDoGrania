@@ -277,3 +277,9 @@ finger, mouse and pen:
 Blazor Server could not do this well from C#: every `pointermove` would travel to the server and back.
 
 - MDN: [Pointer events](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events), [`touch-action`](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action)
+
+## Addendum: select by class, not by position (2026-11-24)
+
+`.cell:first-child { display: none }` hid the empty actions cell of the phone's new-table form. When the columns were
+reordered, the cover became first – and vanished, unnoticed by any test. The rules now name their cell (`.cell-taken`,
+`.cell-cover`). The same reorder put two things on one `::before` (a label and the difficulty bar); an element has only one.
