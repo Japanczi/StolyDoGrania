@@ -530,8 +530,16 @@ button.slot:focus-visible {
     padding: .6rem;
     border: 1px solid var(--line);
     border-radius: 8px;
+    outline: none;
     background: var(--popup-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+}
+
+/* Below 16px, iOS zooms the page in when the field is tapped, pushing the popup out of view. */
+@media (pointer: coarse) {
+    .add-player-free input {
+        font-size: 1rem;
+    }
 }
 
 .add-player-title {

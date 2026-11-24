@@ -232,3 +232,20 @@ against one database (another test renames "Zofia Wiśniewska").
   [Specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity)
 - Bootstrap: [Breakpoints](https://getbootstrap.com/docs/5.3/layout/breakpoints/)
 - Playwright: [Emulation](https://playwright.dev/docs/emulation)
+
+## Addendum: `100vh` is not what you see (2026-11-24)
+
+The "Dodaj gracza" popup was kept on screen with CSS: `top: min(y, calc(100vh - 330px))`. On a phone its bottom, with the
+field for a custom name, was still off screen (user report). Two reasons: on phones `100vh` is the height *without* the
+browser's toolbar, and the on-screen keyboard usually doesn't change it at all. Opening the popup also focused the field,
+so the keyboard came up at once.
+
+`window.visualViewport` describes the part that is really visible (`height`, `offsetTop`) and fires `resize` when the
+toolbar or keyboard moves. `keepInVisibleArea()` in `board.js` places the popup from it, again on every change, and limits
+its height (the player list scrolls). On touch screens the field is no longer focused by itself.
+
+**.NET:** nothing on the server helps here; in Blazor this would be the same JavaScript, called through `IJSRuntime`.
+**Testing:** Playwright has no on-screen keyboard, so the test overrides `visualViewport.height` and sends `resize`.
+
+- MDN: [VisualViewport](https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport)
+- MDN: [viewport units](https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport)

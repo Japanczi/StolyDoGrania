@@ -168,3 +168,43 @@ test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating clo
   await expect(malgorzata.locator('#table-rows .table-row', { hasText: 'Stół po zmianie' })).toHaveCount(0);
   expect(await stillSamePage(malgorzata)).toBe(true);
 });
+
+test('phone: the "Dodaj gracza" popup stays in the visible part of the screen, above the on-screen keyboard', async ({ browser }) => {
+  const jan = await loggedIn(browser, 'Jan Nowak', phone);
+  await jan.getByRole('button', { name: '+ Nowy stół' }).tap();
+  await jan.getByLabel('Nazwa gry nowego stołu').fill('Dodawanie na telefonie');
+  await jan.getByLabel('Nazwa gry nowego stołu').press('Tab');
+  await expect(jan.locator('#new-max')).toBeVisible();
+  await jan.locator('#new-max').fill('4');
+  await jan.getByRole('button', { name: 'Utwórz stół' }).tap();
+  const line = jan.locator('#table-rows .table-row', { hasText: 'Dodawanie na telefonie' }).locator('.row-summary');
+  await line.tap();
+  const sheet = jan.locator('#table-sheet');
+  // force (below) doesn't wait for the sheet's slide-in, so wait for it here.
+  await sheet.evaluate(el => Promise.all(
+    (el as unknown as { getAnimations(): { finished: Promise<unknown> }[] }).getAnimations().map(a => a.finished)).then(() => undefined));
+  // force: the seat is aria-disabled (the owner can't take it); a long press (contextmenu) still opens the popup.
+  await sheet.locator('[data-slot="4"]').click({ button: 'right', force: true });
+  const popup = jan.locator('.add-player');
+  await expect(popup).toBeVisible();
+  // Opening it doesn't bring up the keyboard (which would cover the list of players): nothing is typed in yet.
+  await expect(popup.locator('input[name="name"]')).not.toBeFocused();
+
+  // Playwright has no on-screen keyboard. A real one shrinks window.visualViewport but not 100vh / innerHeight.
+  const visible = 300;
+  await jan.evaluate(height => {
+    const w = globalThis as unknown as { visualViewport: { dispatchEvent(e: unknown): void }; Event: new (type: string) => unknown };
+    Object.defineProperty(w.visualViewport, 'height', { configurable: true, get: () => height });
+    w.visualViewport.dispatchEvent(new w.Event('resize'));
+  }, visible);
+  for (const part of [popup, popup.locator('.add-player-title'), popup.getByRole('button', { name: 'Dodaj', exact: true })]) {
+    const box = await part.boundingBox();
+    if (!box) throw new Error('no box');
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(visible);
+  }
+
+  await popup.locator('input[name="name"]').fill('Gość Testowy');
+  await popup.getByRole('button', { name: 'Dodaj', exact: true }).click();
+  await expect(sheet.getByText('Gość Testowy')).toBeVisible();
+});

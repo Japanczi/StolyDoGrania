@@ -467,3 +467,13 @@ one line each (open ⋯ first) – a sign the tests describe what a user does, w
 
 **Lesson.** A layout change touches more than CSS when it moves controls between "always visible" and "behind a
 click": tests, keyboard (Escape), live updates and scrolling all have to agree on when the menu is open.
+
+---
+
+## The "Dodaj gracza" popup off screen on phones (2026-11-24)
+
+**What happened.** Its bottom (the custom name) was cut off on a real phone, though it fitted in every emulated one.
+Positions based on `100vh` don't know about the browser's toolbar or the keyboard; `window.visualViewport` does. See the
+addendum in phone-layout.md.
+
+**Lesson.** A resized desktop window is not a phone: it has no toolbar and no keyboard. Test for those explicitly.

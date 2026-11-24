@@ -587,8 +587,7 @@
     const popup = document.createElement('div');
     popup.className = 'add-player';
     popup.setAttribute('role', 'dialog');
-    popup.style.left = `min(${x}px, calc(100vw - 270px))`;
-    popup.style.top = `min(${y}px, calc(100vh - 330px))`;
+    popup.tabIndex = -1;
     // Server-rendered with the html tag (escaped), like the rows.
     popup.innerHTML = await response.text();
     const add = (/** @type {object} */ data) => { closePopups(); void act(() => post(`/api/tables/${tableId}/slots/${slot}/add`, data), tableId); };
@@ -601,8 +600,44 @@
       const name = /** @type {HTMLInputElement} */ (popup.querySelector('input[name="name"]')).value;
       if (name.trim() !== '') add({ name });
     });
-    showPopup(popup, popupHost(), 'popup-backdrop');
-    /** @type {HTMLInputElement | null} */ (popup.querySelector('input[name="name"]'))?.focus();
+    /** @type {(() => void) | null} */
+    let stopFollowing = null;
+    showPopup(popup, popupHost(), 'popup-backdrop', () => stopFollowing?.());
+    stopFollowing = keepInVisibleArea(popup, x, y);
+    // On a touch screen focusing the field would open the on-screen keyboard over the list of players, so there the
+    // popup itself is focused; tapping the field opens the keyboard.
+    const input = /** @type {HTMLInputElement | null} */ (popup.querySelector('input[name="name"]'));
+    (input && !matchMedia('(pointer: coarse)').matches ? input : popup).focus({ preventScroll: true });
+  }
+
+  /**
+   * Keeps a fixed popup at (x, y), moved and if need be shortened to fit the part of the screen that is really visible.
+   * Not CSS 100vh: on phones that includes the area under the browser's toolbar and ignores the on-screen keyboard.
+   * window.visualViewport knows both, and tells when they change. Returns the function that stops following.
+   * @param {HTMLElement} popup @param {number} x @param {number} y
+   */
+  function keepInVisibleArea(popup, x, y) {
+    const margin = 8;
+    const viewport = window.visualViewport;
+    const place = () => {
+      const area = viewport
+        ? { left: viewport.offsetLeft, top: viewport.offsetTop, width: viewport.width, height: viewport.height }
+        : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      popup.style.maxHeight = `${area.height - 2 * margin}px`;
+      const right = area.left + area.width - margin - popup.offsetWidth;
+      const bottom = area.top + area.height - margin - popup.offsetHeight;
+      popup.style.left = `${Math.max(area.left + margin, Math.min(x, right))}px`;
+      popup.style.top = `${Math.max(area.top + margin, Math.min(y, bottom))}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    viewport?.addEventListener('resize', place);
+    viewport?.addEventListener('scroll', place);
+    return () => {
+      window.removeEventListener('resize', place);
+      viewport?.removeEventListener('resize', place);
+      viewport?.removeEventListener('scroll', place);
+    };
   }
 
   // ---------- game lookup (shared by the new-table row and the rename popup) ----------
