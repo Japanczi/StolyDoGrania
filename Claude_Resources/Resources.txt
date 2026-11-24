@@ -92,6 +92,10 @@ Colour themes (decided 2026-11-23, designed on the "Planszówkarz palette" canva
   now in the theme's colour), and the mockup's "+ Nowy stół" button in the toolbar (the board keeps its inline
   new-table row). The "Stoły w aplikacji" heading was built with the design B layout (2026-11-23).
 
+The "Dodaj gracza" / "Wybierz właściciela stołu" popup always stays within the visible part of the screen, above the
+on-screen keyboard (its list scrolls when there is little room); on touch screens it opens without the keyboard – tapping
+the name field brings it up (2026-11-24).
+
 Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
 Design/ApplicationDesign.md, "Mobile audit"):
 - On phones the board is a list with one line per table: hour (red "--:--" when not set), game name, taken/total
