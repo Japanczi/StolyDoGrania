@@ -139,7 +139,8 @@ h1:focus {
     position: relative;
 }
 
-    .cell-difficulty::before {
+    /* ::after: in the phone's new-table form ::before is the cell's label. */
+    .cell-difficulty::after {
         content: "";
         position: absolute;
         top: 4px;

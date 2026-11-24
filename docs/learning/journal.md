@@ -487,3 +487,11 @@ addendum in phone-layout.md.
 
 The same day the sheet's handle got its meaning: dragging it down closes the sheet (pointer events, phone-layout.md).
 **Lesson.** A decoration that looks like a control is a promise – keep it or remove it.
+
+---
+
+## Table kinds in colour, with a legend (2026-11-24)
+
+**What happened.** Two feedback notes: kinds told apart by brightness weren't readable (Inny had 1.1:1 against its row), and
+nobody explained them. Now fixed colours, a legend, and an owner's selector that looks like the chip (themes.md, section 6).
+**Lesson.** Measure contrast before choosing a subtle palette – and when a colour gets a meaning, check who already uses it.

@@ -20,6 +20,10 @@ describe('pages', () => {
       assert.match(res.body, /^<!DOCTYPE html>\n<html lang="pl" data-theme="[a-z]+">/);
       assert.match(res.body, /<title>Zapisy na gry<\/title>/);
       assert.match(res.body, /<h1>Zapisy na gry<\/h1>/);
+      // The legend of the table kinds' colours.
+      for (const [kind, label] of [['small', 'Mały'], ['big', 'Duży'], ['other', 'Inny']]) {
+        assert.match(res.body, new RegExp(`kind-swatch kind-${kind}" aria-hidden="true"></span>${label}</li>`));
+      }
       // Logged out: ribbon login button, drawer register/login links, BGG credit.
       assert.match(res.body, /href="\/Account\/Login\?ReturnUrl=%2F">Zaloguj się</);
       assert.match(res.body, /Zarejestruj się/);

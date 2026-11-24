@@ -18,11 +18,21 @@
       --section-own-*                              the "Stoły w aplikacji" heading
       --section-*                                  the "Z arkusza Google" divider
       --slot-*                                     seats: free, taken, blocked (by the owner), host
-      --kind-*                                     table kind cells (Duży / Mały / Inny)
-      --alarm-*                                    "no hour yet"
+      --kind-*                                     table kinds (Duży / Mały / Inny), the same in every theme
+      --alarm                                      "no hour yet": an outline, filled red means "Duży"
       --hour-*                                     the hour button when an hour is set
       --mine                                       "you have a seat here" mark
 */
+
+/* Table kinds: the same colours in every theme, so their meaning never changes (feedback 20261124-083849). */
+:root {
+    --kind-big-bg: #d92d3f;
+    --kind-big-text: #ffffff;
+    --kind-small-bg: #f3eeef;
+    --kind-small-text: #1a0b0e;
+    --kind-other-bg: #5c5c62;
+    --kind-other-text: #ffffff;
+}
 
 /* A · Grafit i bursztyn: neutral graphite, one warm accent for everything important. */
 :root[data-theme="amber"] {
@@ -62,16 +72,8 @@
     --slot-host-bg: #f2b33d;
     --slot-host-text: #111113;
 
-    --kind-big-bg: #f4f3ef;
-    --kind-big-text: #111113;
-    --kind-small-bg: transparent;
-    --kind-small-border: #a1a1a8;
-    --kind-small-text: #f4f3ef;
-    --kind-other-bg: #2a2c31;
-    --kind-other-text: #a1a1a8;
 
-    --alarm-bg: #ff5a4e;
-    --alarm-text: #111113;
+    --alarm: #ff5a4e;
     --hour-border: transparent;
     --hour-text: inherit;
     --mine: #f2b33d;
@@ -115,16 +117,8 @@
     --slot-host-bg: #e0b243;
     --slot-host-text: #1a1404;
 
-    --kind-big-bg: #edf1ee;
-    --kind-big-text: #0f1211;
-    --kind-small-bg: transparent;
-    --kind-small-border: #9da9a2;
-    --kind-small-text: #edf1ee;
-    --kind-other-bg: #252d29;
-    --kind-other-text: #9da9a2;
 
-    --alarm-bg: #ff6b5a;
-    --alarm-text: #1a0705;
+    --alarm: #ff6b5a;
     --hour-border: transparent;
     --hour-text: inherit;
     --mine: #e0b243;
@@ -169,16 +163,8 @@
     --slot-host-bg: #e7b53c;
     --slot-host-text: #1a1404;
 
-    --kind-big-bg: #f3eeef;
-    --kind-big-text: #1a0b0e;
-    --kind-small-bg: transparent;
-    --kind-small-border: #a8a3a5;
-    --kind-small-text: #f3eeef;
-    --kind-other-bg: #3b1a21;
-    --kind-other-text: #a8a3a5;
 
-    --alarm-bg: #c41e3a;
-    --alarm-text: #ffffff;
+    --alarm: #ff6b5f;
     --hour-border: #e7b53c;
     --hour-text: #e7b53c;
     --mine: #e7b53c;

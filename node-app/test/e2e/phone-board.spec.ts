@@ -95,6 +95,12 @@ test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating clo
   await name.fill('Stół z telefonu');
   await name.press('Enter');
   await expect(sheet.locator('#new-max')).toBeVisible();
+  // A game nobody knows may get a cover: its upload button is there, big enough to tap (it went missing on 2026-11-23).
+  await expect(sheet.locator('#new-cover-label')).toBeVisible();
+  expect((await sheet.locator('#new-cover-label').boundingBox())?.width).toBeGreaterThanOrEqual(44);
+  // The difficulty's label is a normal part of its box, not under the bar (both were ::before).
+  expect(await sheet.locator('#new-difficulty').evaluate(el => (globalThis as unknown as
+    { getComputedStyle(e: unknown, p: string): { position: string } }).getComputedStyle(el, '::before').position)).toBe('static');
   await malgorzata.goBack();
   await expect(sheet).toBeHidden();
   await open.tap();
@@ -112,6 +118,18 @@ test('phone: "+ Nowy stół" opens the new-table form in the sheet; creating clo
 
   // Her own table: the "⋯" menu lists the actions with labels; the two-tap delete works from there.
   await line.tap();
+  // Measured once the sheet has slid in: while it moves, two measurements don't compare.
+  await sheet.evaluate(el => Promise.all(
+    (el as unknown as { getAnimations(): { finished: Promise<unknown> }[] }).getAnimations().map(a => a.finished)).then(() => undefined));
+  // The kind and hour pickers are boxes of the same size as their neighbours (asked 2026-11-24).
+  const box = await sheet.locator('.cell-taken').boundingBox();
+  for (const picker of ['.cell-kind select', '.cell-hour .hour-button']) {
+    const b = await sheet.locator(picker).boundingBox();
+    expect(b?.width).toBeCloseTo(box?.width ?? 0, 0);
+    expect(b?.height).toBeCloseTo(box?.height ?? 0, 0);
+    expect(b?.y).toBeCloseTo(box?.y ?? 0, 0);
+    await expect(sheet.locator(picker)).toHaveCSS('border-top-left-radius', '6px');
+  }
   const menu = sheet.getByRole('button', { name: 'Opcje stołu' });
   await expect(menu).toBeVisible();
   const deleteButton = sheet.locator('[data-action="delete"]');

@@ -49,7 +49,7 @@ Layout should follow the screenshot, but with some changes:
   2026-11-23) | seats (at least 240px, 3.4 parts) | 48px ⋯.
   Header labels: 12px, semi-bold (600), uppercase, letter spacing .05em, all the same weight (was 11px / 800, too
   sharp). The new-table row's dashed outline uses the theme's line colour (darker than before).
-  Table kind and hour are small chips inside their cells (the kind by lightness; "no hour" a chip in the alarm
+  Table kind and hour are small chips inside their cells (the kind in its colour; "no hour" outlined in the alarm
   colour) instead of whole coloured cells. A "Stoły w aplikacji" heading (label + line) sits over the app's own
   tables; the sheet divider uses the same label + line style. Same layout in all three colour themes.
   (Replaces the 2026-11-22 column widths: game 2/15 of the flexible space, cover column 108px.)
@@ -61,11 +61,11 @@ Layout should follow the screenshot, but with some changes:
   slot after creating a table). (Was: white free, dark-pink taken, salmon owner-marked, very dark pink + gold border owner.)
 - Slots taken set by owner - users unable to take these slots
 - Raising the slots taken counter marks the highest-numbered free slots, passing over seated players, so marks can have gaps between them. The limit is the number of free slots.
-- Table type: the expanded list has black text on a white background.
+- Table type: the expanded list uses the theme's popup colours (was black on white; 2026-11-24).
 - List of game titles suggested when creating a table: ordered vertically, white text and borders.
 - The game-name fields (new-table row, 🏷️ rename) show no drop-down of catalog names while typing (the old <datalist>
   was removed, decided 2026-11-22); the name is only looked up when the field is left.
-- No hour of meeting set = the theme's alarm colour as background (red in all three themes)
+- No hour of meeting set = outlined in the theme's alarm colour (red in all three themes), not filled (2026-11-24)
 - BGG Link should be clickable and open in a new tab
 - Game picture: a small thumbnail in its own column, the first one (left of the game name), 56px square with rounded
   corners (design B layout, 2026-11-23; was 100px, between difficulty and game slots)
@@ -87,7 +87,10 @@ Colour themes (decided 2026-11-23, designed on the "Planszówkarz palette" canva
     #4CC37A free seats and links, alarm #FF6B5A.
 - Header bar: solid, in the theme's header colour, with a short divider before each column but the first – 1px wide,
   60% of the bar's height, black at 35% opacity (so it is a darker shade of the bar's colour).
-- Table kinds differ by lightness, not by hue: Duży solid light, Mały outlined, Inny muted.
+- Table kinds (feedback 20261124-083849): Duży red #D92D3F, Mały white #F3EEEF, Inny dark gray #5C5C62 – the same in every theme
+  (replaces "by lightness"). A legend of the three colours stands above the list, on phones too (feedback 20261124-083959).
+  The owner's kind selector looks like the plain chip everyone else sees, with a small arrow; the list it opens is the
+  browser's own. "No hour" is only a red outline, so that filled red always means Duży (decided 2026-11-24).
 - Not done yet (designed but not built): the phone's gold "you have a seat here" dot (the phone keeps its left edge,
   now in the theme's colour), and the mockup's "+ Nowy stół" button in the toolbar (the board keeps its inline
   new-table row). The "Stoły w aplikacji" heading was built with the design B layout (2026-11-23).
@@ -96,6 +99,8 @@ The "Dodaj gracza" / "Wybierz właściciela stołu" popup always stays within th
 on-screen keyboard (its list scrolls when there is little room); on touch screens it opens without the keyboard – tapping
 the name field brings it up (2026-11-24).
 
+In a table's sheet the kind and hour pickers fill their boxes, the same size and shape as the other details; the kind's box
+has the kind's colour. The new-table sheet shows the cover (96px) with its upload button above the buttons (2026-11-24).
 While a table's sheet is open on a phone, the board underneath does not scroll (2026-11-24). Dragging the
 sheet's top strip (the handle) down closes it: over 100px or with a flick; less and it springs back (2026-11-24).
 
