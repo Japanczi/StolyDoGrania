@@ -249,3 +249,31 @@ its height (the player list scrolls). On touch screens the field is no longer fo
 
 - MDN: [VisualViewport](https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport)
 - MDN: [viewport units](https://developer.mozilla.org/en-US/docs/Web/CSS/length#relative_length_units_based_on_viewport)
+
+## Addendum: a modal dialog doesn't stop scrolling (2026-11-24)
+
+`showModal()` makes everything outside the dialog unclickable, but a swipe still scrolled the board under the sheet. The
+lock is CSS only: `html.js:has(.table-sheet[open]) { overflow: hidden }`. `:has()` styles an element by what it contains, so
+however the sheet closes (✕, Back, Escape) the lock goes with it – no JavaScript to forget. `overscroll-behavior: contain`
+keeps the sheet's own scrolling from passing on to the page at its end. In Blazor the same CSS would work unchanged.
+
+**Pitfall when testing:** the first test used a synthetic swipe that scrolled nothing, so "the page didn't move" was true
+even without the lock. Its last step – after closing, the same swipe *must* scroll – exposed that. A test that something
+doesn't happen also needs to show that it otherwise would.
+
+- MDN: [`:has()`](https://developer.mozilla.org/en-US/docs/Web/CSS/:has), [`overscroll-behavior`](https://developer.mozilla.org/en-US/docs/Web/CSS/overscroll-behavior)
+
+## Addendum: dragging the sheet (2026-11-24)
+
+The handle at the top of the sheet looked draggable but wasn't. Now it is, with **pointer events** – one set of events for
+finger, mouse and pen:
+
+- `setPointerCapture()` keeps the events coming when the finger leaves the strip.
+- CSS `touch-action: none` on the strip: otherwise the browser takes the movement for scrolling and sends `pointercancel`.
+- The sheet follows through `translate`, which is removed as soon as the drag ends: an element with a translate becomes the
+  reference for the `position: fixed` popups inside it.
+- The slide out or back is `element.animate()` (Web Animations API), so the sheet closes when it has finished.
+
+Blazor Server could not do this well from C#: every `pointermove` would travel to the server and back.
+
+- MDN: [Pointer events](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events), [`touch-action`](https://developer.mozilla.org/en-US/docs/Web/CSS/touch-action)

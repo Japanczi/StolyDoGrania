@@ -1058,6 +1058,14 @@ button.confirm-button.armed {
             box-shadow: none;
         }
 
+    /* The board underneath doesn't scroll while the sheet is open (user report 2026-11-24): showModal() blocks clicks
+       outside the dialog, but not scrolling. The gutter keeps the width in a narrow desktop window, where the scrollbar
+       takes up room. */
+    html.js:has(.table-sheet[open]) {
+        overflow: hidden;
+        scrollbar-gutter: stable;
+    }
+
     /* The sheet: a native <dialog> opened with showModal(), so the browser handles the backdrop, focus and Escape.
        No transform on it: the hour picker inside is position: fixed and must stay relative to the screen. */
     html.js .table-sheet[open] {
@@ -1069,6 +1077,8 @@ button.confirm-button.armed {
         margin: 0;
         padding: 0;
         overflow-y: auto;
+        /* Reaching its end doesn't pass the scroll on to the page. */
+        overscroll-behavior: contain;
         border: 0;
         border-top: 1px solid var(--line);
         border-radius: 14px 14px 0 0;
@@ -1086,11 +1096,19 @@ button.confirm-button.armed {
         padding: .5rem .75rem 1rem;
     }
 
+    /* The strip can be dragged down to close the sheet (board.js). touch-action: the browser leaves touches here to us
+       (otherwise it would treat them as scrolling and cancel the drag). The negative margins make the whole top edge
+       of the sheet part of it, not just the few pixels of the handle. */
     .sheet-head {
         position: relative;
         display: flex;
         align-items: center;
-        min-height: 2rem;
+        min-height: 2.5rem;
+        margin: -.5rem -.75rem 0;
+        padding: .5rem .75rem 0;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
     }
 
     /* Keeps the ✕ on the right, with or without the ⋯ button on the left. */
@@ -1116,7 +1134,7 @@ button.confirm-button.armed {
 
     .sheet-grip {
         position: absolute;
-        top: .25rem;
+        top: .75rem;
         left: 50%;
         width: 40px;
         height: 4px;

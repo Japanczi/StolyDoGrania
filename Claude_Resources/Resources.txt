@@ -96,6 +96,9 @@ The "Dodaj gracza" / "Wybierz właściciela stołu" popup always stays within th
 on-screen keyboard (its list scrolls when there is little room); on touch screens it opens without the keyboard – tapping
 the name field brings it up (2026-11-24).
 
+While a table's sheet is open on a phone, the board underneath does not scroll (2026-11-24). Dragging the
+sheet's top strip (the handle) down closes it: over 100px or with a flick; less and it springs back (2026-11-24).
+
 Mobile layout of the board (decided 2026-11-23, variant C of three sketches; audit and open points in
 Design/ApplicationDesign.md, "Mobile audit"):
 - On phones the board is a list with one line per table: hour (red "--:--" when not set), game name, taken/total
