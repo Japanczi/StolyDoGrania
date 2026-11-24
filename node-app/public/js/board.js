@@ -316,6 +316,57 @@
     if (target.closest('[data-sheet-menu]')) setSheetMenu(!sheetBody.classList.contains('menu-open'));
   });
 
+  // ---------- dragging the sheet down by its top strip closes it (the handle suggests it; asked 2026-11-24) ----------
+  // The sheet follows the finger through "translate", only while dragged: left on, it would move the popups inside
+  // (position: fixed). Upwards there's nothing to show, so it doesn't move.
+
+  const sheetHead = /** @type {HTMLElement} */ (sheet.querySelector('.sheet-head'));
+  /** The finger (or mouse) dragging the sheet. @type {{ pointerId: number, startY: number, moves: { y: number, time: number }[] } | null} */
+  let drag = null;
+
+  sheetHead.addEventListener('pointerdown', e => {
+    if (drag || e.button !== 0 || /** @type {Element} */ (e.target).closest('button')) return;
+    drag = { pointerId: e.pointerId, startY: e.clientY, moves: [{ y: e.clientY, time: e.timeStamp }] };
+    // Later events come here even when the finger leaves the strip.
+    sheetHead.setPointerCapture(e.pointerId);
+  });
+
+  // No scroll gesture at all from this strip: after a flick, Chromium otherwise swallowed the next tap on the page.
+  sheetHead.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false });
+
+  sheetHead.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.moves.push({ y: e.clientY, time: e.timeStamp });
+    sheet.style.translate = `0 ${Math.max(0, e.clientY - drag.startY)}px`;
+  });
+
+  sheetHead.addEventListener('pointerup', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const distance = Math.max(0, e.clientY - drag.startY);
+    // A flick: fast (px per ms) over the last 100 ms. A finger that rested before lifting has no moves in that time.
+    const first = drag.moves.find(m => e.timeStamp - m.time < 100);
+    const flicked = distance > 20 && first !== undefined && (e.clientY - first.y) / Math.max(1, e.timeStamp - first.time) > .5;
+    endDrag(distance > 100 || flicked);
+  });
+  sheetHead.addEventListener('pointercancel', e => { if (drag?.pointerId === e.pointerId) endDrag(false); });
+
+  /** Slides the sheet out and closes it, or back into place. @param {boolean} close */
+  function endDrag(close) {
+    drag = null;
+    const from = sheet.style.translate;
+    sheet.style.translate = '';
+    if (from === '') return;
+    const slide = sheet.animate({ translate: [from, close ? '0 100%' : '0 0'] }, {
+      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 150, easing: 'ease-out', fill: close ? 'forwards' : 'none',
+    });
+    if (!close) return;
+    slide.onfinish = () => { sheet.close(); slide.cancel(); };
+    // Closed some other way meanwhile (Back): don't close it again, and don't leave it shifted.
+    sheet.addEventListener('close', () => slide.cancel(), { once: true });
+  }
+
+  sheet.addEventListener('close', () => { drag = null; sheet.style.translate = ''; });
+
   /** Popups go inside the open sheet: showModal() makes everything outside it unclickable. */
   const popupHost = () => (sheet.open ? sheet : document.body);
 

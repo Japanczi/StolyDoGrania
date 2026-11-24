@@ -208,3 +208,100 @@ test('phone: the "Dodaj gracza" popup stays in the visible part of the screen, a
   await popup.getByRole('button', { name: 'Dodaj', exact: true }).click();
   await expect(sheet.getByText('Gość Testowy')).toBeVisible();
 });
+
+test('phone: swiping while the sheet is open does not scroll the board underneath', async ({ browser }) => {
+  const jan = await loggedIn(browser, 'Jan Nowak', phone);
+  // A long page, whatever tables the other tests have left, and not at its top.
+  await jan.addStyleTag({ content: '.app-main { padding-bottom: 3000px }' });
+  type Win = { scrollY: number; scrollTo(x: number, y: number): void };
+  await jan.evaluate(() => (globalThis as unknown as Win).scrollTo(0, 60));
+  const scrollY = () => jan.evaluate(() => (globalThis as unknown as Win).scrollY);
+  // Real touch input (Chromium's own protocol): a swipe up from the given point.
+  const cdp = await jan.context().newCDPSession(jan);
+  const swipe = async (y: number) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y }] });
+    for (let moved = 15; moved <= 150; moved += 15) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 195, y: y - moved }] });
+      await jan.waitForTimeout(16);
+    }
+    // The finger rests before lifting: after a flung swipe Chromium may swallow the next tap (with or without a sheet).
+    for (let i = 0; i < 20; i++) {
+      await jan.waitForTimeout(16);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 195, y: y - 150 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await jan.waitForTimeout(100);
+  };
+
+  await jan.getByRole('button', { name: '+ Nowy stół' }).tap();
+  const sheet = jan.locator('#table-sheet');
+  await expect(sheet).toBeVisible();
+  await sheet.evaluate(el => Promise.all(
+    (el as unknown as { getAnimations(): { finished: Promise<unknown> }[] }).getAnimations().map(a => a.finished)).then(() => undefined));
+  // Tapping may itself have scrolled the button into view: compare with where the page is now.
+  const before = await scrollY();
+  expect(before).toBeGreaterThan(0);
+  await swipe(300); // on the dimmed board above the sheet
+  expect(await scrollY()).toBe(before);
+  await swipe(825); // on the sheet itself
+  expect(await scrollY()).toBe(before);
+
+  // Closed: the page is where it was, and scrolls again.
+  await sheet.getByRole('button', { name: 'Zamknij' }).tap();
+  await expect(sheet).toBeHidden();
+  expect(await scrollY()).toBe(before);
+  await swipe(600);
+  expect(await scrollY()).toBeGreaterThan(before);
+});
+
+test('phone: dragging the sheet down by its top strip closes it; a short drag springs back', async ({ browser }) => {
+  const jan = await loggedIn(browser, 'Jan Nowak', phone);
+  const sheet = jan.locator('#table-sheet');
+  const settled = () => sheet.evaluate(el => Promise.all(
+    (el as unknown as { getAnimations(): { finished: Promise<unknown> }[] }).getAnimations().map(a => a.finished)).then(() => undefined));
+  const open = async () => {
+    await jan.getByRole('button', { name: '+ Nowy stół' }).tap();
+    await expect(sheet).toBeVisible();
+    await settled();
+  };
+  const cdp = await jan.context().newCDPSession(jan);
+  /** A touch drag of the handle by dy, in steps; the finger rests before lifting unless it's a flick. */
+  const dragHandle = async (dy: number, flick = false) => {
+    const grip = await sheet.locator('.sheet-grip').boundingBox();
+    if (!grip) throw new Error('no grip');
+    const x = grip.x + grip.width / 2;
+    const y = grip.y + grip.height / 2;
+    const touch = (type: 'touchStart' | 'touchMove', to: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: [{ x, y: to }] });
+    await touch('touchStart', y);
+    // Each simulated move takes a couple of frames, so a flick is two big ones.
+    const steps = flick ? 2 : 5;
+    for (let i = 1; i <= steps; i++) await touch('touchMove', y + dy * i / steps);
+    if (!flick) await jan.waitForTimeout(200);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+
+  await open();
+  const before = await sheet.boundingBox();
+  await dragHandle(50);
+  await settled();
+  await expect(sheet).toBeVisible();
+  expect(await sheet.boundingBox()).toEqual(before);
+  await dragHandle(-80);
+  await settled();
+  expect(await sheet.boundingBox()).toEqual(before);
+
+  // (The sheet is low here: from its handle to the screen's bottom there is room for just over 100px.)
+  await dragHandle(110);
+  await expect(sheet).toBeHidden();
+  // Opens again in its place, and a quick short flick closes it too.
+  await open();
+  expect(await sheet.boundingBox()).toEqual(before);
+  await dragHandle(80, true);
+  await expect(sheet).toBeHidden();
+  expect(new URL(jan.url()).pathname).toBe('/');
+
+  // The buttons in the strip still work.
+  await open();
+  await sheet.getByRole('button', { name: 'Zamknij' }).tap();
+  await expect(sheet).toBeHidden();
+});

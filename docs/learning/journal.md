@@ -477,3 +477,13 @@ Positions based on `100vh` don't know about the browser's toolbar or the keyboar
 addendum in phone-layout.md.
 
 **Lesson.** A resized desktop window is not a phone: it has no toolbar and no keyboard. Test for those explicitly.
+
+---
+
+## The board no longer scrolls under the phone sheet (2026-11-24)
+
+**What happened.** A modal `<dialog>` blocks clicks, not scrolling; one `:has()` rule locks the page while it's open.
+**Lesson.** Testing that nothing happens needs a counter-check that the action works at all (see phone-layout.md).
+
+The same day the sheet's handle got its meaning: dragging it down closes the sheet (pointer events, phone-layout.md).
+**Lesson.** A decoration that looks like a control is a promise – keep it or remove it.
